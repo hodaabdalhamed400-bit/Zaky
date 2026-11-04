@@ -14,10 +14,94 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ===== الشاشة الافتتاحية (بتتحمّل قبل أي حاجة) ===== */
+    #splash { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: hidden;
+      background: radial-gradient(70% 55% at 50% 42%, #0f2a45 0%, #07111f 70%); color: #fff;
+      font-family: 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
+    #splash.bye { animation: spOut .75s cubic-bezier(.7, 0, .2, 1) forwards; }
+    @keyframes spOut { to { clip-path: circle(0% at 50% 42%); opacity: .6; } }
+    #splash .sp-core { position: relative; display: grid; justify-items: center; gap: 1.1rem; transform: translateY(-4vh); }
+    #splash .sp-mark-wrap { position: relative; width: 132px; height: 132px; display: grid; place-items: center; }
+    #splash .sp-ring { position: absolute; inset: 0; border-radius: 34px; border: 2px solid rgba(79, 209, 224, .55); opacity: 0;
+      animation: spRing 2.2s cubic-bezier(.2, .8, .2, 1) .55s infinite; }
+    #splash .sp-ring.r2 { animation-delay: 1.05s; }
+    @keyframes spRing { 0% { transform: scale(.85); opacity: .9; } 100% { transform: scale(1.9); opacity: 0; } }
+    #splash .sp-tile { position: absolute; inset: 0; border-radius: 34px; overflow: hidden;
+      background: linear-gradient(145deg, rgba(31, 174, 193, .28), rgba(124, 92, 255, .18)); border: 1px solid rgba(79, 209, 224, .4);
+      box-shadow: 0 0 60px rgba(31, 174, 193, .35), inset 0 1px 0 rgba(255, 255, 255, .15);
+      transform: scale(0) rotate(-45deg); animation: spTile .8s cubic-bezier(.34, 1.56, .64, 1) .1s forwards; }
+    @keyframes spTile { to { transform: scale(1) rotate(0); } }
+    #splash .sp-tile::after { content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, .45) 50%, transparent 65%); transform: translateX(-130%);
+      animation: spShine 1s ease-in-out 1s forwards; }
+    @keyframes spShine { to { transform: translateX(130%); } }
+    #splash .sp-mark { position: relative; width: 74px; height: auto; opacity: 0; transform: scale(.4) rotate(160deg);
+      filter: drop-shadow(0 6px 18px rgba(31, 174, 193, .55)); animation: spMark .9s cubic-bezier(.34, 1.56, .64, 1) .35s forwards; }
+    @keyframes spMark { to { opacity: 1; transform: scale(1) rotate(0); } }
+    #splash .sp-word { display: flex; direction: ltr; font-size: 2.1rem; font-weight: 700; letter-spacing: .06em; line-height: 1; }
+    #splash .sp-word span { display: inline-block; opacity: 0; transform: translateY(18px); animation: spLetter .5s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+    #splash .sp-word .t { color: #4fd1e0; }
+    @keyframes spLetter { to { opacity: 1; transform: none; } }
+    #splash .sp-sub { margin: -.4rem 0 0; font-size: 1rem; color: #9fb3ca; opacity: 0; animation: spFade .6s ease 1.25s forwards; }
+    @keyframes spFade { to { opacity: 1; } }
+    #splash .sp-bar { width: 140px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; opacity: 0; animation: spFade .4s ease 1.1s forwards; }
+    #splash .sp-bar i { display: block; height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, #1faec1, #a78bfa, #4fd1e0);
+      transform: scaleX(0); transform-origin: right; animation: spLoad 1s cubic-bezier(.6, 0, .2, 1) 1.15s forwards; }
+    @keyframes spLoad { to { transform: scaleX(1); } }
+    #splash .sp-foot { position: absolute; bottom: max(28px, env(safe-area-inset-bottom)); font-size: .78rem; color: #6f86a1; opacity: 0; animation: spFade .6s ease 1.4s forwards; }
+    #splash .sp-dots { position: absolute; inset: 0; pointer-events: none; }
+    #splash .sp-dots i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #4fd1e0; opacity: 0;
+      animation: spDot 2.4s ease-out infinite; }
+    @keyframes spDot { 0% { opacity: 0; transform: translate(0, 0) scale(.5); } 20% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.2); } }
+    @media (prefers-reduced-motion: reduce) { #splash *, #splash { animation-duration: .01ms !important; animation-delay: 0s !important; } }
+  </style>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/home.css">
 </head>
 <body class="hp">
+  <!-- الشاشة الافتتاحية -->
+  <div id="splash" role="img" aria-label="smart Meet · ذكي">
+    <div class="sp-dots" aria-hidden="true">
+      <i style="top:42%;left:50%;--dx:-140px;--dy:-120px;animation-delay:.6s"></i><i style="top:42%;left:50%;--dx:150px;--dy:-90px;animation-delay:.9s"></i>
+      <i style="top:42%;left:50%;--dx:-110px;--dy:130px;animation-delay:1.2s"></i><i style="top:42%;left:50%;--dx:130px;--dy:120px;animation-delay:.75s"></i>
+      <i style="top:42%;left:50%;--dx:0px;--dy:-170px;animation-delay:1.05s;background:#a78bfa"></i><i style="top:42%;left:50%;--dx:-170px;--dy:10px;animation-delay:1.35s;background:#a78bfa"></i>
+    </div>
+    <div class="sp-core">
+      <div class="sp-mark-wrap">
+        <span class="sp-ring"></span><span class="sp-ring r2"></span>
+        <span class="sp-tile"></span>
+        <img class="sp-mark" src="/img/mark-light.png" alt="">
+      </div>
+      <div class="sp-word" aria-hidden="true">
+        <span class="t" style="animation-delay:.75s">s</span><span class="t" style="animation-delay:.8s">m</span><span class="t" style="animation-delay:.85s">a</span><span class="t" style="animation-delay:.9s">r</span><span class="t" style="animation-delay:.95s">t</span>
+        <span style="animation-delay:1.05s">&nbsp;</span><span style="animation-delay:1.05s">M</span><span style="animation-delay:1.1s">e</span><span style="animation-delay:1.15s">e</span><span style="animation-delay:1.2s">t</span>
+      </div>
+      <p class="sp-sub">اجتماعات ذكي</p>
+      <div class="sp-bar"><i></i></div>
+    </div>
+    <p class="sp-foot">ذكي smart لحاضنات ومسرعات الأعمال</p>
+  </div>
+  <script>
+    (() => {
+      // بتظهر عند فتح التطبيق، ومرة واحدة لكل جلسة (مش كل ما ترجع للرئيسية)
+      const sp = document.getElementById('splash');
+      let seen = false; try { seen = sessionStorage.getItem('meet:splash') === '1'; sessionStorage.setItem('meet:splash', '1'); } catch {}
+      if (seen) { sp.remove(); return; }
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.classList.add('splashing');
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const done = () => {
+        if (!sp.isConnected || sp.classList.contains('bye')) return;
+        sp.classList.add('bye');
+        document.documentElement.style.overflow = '';
+        setTimeout(() => document.documentElement.classList.remove('splashing'), 350);
+        setTimeout(() => sp.remove(), 760);
+      };
+      setTimeout(done, reduce ? 300 : 2300);
+      sp.addEventListener('click', done); // ضغطة = تخطّي
+    })();
+  </script>
   <!-- خلفية متحركة -->
   <div class="hp-bg" aria-hidden="true">
     <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>

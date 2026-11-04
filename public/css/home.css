@@ -299,3 +299,6 @@ body.hp { min-height: 100dvh; overflow-x: hidden; background: #050d19; }
 .lg-card li::marker { color: var(--brand); }
 .lg-note { text-align: center; color: var(--muted); font-size: .88rem; margin-top: 1.4rem; }
 .lg-note a { color: var(--brand-2); }
+
+/* المحتوى يستنى لحد ما الشاشة الافتتاحية تخلص */
+html.splashing .reveal { animation-play-state: paused; }
