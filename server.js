@@ -195,7 +195,13 @@ io.on('connection', (socket) => {
     if (Date.now() - tWindow > 60_000) { tWindow = Date.now(); tCount = 0; }
     if (++tCount > 60) return ack({ error: 'rate' });
     try {
-      ack({ text: await ai.translate(t, lang) });
+      const room = rooms.get(roomId);
+      // آخر 6 جمل اتقالت قبل الجملة دي كسياق
+      const speech = room.log.filter((e) => e.type === 'speech');
+      const idx = speech.map((e) => e.text).lastIndexOf(t);
+      const before = (idx >= 0 ? speech.slice(0, idx) : speech).slice(-6);
+      const context = before.map((e) => `${e.name}: ${e.text}`).join('\n');
+      ack({ text: await ai.translate(t, lang, { title: room.title, context }) });
     } catch (err) {
       console.error('ai-translate failed:', err.message);
       ack({ error: ai.friendlyError(err) });

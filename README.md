@@ -63,6 +63,7 @@ npm start
 | `ANTHROPIC_API_KEY` | مفتاح Claude لتفعيل المساعد الذكي والترجمة | — |
 | `AI_MODEL` | موديل المساعد الذكي | `claude-opus-5-5` |
 | `TRANSLATE_MODEL` | موديل الترجمة الفورية وتصحيح الكلام المكتوب | `claude-haiku-5-5` |
+| `TRANSLATE_EFFORT` | جودة الترجمة: `low` (أسرع وأرخص) / `medium` / `high` (أدق) | `medium` |
 | `CAPTION_CORRECTION` | اكتب `off` لإيقاف التصحيح الذكي للكلام المكتوب | مفعّل |
 | `MAX_PARTICIPANTS` | أقصى عدد في الاجتماع الواحد | `8` |
 | `TURN_URL` | عنوان خادم TURN (يمكن أكثر من عنوان مفصولة بفاصلة) | — |

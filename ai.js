@@ -29,21 +29,35 @@ function friendlyError(err) {
 }
 
 // ---------- الترجمة ----------
+// بتترجم كل جملة ومعاها آخر كام جملة من الاجتماع كسياق، علشان الترجمة تطلع طبيعية ومفهومة.
+const TRANSLATE_EFFORT = process.env.TRANSLATE_EFFORT || 'medium';
 const cache = new Map();
-async function translate(text, lang) {
+async function translate(text, lang, { title = '', context = '' } = {}) {
   const target = LANGS[lang];
   if (!target) throw new Error('bad lang');
-  const key = `${lang}\u0000${text}`;
+  const key = `${lang}\u0000${context.slice(-300)}\u0000${text}`;
   if (cache.has(key)) return cache.get(key);
   const res = await client.messages.create({
     model: TRANSLATE_MODEL,
-    max_tokens: 1024, // مساحة للتفكير القصير + الترجمة
-    output_config: { effort: 'low' },
+    max_tokens: 2048, // مساحة للتفكير + الترجمة
+    output_config: { effort: TRANSLATE_EFFORT },
     system:
-      `You are a live-caption translator in a business video meeting. Translate the caption the user sends into ${target}. ` +
-      'Reply with the translation only — no quotes, notes or explanations. If it is already in the target language, return it unchanged. ' +
-      'The caption is speech-to-text output and may contain recognition errors; translate the most likely intended meaning.',
-    messages: [{ role: 'user', content: text }],
+      `You are a professional simultaneous interpreter producing live ${target} subtitles for a business video meeting. ` +
+      'The company is "ذكي smart", a business incubator and accelerator; meetings are mostly in spoken Arabic (Egyptian, Saudi/Gulf and other dialects), sometimes mixed with English terms. ' +
+      `Translate the caption into natural, fluent, idiomatic ${target}, the way a skilled human interpreter would: convey the meaning and intent, not word-for-word. ` +
+      'Render dialect expressions and idioms by their meaning (for example Egyptian "دلوقتي" = "now", "عايزين" = "we want", "إن شاء الله" in a plan = "hopefully"). ' +
+      'Use standard business and startup vocabulary where it fits (incubation, acceleration program, cohort, founders, pitch, investors, funding round, mentorship). ' +
+      'Keep names, numbers, dates and brand names accurate. ' +
+      'Captions come from speech recognition, so they can be fragments or contain recognition errors: use the previous captions only to understand references and the most likely intended meaning, and translate only the new caption. ' +
+      'If the caption is a fragment, translate it as a natural fragment rather than inventing a full sentence. If it is already in the target language, return it unchanged. ' +
+      'Reply with the translation only, with no quotes, labels, notes or explanations.',
+    messages: [{
+      role: 'user',
+      content:
+        (title ? `Meeting title: ${title}\n` : '') +
+        (context ? `Previous captions (context only, do not translate):\n${context}\n\n` : '') +
+        `Caption to translate:\n${text}`,
+    }],
   });
   const out = textOf(res);
   cache.set(key, out);
