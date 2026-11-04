@@ -125,29 +125,40 @@
     pushTracksToPeers();
   }
   const FX_GROUPS = {
-    sticker: [['none', '🚫', 'بدون'], ['glasses', '🕶️', 'نظارة'], ['crown', '👑', 'تاج'], ['cat', '🐱', 'قطة'], ['dog', '🐶', 'كلب'], ['party', '🥳', 'حفلة'],
-      ['clown', '🤡', 'مهرج'], ['mustache', '🥸', 'شنب'], ['hat', '🎩', 'برنيطة'], ['nerd', '🤓', 'نظارة طبية'], ['hearts', '😍', 'قلوب'], ['stars', '🤩', 'نجوم']],
+    lens: [['none', '🚫', 'بدون', '#334155,#1e293b'], ['beauty', '✨', 'تجميل', '#f9a8d4,#a855f7'], ['makeup', '💄', 'مكياج', '#fb7185,#be185d'],
+      ['glam', '💎', 'جلام', '#fcd34d,#f472b6'], ['dog', '🐶', 'كلب', '#d97706,#78350f'], ['cat', '🐱', 'قطة', '#a78bfa,#4c1d95'],
+      ['flowers', '🌸', 'ورد', '#f9a8d4,#16a34a'], ['butterfly', '🦋', 'فراشات', '#60a5fa,#7c3aed'], ['hearts', '😍', 'قلوب', '#fb7185,#e11d48'],
+      ['gold', '🌟', 'ذهبي', '#fcd34d,#b45309'], ['glasses', '🕶️', 'نظارة', '#1faec1,#132e4d'], ['baby', '👶', 'بيبي', '#fde68a,#f9a8d4'],
+      ['alien', '👽', 'فضائي', '#4ade80,#065f46'], ['bigmouth', '😮', 'بق كبير', '#fb923c,#c2410c'], ['bignose', '👃', 'مناخير', '#fdba74,#9a3412'],
+      ['thin', '🥢', 'نحيف', '#5eead4,#0f766e'], ['chubby', '🐹', 'تخين', '#fca5a5,#b91c1c']],
     bg: [['none', '🚫', 'بدون'], ['blur', '🌫️', 'تغبيش'], ['brand', '🔷', 'ذكي'], ['office', '🏢', 'مكتب'], ['space', '🪐', 'الفضاء']],
-    color: [['none', '🚫', 'طبيعي'], ['soft', '✨', 'تنعيم'], ['warm', '🌅', 'دافي'], ['cool', '❄️', 'بارد'], ['vivid', '🌈', 'حيوي'], ['vintage', '📜', 'قديم'], ['bw', '⚫', 'أبيض وأسود'], ['noir', '🎬', 'سينما'], ['invert', '🔮', 'عكس']],
-    fun: [['none', '🚫', 'بدون'], ['party', '🪩', 'ديسكو'], ['pixel', '👾', 'بكسل'], ['mirror', '🪞', 'مراية'], ['squeeze', '🤏', 'نحيف'], ['stretch', '↔️', 'عريض'], ['tv', '📺', 'تلفزيون قديم']],
+    color: [['none', '🚫', 'طبيعي'], ['warm', '🌅', 'دافي'], ['cool', '❄️', 'بارد'], ['vivid', '🌈', 'حيوي'], ['vintage', '📜', 'قديم'], ['bw', '⚫', 'أبيض وأسود'], ['noir', '🎬', 'سينما']],
   };
   function loadFxState() {
     if (!window.CamFX) return;
-    try { const st = JSON.parse(store.get('meet:fx') || '{}'); for (const k of Object.keys(FX_GROUPS)) if (st[k]) CamFX.set(k, st[k]); } catch { /* ignore */ }
+    try { const st = JSON.parse(store.get('meet:fx2') || '{}'); for (const k of Object.keys(FX_GROUPS)) if (st[k]) CamFX.set(k, st[k]); } catch { /* ignore */ }
   }
   function renderFxPanel() {
     if (!window.CamFX) return;
     for (const [group, items] of Object.entries(FX_GROUPS)) {
-      $(`fx-${group}`).innerHTML = items.map(([id, ic, label], i) => `
-        <button class="fx-chip ${CamFX.state[group] === id ? 'on' : ''}" data-fxg="${group}" data-fxv="${id}" style="--i:${i}">
-          <span>${ic}</span><small>${label}</small></button>`).join('');
+      $(`fx-${group}`).innerHTML = items.map(([id, ic, label, grad], i) => (group === 'lens'
+        ? `<button class="lens ${CamFX.state.lens === id ? 'on' : ''}" data-fxg="lens" data-fxv="${id}" style="--i:${i};--g:linear-gradient(145deg,${grad})">
+             <span class="lens-orb">${ic}</span><small>${label}</small></button>`
+        : `<button class="fx-chip ${CamFX.state[group] === id ? 'on' : ''}" data-fxg="${group}" data-fxv="${id}" style="--i:${i}">
+             <span>${ic}</span><small>${label}</small></button>`)).join('');
     }
+    const on = $('fx-lens').querySelector('.lens.on');
+    if (on) on.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    const cur = FX_GROUPS.lens.find(([id]) => id === CamFX.state.lens);
+    $('fxLensName').textContent = cur && cur[0] !== 'none' ? `${cur[1]} ${cur[2]}` : '';
+    const hint = $('fxHint'); const ht = { dog: 'افتح بقك 👅', hearts: 'اضحك 😁' }[CamFX.state.lens] || '';
+    if (hint.textContent !== ht) { hint.textContent = ht; hint.style.animation = 'none'; void hint.offsetWidth; hint.style.animation = ''; }
   }
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-fxg]');
     if (!b || !window.CamFX) return;
     CamFX.set(b.dataset.fxg, b.dataset.fxv);
-    store.set('meet:fx', JSON.stringify(CamFX.state));
+    store.set('meet:fx2', JSON.stringify(CamFX.state));
     renderFxPanel();
     if (!me.cam) { toast('افتح الكاميرا علشان الفلتر يشتغل 📷'); return; }
     if (CamFX.needsAI() && !CamFX.aiReady()) { $('fxLoading').hidden = false; }
@@ -157,7 +168,7 @@
   });
   $('fxReset').onclick = async () => {
     for (const k of Object.keys(FX_GROUPS)) CamFX.set(k, 'none');
-    store.set('meet:fx', '{}');
+    store.set('meet:fx2', '{}');
     renderFxPanel(); await refreshFx(); $('fxReset').hidden = true;
   };
   window.addEventListener('camfx-error', () => toast('الفلاتر الذكية مش مدعومة على الجهاز ده — جرّب فلاتر الألوان'));

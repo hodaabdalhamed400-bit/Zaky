@@ -547,3 +547,26 @@ body.in-meeting { overflow: hidden; height: 100dvh; }
 .fx-chip.on small { color: #f9a8d4; }
 .fx-chip.on span { animation: chipOn .5s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes chipOn { 40% { transform: scale(1.35) rotate(12deg); } }
+
+/* --- عدسات زي سناب شات --- */
+.fx-preview { aspect-ratio: 3 / 4; max-height: 62dvh; }
+@media (min-width: 900px) { .fx-preview { aspect-ratio: 4 / 5; } }
+.fx-preview::after { content: ''; position: absolute; inset: auto 0 0 0; height: 46%; pointer-events: none; background: linear-gradient(to top, rgba(0, 0, 0, .65), transparent); }
+.lens-rail { position: absolute; z-index: 2; inset-inline: 0; bottom: 10px; display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 10px calc(50% - 30px) 4px; scrollbar-width: none; }
+.lens-rail::-webkit-scrollbar { display: none; }
+.lens { flex: none; scroll-snap-align: center; border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  opacity: 0; animation: emoIn .4s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: calc(var(--i) * 30ms); }
+.lens-orb { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-size: 1.6rem; background: var(--g);
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, .55), 0 6px 16px rgba(0, 0, 0, .4); transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), box-shadow .3s; }
+.lens small { font-size: .68rem; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, .8); white-space: nowrap; }
+.lens:hover .lens-orb { transform: scale(1.08); }
+.lens.on .lens-orb { transform: scale(1.22); box-shadow: 0 0 0 3.5px #fff, 0 0 0 7px rgba(244, 114, 182, .55), 0 10px 26px rgba(0, 0, 0, .5); animation: lensOn .5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes lensOn { 40% { transform: scale(1.4) rotate(-10deg); } }
+.fx-lens-name { position: absolute; top: 10px; inset-inline-start: 10px; z-index: 2; font-weight: 700; font-size: .85rem; padding: .3rem .7rem; border-radius: 999px;
+  background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); }
+.fx-lens-name:empty, .fx-hint:empty { display: none; }
+.fx-hint { position: absolute; top: 44%; left: 50%; transform: translate(-50%, -50%); z-index: 2; font-size: 1.1rem; font-weight: 700; padding: .4rem .9rem; border-radius: 999px;
+  background: rgba(0, 0, 0, .5); animation: hint 2.4s ease forwards; pointer-events: none; }
+@keyframes hint { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15%, 75% { opacity: 1; transform: translate(-50%, -50%); } 100% { opacity: 0; } }
+.fx-reset { bottom: auto; top: 10px; left: auto; inset-inline-end: 10px; transform: none; z-index: 2; }
