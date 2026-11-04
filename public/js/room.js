@@ -319,7 +319,8 @@
       for (const id of [...peers.keys()]) removePeer(id);
       socket.emit('join', { roomId, name: me.name, title: meetingTitle, state: { mic: me.mic, cam: me.cam } }, (res) => {
         if (res?.error === 'full') { alert(`الاجتماع ممتلئ (الحد الأقصى ${res.max} مشاركين).`); location.href = '/'; return; }
-        if (res?.error) { alert('رابط الاجتماع غير صحيح.'); location.href = '/'; return; }
+        if (res?.error === 'too_many') { alert('محاولات غلط كتير — استنى ربع ساعة وحاول تاني.'); location.href = '/'; return; }
+        if (res?.error) { alert('رابط الاجتماع غير صحيح أو منتهي. اطلب الرابط تاني من منظّم الاجتماع.'); location.href = '/'; return; }
         me.id = res.selfId;
         startedAt = res.startedAt;
         meetingTitle = res.title;
@@ -443,7 +444,7 @@
   }
 
   async function invite() {
-    const url = `${location.origin}/m/${roomId}`;
+    const url = `${location.origin}/m/${roomId}${meetingTitle && meetingTitle !== 'اجتماع' ? `?t=${encodeURIComponent(meetingTitle)}` : ''}`;
     const text = `انضم لاجتماع "${meetingTitle}" على ${BRAND.title}`;
     if (navigator.share) {
       try { await navigator.share({ title: BRAND.title, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
@@ -937,6 +938,11 @@
         ? `${info.participants} ${info.participants === 1 ? 'مشارك' : 'مشاركين'} في الاجتماع الآن`
         : 'لا يوجد أحد في الاجتماع بعد — ستكون أول المنضمين.';
       if (info.participants >= cfg.maxParticipants) $('lobbyErr').textContent = 'الاجتماع ممتلئ حاليًا.';
+      if (info.valid === false) {
+        $('lobbyInfo').textContent = '';
+        $('lobbyErr').textContent = 'رابط الاجتماع غير صحيح. اطلب الرابط تاني من منظّم الاجتماع.';
+        $('joinBtn').disabled = true;
+      }
     } catch { $('lobbyInfo').textContent = ''; }
 
     if (!navigator.mediaDevices?.getUserMedia) {

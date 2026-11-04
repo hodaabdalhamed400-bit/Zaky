@@ -25,12 +25,51 @@ function logEvent(room, entry) {
 }
 const rooms = new Map();
 
+// ---------- كود الشركة ----------
+// لو ACCESS_CODE موجود: إنشاء اجتماع جديد محتاج الكود، وكل رابط اجتماع عليه "توقيع" من الخادم
+// (آخر 4 حروف في الكود) علشان الضيوف يقدروا يدخلوا بالرابط، والروابط المتألفة ما تشتغلش.
+const ACCESS_CODE = (process.env.ACCESS_CODE || '').trim();
+const ROOM_SECRET = process.env.ROOM_SECRET || (ACCESS_CODE && `room:${ACCESS_CODE}`);
+const CHARS = 'abcdefghijkmnopqrstuvwxyz';
+const SIGNED_ID_RE = /^[a-z]{3}-[a-z]{4}-[a-z]{4}$/;
+
+function sign(prefix) {
+  const mac = crypto.createHmac('sha256', ROOM_SECRET).update(prefix).digest();
+  return Array.from(mac.subarray(0, 4), (b) => CHARS[b % CHARS.length]).join('');
+}
+function isAuthorizedRoomId(id) {
+  if (!ACCESS_CODE) return true;
+  if (!SIGNED_ID_RE.test(id)) return false;
+  const expected = sign(id.slice(0, 8));
+  return crypto.timingSafeEqual(Buffer.from(id.slice(9)), Buffer.from(expected));
+}
+function codeMatches(code) {
+  const a = crypto.createHash('sha256').update(String(code ?? '').trim()).digest();
+  const b = crypto.createHash('sha256').update(ACCESS_CODE).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+// حماية من التخمين: 10 محاولات غلط كل 15 دقيقة لكل جهاز/IP
+const failures = new Map();
+function tooManyFailures(ip) {
+  const f = failures.get(ip);
+  if (!f) return false;
+  if (Date.now() - f.since > 15 * 60_000) { failures.delete(ip); return false; }
+  return f.count >= 10;
+}
+function recordFailure(ip) {
+  const f = failures.get(ip);
+  if (!f || Date.now() - f.since > 15 * 60_000) failures.set(ip, { count: 1, since: Date.now() });
+  else f.count++;
+  if (failures.size > 10_000) failures.clear();
+}
+
 function newRoomId() {
-  const chars = 'abcdefghijkmnopqrstuvwxyz';
-  const part = (n) => Array.from(crypto.randomBytes(n), (b) => chars[b % chars.length]).join('');
+  const part = (n) => Array.from(crypto.randomBytes(n), (b) => CHARS[b % CHARS.length]).join('');
   let id;
-  do id = `${part(3)}-${part(4)}-${part(3)}`;
-  while (rooms.has(id));
+  do {
+    const prefix = `${part(3)}-${part(4)}`;
+    id = ACCESS_CODE ? `${prefix}-${sign(prefix)}` : `${prefix}-${part(3)}`;
+  } while (rooms.has(id));
   return id;
 }
 
@@ -49,16 +88,30 @@ function iceServers() {
 const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1); // Render بيحط الـ IP الحقيقي في X-Forwarded-For
+app.use(express.json({ limit: '2kb' }));
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
 app.get('/healthz', (_req, res) => res.send('ok'));
-app.get('/api/new', (_req, res) => res.json({ id: newRoomId() }));
+app.post('/api/new', (req, res) => {
+  if (ACCESS_CODE) {
+    if (tooManyFailures(req.ip)) return res.status(429).json({ error: 'too_many' });
+    if (!codeMatches(req.body?.code)) {
+      recordFailure(req.ip);
+      return res.status(401).json({ error: 'bad_code' });
+    }
+  }
+  res.json({ id: newRoomId() });
+});
 app.get('/api/config', (_req, res) => res.json({
-  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, languages: Object.keys(ai.LANGS),
+  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, languages: Object.keys(ai.LANGS),
 }));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
-  res.json({ exists: !!room, participants: room ? room.peers.size : 0, title: room?.title || null });
+  res.json({
+    exists: !!room, valid: !!room || isAuthorizedRoomId(req.params.id),
+    participants: room ? room.peers.size : 0, title: room?.title || null,
+  });
 });
 app.get('/m/:id', (req, res) => {
   if (!ROOM_ID_RE.test(req.params.id)) return res.redirect('/');
@@ -76,6 +129,9 @@ io.on('connection', (socket) => {
 
     let room = rooms.get(id);
     if (!room) {
+      const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address;
+      if (tooManyFailures(ip)) return ack?.({ error: 'too_many' });
+      if (!isAuthorizedRoomId(id)) { recordFailure(ip); return ack?.({ error: 'notfound' }); }
       room = { title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [] };
       rooms.set(id, room);
     }
@@ -221,5 +277,6 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`smart Meet running on http://localhost:${PORT}`);
+  console.log(ACCESS_CODE ? 'Company access code: ON (new meetings need the code)' : 'Company access code: OFF — set ACCESS_CODE to restrict creating meetings');
   console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation & caption correction: ${ai.translateModel}${ai.correctionEnabled ? '' : ', correction OFF'})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
 });

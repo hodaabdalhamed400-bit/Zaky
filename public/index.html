@@ -28,6 +28,10 @@
         <span>عنوان الاجتماع (اختياري)</span>
         <input id="title" maxlength="80" placeholder="مثلاً: اجتماع المبيعات الأسبوعي">
       </label>
+      <label class="field" id="accessField" hidden>
+        <span>كود الشركة (للموظفين)</span>
+        <input id="access" type="password" autocomplete="current-password" placeholder="••••••">
+      </label>
       <button id="create" class="btn btn-primary btn-block"><span data-icon="plus"></span> اجتماع جديد</button>
 
       <div class="divider"><span>أو</span></div>
@@ -51,10 +55,29 @@
     $('name').value = store.get('meet:name') || '';
     const saveName = () => { const n = $('name').value.trim(); if (n) store.set('meet:name', n); };
 
+    // كود الشركة: بيظهر بس لو الخادم طالبه، والموبايل بيفتكره بعد أول مرة صح
+    let needCode = false;
+    fetch('/api/config').then((r) => r.json()).then((cfg) => {
+      needCode = !!cfg.accessCode;
+      $('accessField').hidden = !needCode || !!store.get('meet:access');
+    }).catch(() => {});
+
     $('create').onclick = async () => {
       saveName();
+      $('err').textContent = '';
+      const code = $('access').value.trim() || store.get('meet:access') || '';
+      if (needCode && !code) { $('accessField').hidden = false; $('err').textContent = 'اكتب كود الشركة علشان تعمل اجتماع جديد.'; $('access').focus(); return; }
       try {
-        const { id } = await (await fetch('/api/new')).json();
+        const r = await fetch('/api/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+        if (r.status === 401) {
+          store.set('meet:access', '');
+          $('accessField').hidden = false; $('access').value = ''; $('access').focus();
+          $('err').textContent = 'كود الشركة غلط.';
+          return;
+        }
+        if (r.status === 429) { $('err').textContent = 'محاولات غلط كتير — استنى ربع ساعة وحاول تاني.'; return; }
+        const { id } = await r.json();
+        if (needCode) store.set('meet:access', code);
         const t = $('title').value.trim();
         location.href = `/m/${id}${t ? `?t=${encodeURIComponent(t)}` : ''}`;
       } catch { $('err').textContent = 'تعذر إنشاء الاجتماع، حاول مرة أخرى.'; }

@@ -14,6 +14,8 @@ services:
         value: "8"
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ACCESS_CODE
+        sync: false
       - key: TURN_URL
         sync: false
       - key: TURN_USERNAME
