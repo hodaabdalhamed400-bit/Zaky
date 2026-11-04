@@ -137,6 +137,7 @@
       const muted = key === 'me' ? !me.mic : !peers.get(key)?.state.mic;
       const tile = key === 'me' ? $('tile-me') : peers.get(key)?.tile;
       tile?.classList.toggle('speaking', rms > 4 && !muted);
+      if (key === 'me') $('micBtn').classList.toggle('talking', rms > 4 && !muted);
     }
   }, 200);
 
@@ -510,8 +511,24 @@
     layout();
   }
 
-  $('micBtn').onclick = async () => { await enableMic(!me.mic); sendState(); refreshControls(); };
-  $('camBtn').onclick = async () => { await enableCam(!me.cam); sendState(); refreshControls(); };
+  const bump = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 600); };
+  $('micBtn').onclick = async () => { await enableMic(!me.mic); bump($('micBtn'), me.mic ? 'flip' : 'shake'); sendState(); refreshControls(); };
+  $('camBtn').onclick = async () => { await enableCam(!me.cam); bump($('camBtn'), me.cam ? 'flip' : 'shake'); sendState(); refreshControls(); };
+
+  // ترتيب ظهور مربعات الخدمات واحد ورا التاني
+  document.querySelectorAll('.tile-btn').forEach((t, i) => t.style.setProperty('--i', i));
+  // موجة الضغطة
+  document.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('.ctl, .tile-btn');
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    const w = document.createElement('span');
+    w.className = 'ripple';
+    w.style.left = `${e.clientX - r.left}px`;
+    w.style.top = `${e.clientY - r.top}px`;
+    b.append(w);
+    setTimeout(() => w.remove(), 650);
+  });
   // المنظّم يختار: يخرج بس، ولا ينهي الاجتماع للكل
   $('leaveBtn').onclick = () => {
     if (!me.host) return leave();
@@ -1031,7 +1048,7 @@
     $('panelTitle').textContent = PANEL_TITLES[name];
     $('panelTitle').classList.toggle('sr-only', name !== 'settings');
     document.querySelectorAll('.tabs [data-panel]').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
-    document.querySelectorAll('.dk[data-panel]').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
+    document.querySelectorAll('.ctl[data-panel]').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
     document.querySelectorAll('.panel-body').forEach((b) => b.classList.toggle('show', b.dataset.view === name));
     if (name === 'chat') {
       unread = 0;
@@ -1046,7 +1063,7 @@
   function closePanel() {
     $('panel').hidden = true;
     $('meeting').classList.remove('panel-open');
-    document.querySelectorAll('.dk[data-panel]').forEach((t) => t.classList.remove('active'));
+    document.querySelectorAll('.ctl[data-panel]').forEach((t) => t.classList.remove('active'));
     currentPanel = null;
   }
   $('panelClose').onclick = closePanel;

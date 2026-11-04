@@ -76,9 +76,9 @@
       <aside class="panel" id="panel" hidden>
         <header class="panel-head">
           <nav class="tabs" role="tablist">
-            <button data-panel="chat" role="tab"><span data-icon="chat" data-size="18"></span><span>المحادثة</span><b class="badge" id="chatBadge" hidden></b></button>
+            <button data-panel="chat" role="tab"><span data-icon="chat" data-size="18"></span><span>المحادثة</span></button>
             <button data-panel="assistant" role="tab"><span data-icon="sparkles" data-size="18"></span><span>المساعد</span></button>
-            <button data-panel="people" role="tab"><span data-icon="users" data-size="18"></span><span>الحضور</span><b class="badge soft" id="peopleBadge">1</b></button>
+            <button data-panel="people" role="tab"><span data-icon="users" data-size="18"></span><span>الحضور</span></button>
             <button data-panel="translate" role="tab"><span data-icon="globe" data-size="18"></span><span>الترجمة</span></button>
             <button data-panel="minutes" role="tab"><span data-icon="notes" data-size="18"></span><span>المحضر</span></button>
           </nav>
@@ -181,38 +181,32 @@
       </aside>
     </div>
 
-    <!-- شريط التحكم العائم -->
-    <nav class="dock" aria-label="أدوات الاجتماع">
-      <div class="dock-group">
-        <button class="dk" id="micBtn" title="الميكروفون"><span data-icon="mic"></span><span class="lbl">المايك</span></button>
-        <button class="dk" id="camBtn" title="الكاميرا"><span data-icon="cam"></span><span class="lbl">الكاميرا</span></button>
-        <button class="dk wide-only" data-action="screen" title="مشاركة الشاشة"><span data-icon="screen"></span><span class="lbl">الشاشة</span></button>
-        <button class="dk wide-only" data-action="captions" id="ccBtn" title="تحويل كلامي لنص"><span data-icon="captions"></span><span class="lbl">النص</span></button>
-        <button class="dk wide-only" data-action="hand" title="رفع اليد"><span data-icon="hand"></span><span class="lbl">إيدي</span></button>
-        <button class="dk wide-only" data-action="reactions" title="تفاعل"><span data-icon="smile"></span><span class="lbl">تفاعل</span></button>
-        <button class="dk" data-panel="chat" title="المحادثة"><span data-icon="chat"></span><span class="lbl">الشات</span></button>
-        <button class="dk" id="moreBtn" title="المزيد"><span data-icon="more"></span><span class="lbl">المزيد</span></button>
-      </div>
-      <button class="dock-leave" id="leaveBtn" title="مغادرة الاجتماع"><span data-icon="leave"></span><span class="lbl">مغادرة</span></button>
+    <!-- أزرار التحكم -->
+    <nav class="controls" aria-label="أدوات الاجتماع">
+      <button class="ctl" id="micBtn"><span class="orb" data-icon="mic"></span><span class="lbl">المايك</span></button>
+      <button class="ctl" id="camBtn"><span class="orb" data-icon="cam"></span><span class="lbl">الكاميرا</span></button>
+      <button class="ctl" data-panel="chat"><span class="orb" data-icon="chat"></span><span class="lbl">المحادثة</span><b class="badge" id="chatBadge" hidden></b></button>
+      <button class="ctl" id="moreBtn"><span class="orb" data-icon="more"></span><span class="lbl">المزيد</span></button>
+      <button class="ctl leave" id="leaveBtn"><span class="orb" data-icon="leave"></span><span class="lbl">مغادرة</span></button>
       <div class="emoji-bar" id="emojiBar" hidden>
         <button>👍</button><button>👏</button><button>😂</button><button>❤️</button><button>🎉</button><button>😮</button>
       </div>
     </nav>
 
-    <!-- قايمة المزيد -->
-    <section class="sheet" id="tools" hidden>
-      <div class="sheet-grip"></div>
-      <div class="sheet-list">
-        <button class="sheet-item" data-panel="assistant"><span class="si-ic ai" data-icon="sparkles"></span><span><b>المساعد الذكي</b><small>ملخص، قرارات ومهام، وأسئلة عن الاجتماع</small></span></button>
-        <button class="sheet-item" data-panel="translate" id="translateTool"><span class="si-ic" data-icon="globe"></span><span><b>الترجمة والنص</b><small>تحويل الكلام لنص وترجمته فورًا</small></span></button>
-        <button class="sheet-item narrow-only" data-action="captions"><span class="si-ic" data-icon="captions"></span><span><b>تحويل كلامي لنص</b><small>تشغيل / إيقاف</small></span></button>
-        <button class="sheet-item narrow-only" data-action="screen"><span class="si-ic" data-icon="screen"></span><span><b>مشاركة الشاشة</b><small>اعرض شاشتك على الجميع</small></span></button>
-        <button class="sheet-item narrow-only" data-action="hand"><span class="si-ic" data-icon="hand"></span><span><b>رفع اليد</b><small>اطلب الكلمة</small></span></button>
-        <button class="sheet-item narrow-only" data-action="reactions"><span class="si-ic" data-icon="smile"></span><span><b>تفاعل</b><small>ابعت إيموجي للكل</small></span></button>
-        <button class="sheet-item" data-action="record"><span class="si-ic rec" data-icon="record"></span><span><b class="lbl">تسجيل</b><small>حفظ الاجتماع فيديو على جهازك</small></span></button>
-        <button class="sheet-item" data-panel="minutes"><span class="si-ic" data-icon="notes"></span><span><b>محضر الاجتماع</b><small>كل اللي اتقال واتكتب، قابل للتحميل</small></span></button>
-        <button class="sheet-item" data-action="invite"><span class="si-ic" data-icon="share"></span><span><b>دعوة شخص</b><small>شارك رابط الاجتماع</small></span></button>
-        <button class="sheet-item" data-panel="settings"><span class="si-ic" data-icon="settings"></span><span><b>الإعدادات</b><small>الاسم، الميكروفون، الكاميرا</small></span></button>
+    <!-- لوحة الخدمات (المزيد) -->
+    <section class="tools" id="tools" hidden>
+      <div class="tools-grid">
+        <button class="tile-btn" data-panel="assistant" style="--c1:#7c5cff;--c2:#1faec1"><span class="orb" data-icon="sparkles"></span><span class="lbl">المساعد</span></button>
+        <button class="tile-btn" data-panel="translate" id="translateTool" style="--c1:#3b82f6;--c2:#1faec1"><span class="orb" data-icon="globe"></span><span class="lbl">الترجمة</span></button>
+        <button class="tile-btn" data-action="captions" style="--c1:#06b6d4;--c2:#0e7490"><span class="orb" data-icon="captions"></span><span class="lbl">كلامي لنص</span></button>
+        <button class="tile-btn" data-action="screen" style="--c1:#14b8a6;--c2:#0f766e"><span class="orb" data-icon="screen"></span><span class="lbl">مشاركة الشاشة</span></button>
+        <button class="tile-btn" data-panel="people" style="--c1:#6366f1;--c2:#132e4d"><span class="orb" data-icon="users"></span><span class="lbl">الحضور</span><b class="badge soft" id="peopleBadge">1</b></button>
+        <button class="tile-btn" data-action="hand" style="--c1:#f59e0b;--c2:#d97706"><span class="orb" data-icon="hand"></span><span class="lbl">رفع اليد</span></button>
+        <button class="tile-btn" data-action="reactions" style="--c1:#ec4899;--c2:#db2777"><span class="orb" data-icon="smile"></span><span class="lbl">التفاعلات</span></button>
+        <button class="tile-btn" data-action="record" style="--c1:#ef4444;--c2:#b91c1c"><span class="orb" data-icon="record"></span><span class="lbl">تسجيل</span></button>
+        <button class="tile-btn" data-panel="minutes" style="--c1:#64748b;--c2:#132e4d"><span class="orb" data-icon="notes"></span><span class="lbl">المحضر</span></button>
+        <button class="tile-btn" data-action="invite" style="--c1:#22c55e;--c2:#15803d"><span class="orb" data-icon="share"></span><span class="lbl">دعوة صديق</span></button>
+        <button class="tile-btn" data-panel="settings" style="--c1:#94a3b8;--c2:#475569"><span class="orb" data-icon="settings"></span><span class="lbl">الإعدادات</span></button>
       </div>
     </section>
   </div>
