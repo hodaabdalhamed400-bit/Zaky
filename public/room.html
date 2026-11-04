@@ -38,8 +38,6 @@
           <label class="field"><span>اعرض كلام الآخرين بـ · Show others' speech in</span><select id="lobbyTr"></select></label>
           <label class="check"><input type="checkbox" id="lobbyCap"><span>حوّل كلامي لنص — مطلوب علشان الترجمة توصل للآخرين<br><small>Caption my speech — needed so others get the translation</small></span></label>
         </div>
-        <label class="field"><span>إيميلك علشان يوصلك ملخص الاجتماع (اختياري) · Email for the summary</span>
-          <input id="lobbyEmail" type="email" dir="ltr" maxlength="120" placeholder="name@example.com" autocomplete="email"></label>
         <button id="joinBtn" class="btn btn-primary btn-block">انضم الآن · Join</button>
         <p id="lobbyErr" class="error" role="alert"></p>
       </div>
@@ -223,7 +221,7 @@
   <section class="modal" id="leaveModal" hidden>
     <div class="modal-card">
       <h2>عايز تعمل إيه؟</h2>
-      <p class="muted">لو أنهيت الاجتماع للجميع، كل الحضور هيخرجوا ويوصلهم ملخص الاجتماع.</p>
+      <p class="muted">لو أنهيت الاجتماع للجميع، كل الحضور هيخرجوا ويظهرلهم ملخص الاجتماع على الشاشة.</p>
       <button class="btn btn-danger btn-block" data-leave="all">إنهاء الاجتماع للجميع</button>
       <button class="btn btn-ghost btn-block" data-leave="self">الخروج بس (الاجتماع يكمّل)</button>
       <button class="btn btn-block link" data-leave="cancel">رجوع</button>

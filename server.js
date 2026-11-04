@@ -6,7 +6,6 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const ai = require('./ai');
-const mailer = require('./mailer');
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_PARTICIPANTS = Number(process.env.MAX_PARTICIPANTS) || 8;
@@ -117,7 +116,7 @@ app.post('/api/new', (req, res) => {
   res.json({ id, hostKey: hostKeyFor(id) });
 });
 app.get('/api/config', (_req, res) => res.json({
-  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, email: mailer.enabled, languages: Object.keys(ai.LANGS),
+  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, languages: Object.keys(ai.LANGS),
 }));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
@@ -131,39 +130,23 @@ app.get('/m/:id', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'room.html'));
 });
 
-// ---------- نهاية الاجتماع: ملخص ذكي + إيميلات ----------
+// ---------- نهاية الاجتماع: ملخص ذكي يظهر على الشاشة للحضور بس ----------
 async function finishMeeting(room, id) {
   if (room.finished) return room.finishResult || { summaries: {} };
   room.finished = true;
   const content = room.log.filter((e) => e.type === 'speech' || e.type === 'chat').length;
-  const langs = new Set(['ar', ...room.langs, ...[...room.recipients.values()].map((r) => r.lang)]);
   const summaries = {};
   let reason = null;
   if (!ai.enabled) reason = 'ai_off';
   else if (!content) reason = 'empty';
   else {
-    for (const lang of langs) {
+    for (const lang of room.langs) {
       try { summaries[lang] = await ai.summarize(room, lang); } catch (err) { console.error(`summary (${lang}) failed:`, err.message); }
     }
     if (!Object.keys(summaries).length) reason = 'ai_error';
   }
-  let emailed = 0;
-  if (mailer.enabled && Object.keys(summaries).length) {
-    const minutes = Math.max(1, Math.round((Date.now() - room.startedAt) / 60000));
-    const attendees = [...new Set(room.log.filter((e) => e.type === 'join').map((e) => e.name))].join('، ');
-    for (const [email, r] of room.recipients) {
-      try {
-        await mailer.sendSummary(email, {
-          title: room.title, startedAt: room.startedAt, minutes, attendees, lang: r.lang,
-          summary: summaries[r.lang] || summaries.ar || Object.values(summaries)[0],
-          link: process.env.PUBLIC_URL || '',
-        });
-        emailed++;
-      } catch (err) { console.error('email failed:', err.message); }
-    }
-  }
-  room.finishResult = { summaries, emailed, recipients: room.recipients.size, emailEnabled: mailer.enabled, reason };
-  console.log(`meeting ${id} finished: ${Object.keys(summaries).join(',') || 'no'} summary, ${emailed}/${room.recipients.size} emails`);
+  room.finishResult = { summaries, reason };
+  console.log(`meeting ${id} ended: ${Object.keys(summaries).join(',') || 'no'} summary`);
   return room.finishResult;
 }
 
@@ -201,14 +184,13 @@ io.on('connection', (socket) => {
       room = {
         title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [],
         waitlist: new Map(), admitted: new Set(), banned: new Set(), coHosts: new Set(), locked: false, waiting: false,
-        recipients: new Map(), langs: new Set(['ar']), finished: false, emptyTimer: null,
+        langs: new Set(['ar']), finished: false, emptyTimer: null,
       };
       rooms.set(id, room);
     }
 
     if (room.finished) return ack?.({ error: 'ended' });
     const clientId = clean(payload.clientId, 64) || socket.id;
-    const email = clean(payload.email, 120).toLowerCase();
     const sumLang = String(payload.lang || 'ar').startsWith('ar') ? 'ar' : 'en';
     const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId);
     const name = clean(payload.name, 40) || 'ضيف';
@@ -230,7 +212,6 @@ io.on('connection', (socket) => {
       socket.join(id);
       clearTimeout(room.emptyTimer);
       room.langs.add(sumLang);
-      if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) room.recipients.set(email, { name, lang: sumLang });
       const others = [...room.peers.values()].map(publicPeer);
       room.peers.set(socket.id, info);
       room.admitted.add(clientId);
@@ -463,7 +444,6 @@ io.on('connection', (socket) => {
       room.emptyTimer = setTimeout(() => {
         if (room.peers.size || rooms.get(id) !== room) return;
         rooms.delete(id);
-        if (room.recipients.size) finishMeeting(room, id).catch((err) => console.error('finish failed:', err.message));
       }, 120_000);
     }
   });
@@ -471,7 +451,6 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`smart Meet running on http://localhost:${PORT}`);
-  console.log(mailer.enabled ? 'Summary emails: ON' : 'Summary emails: OFF — set SMTP_HOST, SMTP_USER, SMTP_PASS to email summaries');
   console.log(ACCESS_CODE ? 'Company access code: ON (new meetings need the code)' : 'Company access code: OFF — set ACCESS_CODE to restrict creating meetings');
   console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation & caption correction: ${ai.translateModel}${ai.correctionEnabled ? '' : ', correction OFF'})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
 });

@@ -377,7 +377,7 @@
       for (const id of [...peers.keys()]) removePeer(id);
       socket.emit('join', {
         roomId, name: me.name, title: meetingTitle, clientId, hostKey,
-        email: store.get('meet:email') || '', lang: translateTo || speakLang(),
+        lang: translateTo || speakLang(),
         state: { mic: me.mic, cam: me.cam },
       }, onJoined);
     });
@@ -571,14 +571,12 @@
     if (list) out.push('</ul>');
     return out.join('');
   }
-  function showSummary({ summaries = {}, emailed = 0, recipients = 0, emailEnabled, reason }) {
+  function showSummary({ summaries = {}, reason }) {
     const lang = (translateTo || speakLang()).startsWith('ar') ? 'ar' : 'en';
     summaryText = summaries[lang] || summaries.ar || Object.values(summaries)[0] || '';
     const note = [];
     if (summaryText) {
       $('endSummary').innerHTML = `<div class="summary" dir="${lang === 'ar' || !summaries.en ? 'rtl' : 'ltr'}">${renderSummaryHtml(summaryText)}</div>`;
-      if (emailed) note.push(`📧 الملخص اتبعت على ${emailed} ${emailed === 1 ? 'إيميل' : 'إيميلات'}.`);
-      else if (recipients && !emailEnabled) note.push('📧 إرسال الإيميلات مش مفعّل على الخادم لسه.');
     } else {
       const why = { ai_off: 'الملخص الذكي مش مفعّل على الخادم.', empty: 'مفيش كلام اتكتب أو اتقال في المحادثة علشان يتلخّص. (فعّلوا "تحويل الكلام لنص" المرة الجاية.)', ai_error: 'حصلت مشكلة في تجهيز الملخص.' }[reason] || '';
       $('endSummary').innerHTML = `<p class="muted">${why}</p>`;
@@ -1113,7 +1111,6 @@
   $('lobbySpeak').value = speakLang();
   $('lobbyTr').value = translateTo;
   $('lobbyCap').checked = store.get('meet:cap') !== '0';
-  $('lobbyEmail').value = store.get('meet:email') || '';
   $('lobbyName').oninput = refreshPreview;
   preview.classList.add('mirror');
 
@@ -1179,8 +1176,6 @@
       $('setTranslate').value = translateTo;
     }
     store.set('meet:cap', $('lobbyCap').checked ? '1' : '0');
-    const em = $('lobbyEmail').value.trim();
-    store.set('meet:email', /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em) ? em : '');
 
     makeTile('me', me.name, true);
     refreshControls();
