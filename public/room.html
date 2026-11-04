@@ -95,6 +95,8 @@
       </div>
 
       <div class="panel-body" data-view="people">
+        <div id="peopleExtra"></div>
+        <p class="section-title">في الاجتماع</p>
         <ul class="people" id="people"></ul>
         <button class="btn btn-ghost btn-block" data-action="invite"><span data-icon="share"></span> دعوة شخص</button>
       </div>
@@ -214,6 +216,17 @@
       </div>
     </section>
   </div>
+
+  <!-- غرفة الانتظار -->
+  <section class="waiting" id="waitingRoom" hidden>
+    <div class="waiting-card">
+      <img src="/img/mark-light.png" alt="" class="waiting-mark">
+      <div class="spinner"></div>
+      <h2>في انتظار موافقة المنظّم</h2>
+      <p class="muted">هتدخل الاجتماع أول ما المنظّم يوافق. خليك على الصفحة دي.<br><small>Waiting for the host to let you in…</small></p>
+      <a class="btn btn-ghost" href="/">إلغاء</a>
+    </div>
+  </section>
 
   <button class="unmute-bar" id="unmuteBar" hidden>🔊 اضغط هنا لتشغيل صوت المشاركين</button>
   <div class="toasts" id="toasts" aria-live="polite"></div>

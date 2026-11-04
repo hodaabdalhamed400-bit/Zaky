@@ -28,7 +28,17 @@
     hand: false,
     screen: false,
     rec: false,
+    host: false,
   };
+  let roomSettings = { locked: false, waiting: false };
+  let waitlist = [];
+  // معرّف ثابت للجهاز (علشان إعادة الاتصال والطرد) + مفتاح المنظّم لو الجهاز ده هو اللي عمل الاجتماع
+  const clientId = store.get('meet:cid') || (() => {
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+    store.set('meet:cid', id);
+    return id;
+  })();
+  const hostKey = store.get(`meet:host:${roomId}`) || '';
   let micTrack = null;
   let camTrack = null;
   let screenTrack = null;
@@ -156,7 +166,7 @@
     el.innerHTML = `
       <video autoplay playsinline muted></video>${isMe ? '' : '<audio autoplay></audio>'}
       <div class="avatar"></div>
-      <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span></div>
+      <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span><span class="host" hidden>منظّم</span></div>
       <div class="label"><span class="nm"></span></div>`;
     $('grid').append(el);
     updateTile(el, { name, isMe, key: isMe ? me.id || 'me' : id });
@@ -183,6 +193,7 @@
       el.classList.toggle('mirror', !!isMe && !state.screen);
       el.querySelector('.mic-off').hidden = !!state.mic;
       el.querySelector('.hand').hidden = !state.hand;
+      if ('host' in state) el.querySelector('.host').hidden = !state.host;
     }
   }
 
@@ -203,23 +214,70 @@
 
   function renderPeople() {
     const all = [{ id: me.id, name: me.name, state: me, isMe: true }, ...[...peers.values()].map((p) => ({ ...p, isMe: false }))];
+    const hostTools = me.host ? `
+      <div class="host-box">
+        <p class="section-title">أدوات المنظّم</p>
+        <div class="switch-row sm"><div><b>غرفة الانتظار</b><p class="muted small">الضيوف يستنّوا موافقتك قبل ما يدخلوا</p></div>
+          <button class="toggle" role="switch" aria-checked="${roomSettings.waiting}" data-host="waiting"><i></i></button></div>
+        <div class="switch-row sm"><div><b>قفل الاجتماع</b><p class="muted small">محدش جديد يقدر يدخل</p></div>
+          <button class="toggle" role="switch" aria-checked="${roomSettings.locked}" data-host="locked"><i></i></button></div>
+        <button class="btn btn-ghost btn-block" data-host="mute-all">${icon('micOff', 18)} كتم صوت الجميع</button>
+      </div>` : '';
+    const waiting = me.host && waitlist.length ? `
+      <p class="section-title">في الانتظار (${waitlist.length})</p>
+      <ul class="people waiting-list">${waitlist.map((w) => `
+        <li><span class="av" style="--avatar:${colorFor(w.id)}">${esc(initial(w.name))}</span>
+          <span class="nm">${esc(w.name)}</span>
+          <span class="ic"><button class="mini ok" data-host="admit" data-id="${esc(w.id)}">قبول</button>
+          <button class="mini" data-host="deny" data-id="${esc(w.id)}">رفض</button></span></li>`).join('')}
+      </ul>${waitlist.length > 1 ? '<button class="btn btn-ghost btn-block" data-host="admit-all">قبول الكل</button>' : ''}` : '';
+    $('peopleExtra').innerHTML = hostTools + waiting;
     $('people').innerHTML = all.map((p) => `
       <li>
         <span class="av" style="--avatar:${colorFor(p.id || p.name)}">${esc(initial(p.name))}</span>
-        <span class="nm">${esc(p.name)}${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}</span>
+        <span class="nm">${esc(p.name)}${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}${p.state.host ? ' <span class="host-tag">منظّم</span>' : ''}</span>
         <span class="ic">
           ${p.state.hand ? `<span title="رافع يده" style="color:var(--warn)">${icon('hand', 18)}</span>` : ''}
           ${p.state.screen ? `<span title="يشارك الشاشة">${icon('screen', 18)}</span>` : ''}
           <span class="${p.state.mic ? '' : 'off'}">${icon(p.state.mic ? 'mic' : 'micOff', 18)}</span>
           <span class="${p.state.cam ? '' : 'off'}">${icon(p.state.cam ? 'cam' : 'camOff', 18)}</span>
+          ${me.host && !p.isMe && !p.state.host ? `<button class="mini icon" data-host="menu" data-id="${esc(p.id)}" aria-label="خيارات">${icon('more', 16)}</button>` : ''}
         </span>
-      </li>`).join('');
+      </li>
+      ${me.host && !p.isMe && !p.state.host && openMenu === p.id ? `
+      <li class="row-menu">
+        ${p.state.mic ? `<button class="mini" data-host="mute" data-id="${esc(p.id)}">${icon('micOff', 16)} كتم</button>` : ''}
+        <button class="mini" data-host="make-host" data-id="${esc(p.id)}">${icon('users', 16)} منظّم مشارك</button>
+        <button class="mini danger" data-host="remove" data-id="${esc(p.id)}">${icon('close', 16)} إخراج</button>
+      </li>` : ''}`).join('');
+    $('peopleBadge').textContent = all.length + (me.host && waitlist.length ? ` +${waitlist.length}` : '');
   }
+  let openMenu = null;
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-host]');
+    if (!b || !me.host) return;
+    const id = b.dataset.id;
+    const act = b.dataset.host;
+    const name = peers.get(id)?.name || '';
+    if (act === 'menu') { openMenu = openMenu === id ? null : id; renderPeople(); return; }
+    if (act === 'waiting' || act === 'locked') { socket.emit('host:settings', { [act]: !roomSettings[act] }); return; }
+    if (act === 'mute-all') { socket.emit('host:mute-all'); toast('تم كتم صوت الجميع'); return; }
+    if (act === 'admit' || act === 'deny') { socket.emit(`host:${act}`, id); return; }
+    if (act === 'admit-all') { socket.emit('host:admit-all'); return; }
+    if (act === 'mute') { socket.emit('host:mute', id); toast(`تم كتم ${name}`); }
+    if (act === 'make-host') { socket.emit('host:make-host', id); }
+    if (act === 'remove') {
+      if (!confirm(`إخراج ${name} من الاجتماع؟ مش هيقدر يدخل تاني.`)) return;
+      socket.emit('host:remove', id);
+    }
+    openMenu = null;
+    renderPeople();
+  });
 
   // ===================== WebRTC =====================
   function createPeer(info, initiator) {
     const p = {
-      id: info.id, name: info.name, state: { ...info.state }, initiator,
+      id: info.id, name: info.name, state: { ...info.state, host: !!info.host }, initiator,
       stream: new MediaStream(), pending: [], audioSender: null, videoSender: null,
     };
     const pc = new RTCPeerConnection({ iceServers });
@@ -317,11 +375,20 @@
       setStatus(true);
       // عند إعادة الاتصال نبدأ من جديد مع كل المشاركين
       for (const id of [...peers.keys()]) removePeer(id);
-      socket.emit('join', { roomId, name: me.name, title: meetingTitle, state: { mic: me.mic, cam: me.cam } }, (res) => {
+      socket.emit('join', { roomId, name: me.name, title: meetingTitle, clientId, hostKey, state: { mic: me.mic, cam: me.cam } }, onJoined);
+    });
+    function onJoined(res) {
+        $('waitingRoom').hidden = true;
+        if (res?.waiting) { $('waitingRoom').hidden = false; return; }
         if (res?.error === 'full') { alert(`الاجتماع ممتلئ (الحد الأقصى ${res.max} مشاركين).`); location.href = '/'; return; }
         if (res?.error === 'too_many') { alert('محاولات غلط كتير — استنى ربع ساعة وحاول تاني.'); location.href = '/'; return; }
+        if (res?.error === 'locked') { alert('المنظّم قفل الاجتماع، ومحدش جديد يقدر يدخل دلوقتي.'); location.href = '/'; return; }
+        if (res?.error === 'removed') { alert('المنظّم أخرجك من الاجتماع ده.'); location.href = '/'; return; }
         if (res?.error) { alert('رابط الاجتماع غير صحيح أو منتهي. اطلب الرابط تاني من منظّم الاجتماع.'); location.href = '/'; return; }
         me.id = res.selfId;
+        me.host = !!res.host;
+        roomSettings = res.settings || roomSettings;
+        if (me.host && !joinedOnce) toast('إنت منظّم الاجتماع — أدواتك في قايمة الحضور 👥', 4500);
         startedAt = res.startedAt;
         meetingTitle = res.title;
         $('meetingTitle').textContent = meetingTitle;
@@ -339,9 +406,38 @@
         }
         joinedOnce = true;
         layout();
-      });
-    });
+    }
+    socket.on('admitted', onJoined);
+    socket.on('denied', () => { alert('المنظّم ما وافقش على دخولك.'); location.href = '/'; });
     socket.on('disconnect', () => setStatus(false));
+
+    // ----- أحداث المنظّم -----
+    socket.on('waitlist', (list) => {
+      const added = list.filter((w) => !waitlist.some((x) => x.id === w.id));
+      waitlist = list;
+      added.forEach((w) => toast(`🚪 ${w.name} مستني يدخل — وافق من قايمة الحضور`, 5000));
+      document.querySelectorAll('[data-panel="people"]').forEach((b) => b.classList.toggle('attention', waitlist.length > 0));
+      renderPeople();
+    });
+    socket.on('room-settings', (st) => {
+      roomSettings = { locked: st.locked, waiting: st.waiting };
+      renderPeople();
+      toast(`${st.by}: ${st.locked ? '🔒 الاجتماع مقفول' : '🔓 الاجتماع مفتوح'} · غرفة الانتظار ${st.waiting ? 'شغّالة' : 'مقفولة'}`);
+    });
+    socket.on('force-mute', async ({ by }) => {
+      if (me.mic) { await enableMic(false); sendState(); refreshControls(); }
+      toast(`🔇 ${by} كتم صوتك — تقدر تفتحه لما تحب تتكلم`, 4500);
+    });
+    socket.on('removed', ({ by }) => {
+      alert(`${by} أخرجك من الاجتماع.`);
+      leave();
+    });
+    socket.on('peer-host', ({ id }) => {
+      if (id === me.id) { me.host = true; toast('بقيت منظّم مشارك 🎉 — أدواتك في قايمة الحضور', 4500); renderSelf(); }
+      const p = peers.get(id);
+      if (p) { p.state.host = true; updateTile(p.tile, { state: p.state }); }
+      renderPeople();
+    });
 
     socket.on('peer-joined', (info) => {
       createPeer(info, false);
@@ -358,8 +454,8 @@
       const p = peers.get(id);
       if (!p) return;
       if (state.hand && !p.state.hand) toast(`✋ ${p.name} رفع يده`);
-      p.state = state;
-      updateTile(p.tile, { state });
+      p.state = { ...state, host: p.state.host };
+      updateTile(p.tile, { state: p.state });
       updateRecIndicator();
       layout();
     });

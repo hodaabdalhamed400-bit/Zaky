@@ -63,6 +63,14 @@ function recordFailure(ip) {
   if (failures.size > 10_000) failures.clear();
 }
 
+// مفتاح المنظّم: بيتولّد مع الاجتماع ويتحفظ على جهاز اللي عمله بس
+const HOST_SECRET = ROOM_SECRET || crypto.randomBytes(32).toString('hex');
+const hostKeyFor = (id) => crypto.createHmac('sha256', HOST_SECRET).update(`host:${id}`).digest('hex').slice(0, 32);
+function isValidHostKey(id, key) {
+  if (typeof key !== 'string' || key.length !== 32) return false;
+  return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(hostKeyFor(id)));
+}
+
 function newRoomId() {
   const part = (n) => Array.from(crypto.randomBytes(n), (b) => CHARS[b % CHARS.length]).join('');
   let id;
@@ -101,7 +109,8 @@ app.post('/api/new', (req, res) => {
       return res.status(401).json({ error: 'bad_code' });
     }
   }
-  res.json({ id: newRoomId() });
+  const id = newRoomId();
+  res.json({ id, hostKey: hostKeyFor(id) });
 });
 app.get('/api/config', (_req, res) => res.json({
   iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, languages: Object.keys(ai.LANGS),
@@ -118,40 +127,149 @@ app.get('/m/:id', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'room.html'));
 });
 
+const publicPeer = (p) => ({ id: p.id, name: p.name, state: p.state, host: !!p.host });
+const hasHost = (room) => [...room.peers.values()].some((p) => p.host);
+const waitlistOf = (room) => [...room.waitlist.values()].map((w) => ({ id: w.id, name: w.name }));
+function notifyHosts(room) {
+  const list = waitlistOf(room);
+  for (const p of room.peers.values()) if (p.host) io.to(p.id).emit('waitlist', list);
+}
+function admitAll(room) {
+  const all = [...room.waitlist.values()];
+  room.waitlist.clear();
+  all.forEach((w) => w.admit());
+  if (all.length) notifyHosts(room);
+}
+
 io.on('connection', (socket) => {
   let roomId = null;
 
   const peer = () => rooms.get(roomId)?.peers.get(socket.id);
 
+  let waitingIn = null; // الاجتماع اللي الشخص مستني يدخله (غرفة الانتظار)
+
   socket.on('join', (payload = {}, ack) => {
     const id = String(payload.roomId || '');
-    if (roomId || !ROOM_ID_RE.test(id)) return ack?.({ error: 'invalid' });
+    if (roomId || waitingIn || !ROOM_ID_RE.test(id)) return ack?.({ error: 'invalid' });
 
     let room = rooms.get(id);
     if (!room) {
       const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address;
       if (tooManyFailures(ip)) return ack?.({ error: 'too_many' });
       if (!isAuthorizedRoomId(id)) { recordFailure(ip); return ack?.({ error: 'notfound' }); }
-      room = { title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [] };
+      room = {
+        title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [],
+        waitlist: new Map(), admitted: new Set(), banned: new Set(), coHosts: new Set(), locked: false, waiting: false,
+      };
       rooms.set(id, room);
     }
+
+    const clientId = clean(payload.clientId, 64) || socket.id;
+    const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId);
+    const name = clean(payload.name, 40) || 'ضيف';
+    if (room.banned.has(clientId) && !isHost) return ack?.({ error: 'removed' });
+    if (room.locked && !isHost) return ack?.({ error: 'locked' });
     if (room.peers.size >= MAX_PARTICIPANTS) return ack?.({ error: 'full', max: MAX_PARTICIPANTS });
 
-    const s = payload.state || {};
-    const info = {
-      id: socket.id,
-      name: clean(payload.name, 40) || 'ضيف',
-      state: { mic: !!s.mic, cam: !!s.cam, hand: false, screen: false, rec: false },
+    const enter = (reply) => {
+      if (roomId) return;
+      waitingIn = null;
+      if (rooms.get(id) !== room) return reply({ error: 'ended' });
+      if (room.peers.size >= MAX_PARTICIPANTS) return reply({ error: 'full', max: MAX_PARTICIPANTS });
+      const s = payload.state || {};
+      const info = {
+        id: socket.id, name, clientId, host: isHost,
+        state: { mic: !!s.mic, cam: !!s.cam, hand: false, screen: false, rec: false },
+      };
+      roomId = id;
+      socket.join(id);
+      const others = [...room.peers.values()].map(publicPeer);
+      room.peers.set(socket.id, info);
+      room.admitted.add(clientId);
+      logEvent(room, { type: 'join', name });
+      reply({
+        selfId: socket.id, title: room.title, startedAt: room.startedAt, peers: others,
+        host: isHost, settings: { locked: room.locked, waiting: room.waiting },
+      });
+      socket.to(id).emit('peer-joined', publicPeer(info));
+      if (isHost) socket.emit('waitlist', waitlistOf(room));
     };
-    roomId = id;
-    socket.join(id);
-    const others = [...room.peers.values()];
-    room.peers.set(socket.id, info);
 
-    logEvent(room, { type: 'join', name: info.name });
-    ack?.({ selfId: socket.id, title: room.title, startedAt: room.startedAt, peers: others });
-    socket.to(id).emit('peer-joined', info);
+    // غرفة الانتظار: بتشتغل بس لو فيه منظّم موجود يوافق (علشان محدش يفضل مستني للأبد)
+    if (room.waiting && !isHost && hasHost(room) && !room.admitted.has(clientId)) {
+      waitingIn = id;
+      room.waitlist.set(socket.id, {
+        id: socket.id, name,
+        admit: () => enter((data) => socket.emit('admitted', data)),
+        deny: () => { waitingIn = null; socket.emit('denied'); },
+      });
+      notifyHosts(room);
+      return ack?.({ waiting: true });
+    }
+    enter((data) => ack?.(data));
   });
+
+  // ---------- أدوات المنظّم ----------
+  const hostOnly = (fn) => (arg) => {
+    const room = rooms.get(roomId);
+    const me = room?.peers.get(socket.id);
+    if (!me?.host) return;
+    fn(room, me, arg);
+  };
+  const target = (room, id) => {
+    const q = room.peers.get(String(id));
+    return q && !q.host ? q : null; // المنظّمين ما يتحكموش في بعض
+  };
+
+  socket.on('host:admit', hostOnly((room, _me, id) => {
+    const w = room.waitlist.get(String(id));
+    if (!w) return;
+    room.waitlist.delete(w.id);
+    w.admit();
+    notifyHosts(room);
+  }));
+  socket.on('host:admit-all', hostOnly((room) => admitAll(room)));
+  socket.on('host:deny', hostOnly((room, _me, id) => {
+    const w = room.waitlist.get(String(id));
+    if (!w) return;
+    room.waitlist.delete(w.id);
+    w.deny();
+    notifyHosts(room);
+  }));
+  socket.on('host:mute-all', hostOnly((room, me) => {
+    for (const q of room.peers.values()) if (!q.host) io.to(q.id).emit('force-mute', { by: me.name });
+    logEvent(room, { type: 'host', name: me.name, text: 'كتم صوت الجميع' });
+  }));
+  socket.on('host:mute', hostOnly((room, me, id) => {
+    const q = target(room, id);
+    if (q) io.to(q.id).emit('force-mute', { by: me.name });
+  }));
+  socket.on('host:remove', hostOnly((room, me, id) => {
+    const q = target(room, id);
+    if (!q) return;
+    room.banned.add(q.clientId);
+    room.admitted.delete(q.clientId);
+    io.to(q.id).emit('removed', { by: me.name });
+    logEvent(room, { type: 'host', name: me.name, text: `أخرج ${q.name} من الاجتماع` });
+    setTimeout(() => io.sockets.sockets.get(q.id)?.disconnect(true), 400);
+  }));
+  socket.on('host:make-host', hostOnly((room, me, id) => {
+    const q = target(room, id);
+    if (!q) return;
+    q.host = true;
+    room.coHosts.add(q.clientId);
+    io.to(roomId).emit('peer-host', { id: q.id });
+    io.to(q.id).emit('waitlist', waitlistOf(room));
+    logEvent(room, { type: 'host', name: me.name, text: `خلّى ${q.name} منظّم مشارك` });
+  }));
+  socket.on('host:settings', hostOnly((room, me, opts = {}) => {
+    if ('locked' in opts) room.locked = !!opts.locked;
+    if ('waiting' in opts) {
+      room.waiting = !!opts.waiting;
+      if (!room.waiting) admitAll(room);
+    }
+    io.to(roomId).emit('room-settings', { locked: room.locked, waiting: room.waiting, by: me.name });
+  }));
 
   socket.on('signal', ({ to, data } = {}) => {
     if (!roomId || !rooms.get(roomId)?.peers.has(to)) return;
@@ -265,12 +383,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    if (waitingIn) {
+      const wroom = rooms.get(waitingIn);
+      if (wroom?.waitlist.delete(socket.id)) notifyHosts(wroom);
+    }
     const room = rooms.get(roomId);
     if (!room) return;
     const left = room.peers.get(socket.id);
     if (left) logEvent(room, { type: 'leave', name: left.name });
     room.peers.delete(socket.id);
     socket.to(roomId).emit('peer-left', { id: socket.id });
+    // لو آخر منظّم خرج، اللي مستنيين يدخلوا علطول (مفيش حد يوافق عليهم)
+    if (left?.host && !hasHost(room)) admitAll(room);
     if (room.peers.size === 0) rooms.delete(roomId);
   });
 });
