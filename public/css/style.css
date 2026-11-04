@@ -257,3 +257,7 @@ body.light .error { color: var(--danger); }
 .toggle[aria-checked="true"] i { inset-inline-start: 25px; }
 .captions .cap .tr { display: block; color: #a5f3fc; }
 .captions .cap .orig { display: block; font-size: .8rem; color: #cbd5e1; opacity: .8; }
+
+/* ----- Audio unlock ----- */
+.unmute-bar { position: fixed; z-index: 40; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 0; border-radius: 16px;
+  background: var(--brand); color: var(--brand-ink); font-weight: 700; padding: 1rem 1.4rem; box-shadow: 0 20px 50px rgba(0, 0, 0, .5); font-size: 1rem; }

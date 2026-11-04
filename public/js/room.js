@@ -131,12 +131,30 @@
   }, 200);
 
   // ===================== البلاطات (Tiles) =====================
+  // ===================== تشغيل الصوت =====================
+  // بعض المتصفحات (خصوصًا على الموبايل) بتمنع تشغيل الصوت تلقائيًا؛ ساعتها بنطلب ضغطة واحدة.
+  const blockedAudio = new Set();
+  function playAudio(a) {
+    a.play().then(() => blockedAudio.delete(a)).catch(() => {
+      blockedAudio.add(a);
+      $('unmuteBar').hidden = false;
+    });
+  }
+  function unlockAudio() {
+    audioCtx?.resume?.();
+    for (const a of [...blockedAudio]) playAudio(a);
+    if (!blockedAudio.size) $('unmuteBar').hidden = true;
+    setTimeout(() => { if (!blockedAudio.size) $('unmuteBar').hidden = true; }, 300);
+  }
+  document.addEventListener('click', () => { if (blockedAudio.size) unlockAudio(); }, true);
+  document.addEventListener('touchend', () => { if (blockedAudio.size) unlockAudio(); }, true);
+
   function makeTile(id, name, isMe) {
     const el = document.createElement('div');
     el.className = 'tile';
     el.id = `tile-${id}`;
     el.innerHTML = `
-      <video autoplay playsinline ${isMe ? 'muted' : ''}></video>
+      <video autoplay playsinline muted></video>${isMe ? '' : '<audio autoplay></audio>'}
       <div class="avatar"></div>
       <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span></div>
       <div class="label"><span class="nm"></span></div>`;
@@ -218,8 +236,15 @@
     pc.ontrack = (e) => {
       p.stream.getTracks().filter((t) => t.kind === e.track.kind).forEach((t) => p.stream.removeTrack(t));
       p.stream.addTrack(e.track);
-      updateTile(p.tile, { stream: p.stream });
-      if (e.track.kind === 'audio') watchLevel(p.id, p.stream);
+      if (e.track.kind === 'audio') {
+        // الصوت في عنصر مستقل: لو الكاميرا مقفولة، الفيديو ما بيشتغلش، فما يوقفش الصوت معاه
+        const a = p.tile.querySelector('audio');
+        a.srcObject = new MediaStream([e.track]);
+        playAudio(a);
+        watchLevel(p.id, a.srcObject);
+      } else {
+        updateTile(p.tile, { stream: new MediaStream([e.track]) });
+      }
     };
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' && p.initiator) {
@@ -229,7 +254,7 @@
     };
 
     p.tile = makeTile(p.id, p.name, false);
-    updateTile(p.tile, { state: p.state, stream: p.stream });
+    updateTile(p.tile, { state: p.state });
     peers.set(p.id, p);
     layout();
     return p;
