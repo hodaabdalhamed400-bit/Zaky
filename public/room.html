@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1020">
-  <title>Meet</title>
+  <meta name="theme-color" content="#132e4d">
+  <title>smart Meet | ذكي</title>
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
@@ -13,7 +16,7 @@
 
   <!-- ===== شاشة ما قبل الدخول ===== -->
   <section id="lobby" class="lobby">
-    <div class="brand" data-brand></div>
+    <div class="brand" data-brand="dark"></div>
     <div class="lobby-grid">
       <div class="tile preview">
         <video id="previewVideo" autoplay playsinline muted></video>
@@ -39,9 +42,10 @@
   <!-- ===== الاجتماع ===== -->
   <div id="meeting" class="meeting" hidden>
     <header class="topbar">
-      <div class="brand" data-brand></div>
+      <div class="brand" data-brand="compact"></div>
       <div class="meta-row">
         <button class="chip chip-btn" data-panel="minutes" title="محضر الاجتماع"><span data-icon="notes" data-size="18"></span> <span class="chip-txt">محضر الاجتماع</span></button>
+        <button class="chip chip-btn icon-chip" data-panel="translate" title="الترجمة"><span data-icon="globe" data-size="18"></span></button>
         <span class="chip status" id="status"><i class="dot"></i> <span>متصل</span></span>
         <span class="chip" title="عدد المشاركين"><span data-icon="users" data-size="18"></span> <b id="count">1</b></span>
         <span class="chip mono" title="مدة الاجتماع"><span data-icon="clock" data-size="18"></span> <b id="timer">00:00:00</b></span>
@@ -64,8 +68,9 @@
       <button class="tool" data-action="record"><span data-icon="record"></span><span class="lbl">تسجيل</span></button>
       <button class="tool" data-panel="chat"><span data-icon="chat"></span><span class="lbl">المحادثة</span><b class="badge" id="chatBadge" hidden></b></button>
       <button class="tool" data-panel="people"><span data-icon="users"></span><span class="lbl">المشاركون</span><b class="badge" id="peopleBadge">1</b></button>
-      <button class="tool" data-action="screen"><span data-icon="screen"></span><span class="lbl">مشاركة الشاشة</span></button>
-      <button class="tool" data-action="captions"><span data-icon="captions"></span><span class="lbl">الترجمة النصية</span></button>
+      <button class="tool" data-panel="assistant"><span data-icon="sparkles"></span><span class="lbl">المساعد</span></button>
+      <button class="tool" data-action="screen"><span data-icon="screen"></span><span class="lbl">مشاركة</span></button>
+      <button class="tool" data-panel="translate" id="translateTool"><span data-icon="captions"></span><span class="lbl">الترجمة</span></button>
       <button class="tool" data-panel="settings"><span data-icon="settings"></span><span class="lbl">الإعدادات</span></button>
       <button class="tool" data-action="hand"><span data-icon="hand"></span><span class="lbl">رفع اليد</span></button>
       <button class="tool" data-action="reactions"><span data-icon="smile"></span><span class="lbl">التفاعلات</span></button>
@@ -105,20 +110,71 @@
       <div class="panel-body" data-view="minutes">
         <p class="muted small">يُسجَّل هنا تلقائيًا: الدخول والخروج، المحادثة، والكلام المنطوق عند تفعيل الترجمة النصية.</p>
         <ol class="minutes" id="minutes"></ol>
+        <button class="btn btn-ghost btn-block" id="aiSummary"><span data-icon="sparkles"></span> ملخص ذكي للاجتماع</button>
         <button class="btn btn-primary btn-block" id="downloadMinutes"><span data-icon="download"></span> تحميل المحضر</button>
+      </div>
+
+      <div class="panel-body" data-view="assistant">
+        <div class="ai-off" id="aiOff" hidden>
+          المساعد الذكي غير مفعّل على الخادم. لتفعيله أضف المتغير <code dir="ltr">ANTHROPIC_API_KEY</code> ثم أعد تشغيل الخادم.
+        </div>
+        <ol class="messages ai-thread" id="aiThread">
+          <li class="ai-intro">
+            <div class="bubble">أهلاً 👋 أنا المساعد الذكي للاجتماع. أقدر ألخّص اللي اتقال، وأطلع القرارات والمهام، وأجاوب على أسئلتك عن الاجتماع.
+            <br><span class="muted small">أعتمد على المحادثة والكلام المكتوب بالترجمة النصية — فعّلها علشان أسمع الكلام.</span></div>
+          </li>
+        </ol>
+        <div class="quick" id="aiQuick">
+          <button data-q="لخّص الاجتماع حتى الآن في نقاط.">📝 لخّص الاجتماع</button>
+          <button data-q="ما القرارات التي اتُّخذت والمهام المطلوبة ومسؤول كل مهمة وموعدها إن ذُكر؟">✅ القرارات والمهام</button>
+          <button data-q="ما آخر النقاط التي نوقشت في الدقائق الأخيرة؟">⏱️ آخر ما قيل</button>
+          <button data-q="اقترح نقاطًا مهمة لم تُناقش بعد وأسئلة يجب طرحها.">💡 اقتراحات</button>
+        </div>
+        <form class="composer" id="aiForm">
+          <input id="aiInput" maxlength="1000" placeholder="اسأل المساعد عن الاجتماع…" autocomplete="off">
+          <button class="icon-btn primary" aria-label="إرسال"><span data-icon="send" data-size="20"></span></button>
+        </form>
+      </div>
+
+      <div class="panel-body" data-view="translate">
+        <div class="switch-row">
+          <div>
+            <b>تحويل كلامي إلى نص</b>
+            <p class="muted small">يكتب كلامك مباشرة ويعرضه للجميع (ومنه تتعمل الترجمة والمحضر والمساعد).</p>
+          </div>
+          <button class="toggle" id="captionsToggle" role="switch" aria-checked="false" data-action="captions"><i></i></button>
+        </div>
+        <label class="field"><span>اللغة اللي بتتكلم بيها</span>
+          <select id="setLang">
+            <option value="ar-EG">العربية (مصر)</option>
+            <option value="ar-SA">العربية (السعودية)</option>
+            <option value="ar-AE">العربية (الإمارات)</option>
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="fr-FR">Français</option>
+          </select>
+        </label>
+        <label class="field"><span>ترجم كلام المشاركين إلى</span>
+          <select id="setTranslate">
+            <option value="">بدون ترجمة (النص الأصلي)</option>
+            <option value="ar">العربية</option>
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+            <option value="tr">Türkçe</option>
+            <option value="ur">اردو</option>
+            <option value="hi">हिन्दी</option>
+            <option value="zh">中文</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </label>
+        <p class="muted small" id="translateNote"></p>
       </div>
 
       <div class="panel-body" data-view="settings">
         <label class="field"><span>اسمك في الاجتماع</span><input id="setName" maxlength="40"></label>
         <label class="field"><span>الميكروفون</span><select id="setMic"></select></label>
         <label class="field"><span>الكاميرا</span><select id="setCam"></select></label>
-        <label class="field"><span>لغة الترجمة النصية</span>
-          <select id="setLang">
-            <option value="ar-EG">العربية (مصر)</option>
-            <option value="ar-SA">العربية (السعودية)</option>
-            <option value="en-US">English (US)</option>
-          </select>
-        </label>
         <button class="btn btn-primary btn-block" id="saveSettings">حفظ</button>
       </div>
     </aside>

@@ -1,7 +1,7 @@
 {
-  "name": "zaky-meet",
+  "name": "smart-meet",
   "version": "1.0.0",
-  "description": "نظام اجتماعات فيديو خاص بالشركة (WebRTC + Socket.IO)",
+  "description": "smart Meet — منصة اجتماعات ذكي لحاضنات ومسرعات الأعمال",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,6 +13,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
     "express": "^5.1.0",
     "socket.io": "^4.8.1"
   }

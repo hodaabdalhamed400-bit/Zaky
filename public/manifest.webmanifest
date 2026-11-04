@@ -1,0 +1,14 @@
+{
+  "name": "smart Meet | ذكي",
+  "short_name": "smart Meet",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1626",
+  "theme_color": "#132e4d",
+  "icons": [
+    { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

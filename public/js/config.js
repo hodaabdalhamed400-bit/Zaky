@@ -1,7 +1,11 @@
-// ===== إعدادات العلامة التجارية — غيّرها باسم شركتك =====
+// ===== هوية الشركة =====
 window.BRAND = {
-  name: 'ZAKY',          // الاسم الكبير في الشعار
-  product: 'MEET',       // الكلمة الصغيرة تحت الاسم
-  title: 'Zaky Meet',    // عنوان الصفحة
+  company: 'ذكي smart لحاضنات ومسرعات الأعمال',
+  product: 'اجتماعات ذكي',
+  title: 'smart Meet | ذكي',
+  logoOnDark: '/img/logo-light.png',   // الشعار على الخلفيات الداكنة
+  logoOnLight: '/img/logo.png',        // الشعار الأصلي على الخلفيات الفاتحة
+  mark: '/img/mark.png',               // رمز S فقط
+  markOnDark: '/img/mark-light.png',   // رمز S على الخلفيات الداكنة
 };
-// الألوان موجودة في أول ملف css/style.css (متغيرات --brand و --bg ...)
+// الألوان في أول ملف css/style.css (--brand = التركواز، --navy = الكحلي)

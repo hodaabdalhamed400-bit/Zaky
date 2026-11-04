@@ -24,6 +24,7 @@
     download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
     copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/>',
     login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>',
   };
   window.icon = (name, size = 22) =>
@@ -32,8 +33,13 @@
     root.querySelectorAll('[data-icon]').forEach((el) => {
       el.innerHTML = window.icon(el.dataset.icon, Number(el.dataset.size) || 22);
     });
+  // data-brand="dark" → شعار كامل للخلفية الداكنة، "light" → للخلفية الفاتحة، "compact" → الرمز + اسم المنتج
   window.renderBrand = (root = document) =>
     root.querySelectorAll('[data-brand]').forEach((el) => {
-      el.innerHTML = `<span class="brand-name">${window.BRAND.name}</span><span class="brand-product">${window.BRAND.product}</span>`;
+      const B = window.BRAND;
+      const kind = el.dataset.brand;
+      el.innerHTML = kind === 'compact'
+        ? `<img class="brand-mark" src="${B.markOnDark}" alt=""><span class="brand-text"><span><b>smart</b> Meet</span><small>${B.product}</small></span>`
+        : `<img class="brand-logo" src="${kind === 'light' ? B.logoOnLight : B.logoOnDark}" alt="${B.company}">`;
     });
 })();

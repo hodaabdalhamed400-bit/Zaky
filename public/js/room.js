@@ -11,7 +11,7 @@
   };
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const initial = (name) => (String(name).trim()[0] || '?').toUpperCase();
-  const COLORS = ['#1f6f5c', '#3b4fa8', '#8a3b8f', '#a8553b', '#2f7a9c', '#6b5bd6', '#9c2f55', '#4d7a2f'];
+  const COLORS = ['#1faec1', '#2d5c8f', '#178a9a', '#3b6fb0', '#7a4fb0', '#c0703a', '#2f8f6b', '#b0475f'];
   const colorFor = (key) => { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
   const fmtClock = (ts) => new Date(ts).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
@@ -362,7 +362,8 @@
     cam.querySelector('[data-icon]').innerHTML = icon(me.cam ? 'cam' : 'camOff');
     document.querySelector('[data-action="hand"]').classList.toggle('active', me.hand);
     document.querySelector('[data-action="screen"]').classList.toggle('active', me.screen);
-    document.querySelector('[data-action="captions"]').classList.toggle('active', captionsOn);
+    $('translateTool').classList.toggle('active', captionsOn || !!translateTo);
+    $('captionsToggle').setAttribute('aria-checked', String(captionsOn));
     const rec = document.querySelector('[data-action="record"]');
     rec.classList.toggle('active', me.rec);
     rec.querySelector('.lbl').textContent = me.rec ? 'إيقاف التسجيل' : 'تسجيل';
@@ -458,6 +459,8 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null;
   let captionsOn = false;
+  let translateTo = store.get('meet:tr') || '';
+  let aiOn = false;
   function toggleCaptions() { captionsOn ? stopCaptions() : startCaptions(); refreshControls(); }
   function startCaptions() {
     if (!SR) { toast('الترجمة النصية تحتاج متصفح Chrome أو Edge أو Safari حديث.'); return; }
@@ -476,7 +479,7 @@
     };
     recognizer.onerror = (e) => { if (e.error === 'not-allowed') { toast('لم يتم السماح بالتعرف على الكلام.'); stopCaptions(); refreshControls(); } };
     recognizer.onend = () => { if (captionsOn) try { recognizer.start(); } catch { /* ignore */ } };
-    try { recognizer.start(); toast('تم تفعيل الترجمة النصية'); } catch { /* ignore */ }
+    try { recognizer.start(); toast('تم تفعيل تحويل الكلام إلى نص'); } catch { /* ignore */ }
   }
   function stopCaptions() {
     captionsOn = false;
@@ -493,10 +496,93 @@
       captionEls.set(from, el);
     }
     el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}`;
-    clearTimeout(el._t);
-    el._t = setTimeout(() => { el.remove(); captionEls.delete(from); }, final ? 4000 : 7000);
+    const seq = (el._seq = (el._seq || 0) + 1);
+    const expire = (ms) => {
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.remove(); if (captionEls.get(from) === el) captionEls.delete(from); }, ms);
+    };
+    expire(final ? 4000 : 7000);
     if (final) addMinute('speech', text, name, ts);
+    // ترجمة كلام المشاركين الآخرين للغة اللي اخترتها
+    if (final && translateTo && aiOn && from !== me.id) {
+      expire(9000);
+      socket.emit('ai-translate', { text, lang: translateTo }, (res) => {
+        if (res?.text && el._seq === seq && el.isConnected) {
+          el.innerHTML = `<b>${esc(name)}:</b><span class="tr">${esc(res.text)}</span><span class="orig">${esc(text)}</span>`;
+          expire(6000);
+        } else if (res?.error && res.error !== 'rate' && !showCaption._warned) {
+          showCaption._warned = true;
+          toast(`الترجمة: ${res.error}`);
+        }
+      });
+    }
   }
+
+  // لوحة الترجمة
+  $('setLang').value = store.get('meet:lang') || 'ar-EG';
+  $('setTranslate').value = translateTo;
+  $('setLang').onchange = () => {
+    store.set('meet:lang', $('setLang').value);
+    if (captionsOn) { stopCaptions(); startCaptions(); }
+  };
+  $('setTranslate').onchange = () => {
+    translateTo = $('setTranslate').value;
+    store.set('meet:tr', translateTo);
+    refreshControls();
+    toast(translateTo ? 'تم تفعيل الترجمة الفورية لكلام المشاركين' : 'تم إيقاف الترجمة');
+  };
+
+  // ===================== المساعد الذكي =====================
+  const mdLite = (t) => esc(t)
+    .replace(/^#{1,6}\s*(.+)$/gm, '<b>$1</b>')
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  let aiBusy = false;
+  function aiBubble(cls, who, html) {
+    const li = document.createElement('li');
+    li.className = cls;
+    li.innerHTML = `<div class="who">${who}</div><div class="bubble">${html}</div>`;
+    $('aiThread').append(li);
+    $('aiThread').scrollTop = $('aiThread').scrollHeight;
+    return li;
+  }
+  function setAiBusy(b) {
+    aiBusy = b;
+    document.querySelectorAll('#aiQuick button, #aiForm button').forEach((x) => { x.disabled = b || !aiOn; });
+  }
+  function aiAsk(question) {
+    question = question.trim();
+    if (!question || aiBusy) return;
+    if (!aiOn) { toast('المساعد الذكي غير مفعّل على الخادم.'); return; }
+    aiBubble('mine', 'أنت', esc(question));
+    const pending = aiBubble('ai pending', '✨ المساعد الذكي', '<span class="dots">بيفكر</span>');
+    setAiBusy(true);
+    let done = false;
+    const finish = (res) => {
+      if (done) return;
+      done = true;
+      setAiBusy(false);
+      if (res?.answer) {
+        pending.className = 'ai';
+        pending.querySelector('.bubble').innerHTML = `${mdLite(res.answer)}<br><button class="share-ai">↗ شارك الرد في المحادثة</button>`;
+        pending.querySelector('.share-ai').onclick = (e) => {
+          const msg = `✨ المساعد الذكي:\n${res.answer}`;
+          socket.emit('chat', msg.length > 2000 ? `${msg.slice(0, 1997)}…` : msg);
+          e.target.remove();
+          toast('تمت مشاركة الرد في المحادثة');
+        };
+      } else {
+        pending.className = 'ai';
+        pending.querySelector('.bubble').textContent = `⚠️ ${res?.error || 'لم يصل رد من المساعد.'}`;
+      }
+      $('aiThread').scrollTop = $('aiThread').scrollHeight;
+      if (currentPanel !== 'assistant') toast('✨ رد المساعد الذكي جاهز');
+    };
+    socket.emit('ai-ask', question, finish);
+    setTimeout(() => finish({ error: 'استغرق الرد وقتًا طويلًا، حاول مرة أخرى.' }), 180000);
+  }
+  $('aiForm').onsubmit = (e) => { e.preventDefault(); aiAsk($('aiInput').value); $('aiInput').value = ''; };
+  $('aiQuick').onclick = (e) => { const b = e.target.closest('button[data-q]'); if (b) aiAsk(b.dataset.q); };
+  $('aiSummary').onclick = () => { openPanel('assistant'); aiAsk('اكتب ملخصًا منظمًا للاجتماع: أهم النقاط، القرارات، المهام ومسؤول كل مهمة، والخطوات التالية.'); };
 
   // ===================== التفاعلات =====================
   function floatEmoji(emoji, name) {
@@ -666,7 +752,7 @@
   }
 
   // ===================== اللوحة الجانبية =====================
-  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات' };
+  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة' };
   let currentPanel = null;
   function openPanel(name) {
     currentPanel = name;
@@ -679,6 +765,8 @@
       setTimeout(() => $('chatInput').focus(), 50);
     }
     if (name === 'settings') fillSettings();
+    if (name === 'assistant' && aiOn) setTimeout(() => $('aiInput').focus(), 50);
+    toggleTools(false);
     if (name === 'people') renderPeople();
   }
   $('panelClose').onclick = () => { $('panel').hidden = true; currentPanel = null; };
@@ -686,7 +774,6 @@
 
   async function fillSettings() {
     $('setName').value = me.name;
-    $('setLang').value = store.get('meet:lang') || 'ar-EG';
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const fill = (sel, kind, current) => {
@@ -705,11 +792,6 @@
       store.set('meet:name', name);
       socket.emit('rename', name);
       renderSelf();
-    }
-    const lang = $('setLang').value;
-    if (lang !== (store.get('meet:lang') || 'ar-EG')) {
-      store.set('meet:lang', lang);
-      if (captionsOn) { stopCaptions(); startCaptions(); }
     }
     const micId = $('setMic').value; const camId = $('setCam').value;
     if (micId && micId !== micTrack?.getSettings().deviceId) {
@@ -752,6 +834,7 @@
     try {
       const cfg = await (await fetch('/api/config')).json();
       if (cfg.iceServers?.length) iceServers = cfg.iceServers;
+      aiOn = !!cfg.ai;
       const info = await (await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)).json();
       if (info.title) meetingTitle = info.title;
       $('lobbyTitle').textContent = meetingTitle;
@@ -768,6 +851,12 @@
       if (me.mic) await enableMic(true);
       if (me.cam) await enableCam(true);
     }
+    $('aiOff').hidden = aiOn;
+    setAiBusy(false);
+    $('setTranslate').disabled = !aiOn;
+    $('translateNote').textContent = aiOn
+      ? 'الترجمة بتشتغل على كلام المشاركين اللي مفعّلين "تحويل الكلام إلى نص".'
+      : 'الترجمة للغات أخرى تحتاج تفعيل الذكاء الاصطناعي على الخادم. تحويل الكلام لنص شغال عادي.';
     refreshPreview();
     $('lobbyName').focus();
   }
