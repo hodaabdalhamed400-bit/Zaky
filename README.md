@@ -59,7 +59,8 @@ npm start
 |---|---|---|
 | `PORT` | المنفذ | `3000` |
 | `ANTHROPIC_API_KEY` | مفتاح Claude لتفعيل المساعد الذكي والترجمة | — |
-| `AI_MODEL` | موديل الذكاء الاصطناعي | `claude-opus-5-5` |
+| `AI_MODEL` | موديل المساعد الذكي | `claude-opus-5-5` |
+| `TRANSLATE_MODEL` | موديل الترجمة الفورية | `claude-haiku-5-5` |
 | `MAX_PARTICIPANTS` | أقصى عدد في الاجتماع الواحد | `8` |
 | `TURN_URL` | عنوان خادم TURN (يمكن أكثر من عنوان مفصولة بفاصلة) | — |
 | `TURN_USERNAME` / `TURN_PASSWORD` | بيانات دخول خادم TURN | — |

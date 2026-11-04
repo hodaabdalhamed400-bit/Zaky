@@ -2,11 +2,14 @@
 // تتفعل تلقائيًا لما يكون ANTHROPIC_API_KEY موجود في متغيرات البيئة.
 const Anthropic = require('@anthropic-ai/sdk');
 
+// المساعد: Opus (أعلى جودة للملخصات) — الترجمة: Haiku (سريع وأرخص بكتير)
 const MODEL = process.env.AI_MODEL || 'claude-opus-5-5';
+const TRANSLATE_MODEL = process.env.TRANSLATE_MODEL || 'claude-haiku-5-5';
 const enabled = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 const client = enabled ? new Anthropic() : null;
 
-// عند رفض نادر من فلاتر الأمان، الـ API بيعيد الطلب تلقائيًا على موديل بديل.
+// للمساعد (Opus): عند رفض نادر من فلاتر الأمان، الـ API بيعيد الطلب تلقائيًا على موديل بديل.
+// (Haiku ما بيدعمش الخاصية دي، فالترجمة بتتعامل مع الرفض كخطأ عادي.)
 const FALLBACK = { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
 
 const LANGS = { ar: 'Arabic', en: 'English', fr: 'French', tr: 'Turkish', ur: 'Urdu', hi: 'Hindi', zh: 'Chinese (Simplified)', es: 'Spanish', de: 'German' };
@@ -32,10 +35,9 @@ async function translate(text, lang) {
   if (!target) throw new Error('bad lang');
   const key = `${lang}\u0000${text}`;
   if (cache.has(key)) return cache.get(key);
-  const res = await client.beta.messages.create({
-    ...FALLBACK,
-    model: MODEL,
-    max_tokens: 1024,
+  const res = await client.messages.create({
+    model: TRANSLATE_MODEL,
+    max_tokens: 1024, // مساحة للتفكير القصير + الترجمة
     output_config: { effort: 'low' },
     system:
       `You are a live-caption translator in a business video meeting. Translate the caption the user sends into ${target}. ` +
@@ -84,4 +86,4 @@ async function ask(room, question, askerName) {
   return textOf(res);
 }
 
-module.exports = { enabled, model: MODEL, LANGS, translate, ask, friendlyError };
+module.exports = { enabled, model: MODEL, translateModel: TRANSLATE_MODEL, LANGS, translate, ask, friendlyError };

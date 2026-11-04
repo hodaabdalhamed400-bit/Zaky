@@ -190,5 +190,5 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`smart Meet running on http://localhost:${PORT}`);
-  console.log(ai.enabled ? `AI services: ON (${ai.model})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
+  console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation: ${ai.translateModel})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
 });
