@@ -330,6 +330,13 @@
         for (const info of res.peers) negotiate(createPeer(info, true));
         sendState();
         if (!joinedOnce) addMinute('sys', `بدأتَ حضور الاجتماع "${meetingTitle}"`);
+        if (!joinedOnce) {
+          try {
+            const recent = JSON.parse(store.get('meet:recent') || '[]').filter((r) => r.id !== roomId);
+            recent.unshift({ id: roomId, title: meetingTitle, ts: Date.now() });
+            store.set('meet:recent', JSON.stringify(recent.slice(0, 12)));
+          } catch { /* ignore */ }
+        }
         joinedOnce = true;
         layout();
       });
@@ -386,8 +393,10 @@
     mic.querySelector('[data-icon]').innerHTML = icon(me.mic ? 'mic' : 'micOff');
     cam.classList.toggle('off', !me.cam);
     cam.querySelector('[data-icon]').innerHTML = icon(me.cam ? 'cam' : 'camOff');
-    document.querySelector('[data-action="hand"]').classList.toggle('active', me.hand);
-    document.querySelector('[data-action="screen"]').classList.toggle('active', me.screen);
+    const setActive = (sel, on) => document.querySelectorAll(sel).forEach((el) => el.classList.toggle('active', on));
+    setActive('[data-action="hand"]', me.hand);
+    setActive('[data-action="screen"]', me.screen);
+    setActive('[data-action="captions"]:not(.toggle)', captionsOn);
     $('translateTool').classList.toggle('active', captionsOn || !!translateTo);
     $('captionsToggle').setAttribute('aria-checked', String(captionsOn));
     const rec = document.querySelector('[data-action="record"]');
@@ -411,6 +420,8 @@
     btn.classList.toggle('active', open);
     btn.querySelector('[data-icon]').innerHTML = icon(open ? 'close' : 'more');
   }
+  // الضغط على الفيديو يقفل القوايم المفتوحة
+  $('stage').addEventListener('click', () => { if (!$('tools').hidden || !$('emojiBar').hidden) toggleTools(false); });
 
   function leave() {
     if (me.rec) stopRecording();
@@ -426,7 +437,11 @@
     if (panelBtn) { openPanel(panelBtn.dataset.panel); return; }
     const actBtn = e.target.closest('[data-action]');
     if (!actBtn) return;
-    const actions = { record: toggleRecording, screen: toggleScreen, captions: toggleCaptions, hand: toggleHand, reactions: () => { $('emojiBar').hidden = !$('emojiBar').hidden; }, invite };
+    const actions = {
+      record: toggleRecording, screen: toggleScreen, captions: toggleCaptions, hand: toggleHand, invite,
+      reactions: () => { const show = $('emojiBar').hidden; toggleTools(false); $('emojiBar').hidden = !show; },
+    };
+    if (actBtn.closest('#tools') && actBtn.dataset.action !== 'record') toggleTools(false);
     actions[actBtn.dataset.action]?.();
   });
 
@@ -845,9 +860,15 @@
   const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة' };
   let currentPanel = null;
   function openPanel(name) {
+    // نفس الزرار مرتين = قفل (على الكمبيوتر)
+    if (currentPanel === name && !$('panel').hidden && window.innerWidth >= 900) { closePanel(); return; }
     currentPanel = name;
     $('panel').hidden = false;
+    $('meeting').classList.add('panel-open');
     $('panelTitle').textContent = PANEL_TITLES[name];
+    $('panelTitle').classList.toggle('sr-only', name !== 'settings');
+    document.querySelectorAll('.tabs [data-panel]').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
+    document.querySelectorAll('.dk[data-panel]').forEach((t) => t.classList.toggle('active', t.dataset.panel === name));
     document.querySelectorAll('.panel-body').forEach((b) => b.classList.toggle('show', b.dataset.view === name));
     if (name === 'chat') {
       unread = 0;
@@ -859,7 +880,13 @@
     toggleTools(false);
     if (name === 'people') renderPeople();
   }
-  $('panelClose').onclick = () => { $('panel').hidden = true; currentPanel = null; };
+  function closePanel() {
+    $('panel').hidden = true;
+    $('meeting').classList.remove('panel-open');
+    document.querySelectorAll('.dk[data-panel]').forEach((t) => t.classList.remove('active'));
+    currentPanel = null;
+  }
+  $('panelClose').onclick = closePanel;
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('panelClose').click(); });
 
   async function fillSettings() {

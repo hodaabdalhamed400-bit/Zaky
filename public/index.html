@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#132e4d">
+  <meta name="theme-color" content="#f4f8fb">
   <title>smart Meet | ذكي</title>
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
@@ -12,38 +12,62 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body class="home light">
-  <main class="home-wrap">
-    <div class="brand brand-lg" data-brand="light"></div>
-    <h1>منصة اجتماعات ذكي</h1>
-    <p class="muted">اجتماعات فيديو لفريق العمل ورواد الأعمال والشركاء — مع مساعد ذكي وترجمة فورية.</p>
+<body class="light">
+  <header class="site-nav">
+    <div class="brand" data-brand="light"></div>
+    <span class="nav-tag">smart Meet</span>
+  </header>
 
-    <section class="card">
+  <main class="home-main">
+    <section class="hero">
+      <h1>اجتماعات <em>ذكية</em> لرواد الأعمال وفريق ذكي</h1>
+      <p>اجتمع بالفيديو مع فريقك والشركات الناشئة والمستثمرين من أي جهاز، مع مساعد ذكي يلخّص ويطلّع المهام، وترجمة فورية بين العربي والإنجليزي.</p>
+      <ul class="features">
+        <li><span class="f-ic" data-icon="sparkles"></span><span><b>مساعد ذكي</b><small>ملخص الاجتماع، القرارات، والمهام ومسؤول كل مهمة.</small></span></li>
+        <li><span class="f-ic" data-icon="globe"></span><span><b>ترجمة فورية</b><small>كل واحد يشوف كلام التاني بلغته وهو بيتكلم.</small></span></li>
+        <li><span class="f-ic" data-icon="notes"></span><span><b>محضر تلقائي</b><small>كل اللي اتقال واتكتب محفوظ وقابل للتحميل.</small></span></li>
+      </ul>
+    </section>
+
+    <section class="card start-card">
+      <div class="seg" role="tablist">
+        <button class="on" data-mode="new" role="tab">اجتماع جديد</button>
+        <button data-mode="join" role="tab">انضم لاجتماع</button>
+      </div>
+
       <label class="field">
         <span>اسمك</span>
         <input id="name" maxlength="40" placeholder="مثلاً: محمود عبد الحميد" autocomplete="name">
       </label>
 
-      <label class="field">
-        <span>عنوان الاجتماع (اختياري)</span>
-        <input id="title" maxlength="80" placeholder="مثلاً: اجتماع المبيعات الأسبوعي">
-      </label>
-      <label class="field" id="accessField" hidden>
-        <span>كود الشركة (للموظفين)</span>
-        <input id="access" type="password" autocomplete="current-password" placeholder="••••••">
-      </label>
-      <button id="create" class="btn btn-primary btn-block"><span data-icon="plus"></span> اجتماع جديد</button>
+      <div data-pane="new">
+        <label class="field">
+          <span>عنوان الاجتماع (اختياري)</span>
+          <input id="title" maxlength="80" placeholder="مثلاً: لجنة تقييم الدفعة الجديدة">
+        </label>
+        <label class="field" id="accessField" hidden>
+          <span>كود الشركة (للموظفين)</span>
+          <input id="access" type="password" autocomplete="current-password" placeholder="••••••">
+        </label>
+        <button id="create" class="btn btn-primary btn-block"><span data-icon="plus"></span> ابدأ الاجتماع</button>
+      </div>
 
-      <div class="divider"><span>أو</span></div>
-
-      <label class="field">
-        <span>كود أو رابط الاجتماع</span>
-        <input id="code" dir="ltr" placeholder="abc-defg-hij">
-      </label>
-      <button id="join" class="btn btn-ghost btn-block"><span data-icon="login"></span> انضمام</button>
+      <div data-pane="join" hidden>
+        <label class="field">
+          <span>كود أو رابط الاجتماع</span>
+          <input id="code" dir="ltr" placeholder="abc-defg-hijk" autocapitalize="off" autocomplete="off">
+        </label>
+        <button id="join" class="btn btn-primary btn-block"><span data-icon="login"></span> انضمام</button>
+      </div>
       <p id="err" class="error" role="alert"></p>
     </section>
+
+    <section class="recent" id="recent" hidden>
+      <h2>اجتماعاتك الأخيرة</h2>
+      <ul id="recentList"></ul>
+    </section>
   </main>
+  <footer class="site-foot">ذكي smart لحاضنات ومسرعات الأعمال</footer>
 
   <script src="/js/config.js"></script>
   <script src="/js/icons.js"></script>
@@ -52,8 +76,30 @@
     const $ = (id) => document.getElementById(id);
     const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     $('name').value = store.get('meet:name') || '';
     const saveName = () => { const n = $('name').value.trim(); if (n) store.set('meet:name', n); };
+
+    // تبديل بين "اجتماع جديد" و "انضم"
+    document.querySelectorAll('.seg button').forEach((b) => b.onclick = () => {
+      document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === b));
+      document.querySelectorAll('[data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.mode; });
+      $('err').textContent = '';
+    });
+
+    // اجتماعاتك الأخيرة (محفوظة على الجهاز ده بس)
+    try {
+      const recent = JSON.parse(store.get('meet:recent') || '[]');
+      if (recent.length) {
+        const fmt = (ts) => new Date(ts).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        $('recentList').innerHTML = recent.slice(0, 6).map((r) => `
+          <li><a href="/m/${encodeURIComponent(r.id)}">
+            <span class="r-ic">${icon('cam', 20)}</span>
+            <span class="r-t"><b>${esc(r.title || 'اجتماع')}</b><small dir="ltr">${esc(r.id)}</small> · <small>${fmt(r.ts)}</small></span>
+          </a></li>`).join('');
+        $('recent').hidden = false;
+      }
+    } catch { /* ignore */ }
 
     // كود الشركة: بيظهر بس لو الخادم طالبه، والموبايل بيفتكره بعد أول مرة صح
     let needCode = false;
@@ -76,15 +122,17 @@
           return;
         }
         if (r.status === 429) { $('err').textContent = 'محاولات غلط كتير — استنى ربع ساعة وحاول تاني.'; return; }
-        const { id } = await r.json();
+        const data = await r.json();
         if (needCode) store.set('meet:access', code);
+        // مفتاح المنظّم: بيتحفظ على الجهاز ده بس، وبيخلّي صاحبه منظّم الاجتماع
+        if (data.hostKey) store.set(`meet:host:${data.id}`, data.hostKey);
         const t = $('title').value.trim();
-        location.href = `/m/${id}${t ? `?t=${encodeURIComponent(t)}` : ''}`;
+        location.href = `/m/${data.id}${t ? `?t=${encodeURIComponent(t)}` : ''}`;
       } catch { $('err').textContent = 'تعذر إنشاء الاجتماع، حاول مرة أخرى.'; }
     };
     const join = () => {
       saveName();
-      const raw = $('code').value.trim().toLowerCase();
+      const raw = $('code').value.trim().toLowerCase().split(/[?#]/)[0];
       const m = raw.match(/([a-z0-9-]{3,40})\/?$/);
       if (!m) { $('err').textContent = 'اكتب كود اجتماع صحيح.'; return; }
       location.href = `/m/${m[1]}`;
