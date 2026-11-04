@@ -54,7 +54,7 @@ app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 app.get('/healthz', (_req, res) => res.send('ok'));
 app.get('/api/new', (_req, res) => res.json({ id: newRoomId() }));
 app.get('/api/config', (_req, res) => res.json({
-  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, languages: Object.keys(ai.LANGS),
+  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, languages: Object.keys(ai.LANGS),
 }));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
@@ -132,12 +132,36 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('reaction', { from: socket.id, name: p.name, emoji: e });
   });
 
-  socket.on('caption', ({ text, final } = {}) => {
+  let fixCount = 0;
+  let fixWindow = Date.now();
+  socket.on('caption', async ({ text, final } = {}) => {
     const p = peer();
     const t = clean(text, 500);
     if (!p || !t) return;
-    if (final) logEvent(rooms.get(roomId), { type: 'speech', name: p.name, text: t });
-    socket.to(roomId).emit('caption', { from: socket.id, name: p.name, text: t, final: !!final, ts: Date.now() });
+    const room = rooms.get(roomId);
+    const msg = { from: socket.id, name: p.name, text: t, final: !!final, ts: Date.now() };
+    if (!final || !ai.correctionEnabled) {
+      if (final) logEvent(room, { type: 'speech', name: p.name, text: t });
+      socket.to(roomId).emit('caption', msg);
+      return;
+    }
+    // الجملة الكاملة: نصلّحها بالذكاء الاصطناعي، ونبعت النسخة المصلّحة للكل (ومنهم المتكلم نفسه)
+    if (Date.now() - fixWindow > 60_000) { fixWindow = Date.now(); fixCount = 0; }
+    let finalText = t;
+    if (++fixCount <= 40) {
+      const context = room.log.filter((e) => e.type === 'speech').slice(-5).map((e) => `${e.name}: ${e.text}`).join('\n');
+      try {
+        finalText = await Promise.race([
+          ai.fixTranscript(t, { title: room.title, context, speaker: p.name }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+        ]);
+      } catch (err) {
+        console.error('caption fix failed:', err.message);
+      }
+    }
+    if (!rooms.has(roomId)) return;
+    logEvent(room, { type: 'speech', name: p.name, text: finalText });
+    io.to(roomId).emit('caption', { ...msg, text: finalText, corrected: finalText !== t, ts: Date.now() });
   });
 
   // ---------- الذكاء الاصطناعي ----------
@@ -191,5 +215,5 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`smart Meet running on http://localhost:${PORT}`);
-  console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation: ${ai.translateModel})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
+  console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation & caption correction: ${ai.translateModel}${ai.correctionEnabled ? '' : ', correction OFF'})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
 });

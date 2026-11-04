@@ -486,6 +486,7 @@
   let captionsOn = false;
   let translateTo = store.get('meet:tr') || '';
   let aiOn = false;
+  let aiFix = false;
   function toggleCaptions() { captionsOn ? stopCaptions() : startCaptions(); refreshControls(); }
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const SR_ERRORS = {
@@ -527,7 +528,8 @@
       srFailures = [];
       capStatus(`🎙️ آخر كلام اتسمع: "${text}"`, 'ok');
       socket.emit('caption', { text, final: r.isFinal });
-      showCaption({ from: me.id, name: me.name, text, final: r.isFinal, ts: Date.now() });
+      // لو التصحيح الذكي شغّال، النسخة النهائية المصلّحة هترجع من الخادم وهي اللي تتسجل في المحضر
+      showCaption({ from: me.id, name: me.name, text, final: r.isFinal && !aiFix, ts: Date.now() });
     };
     recognizer.onerror = (e) => {
       if (e.error === 'no-speech' || e.error === 'aborted') return;
@@ -563,7 +565,7 @@
     if (!$('captionStatus').classList.contains('err')) capStatus('');
   }
   const captionEls = new Map();
-  function showCaption({ from, name, text, final, ts }) {
+  function showCaption({ from, name, text, final, ts, corrected }) {
     let el = captionEls.get(from);
     if (!el) {
       el = document.createElement('div');
@@ -571,7 +573,7 @@
       $('captions').append(el);
       captionEls.set(from, el);
     }
-    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}`;
+    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}${corrected ? ' <span class="fixed" title="اتصلّح بالذكاء الاصطناعي">✨</span>' : ''}`;
     const seq = (el._seq = (el._seq || 0) + 1);
     const expire = (ms) => {
       clearTimeout(el._t);
@@ -911,6 +913,7 @@
       const cfg = await (await fetch('/api/config')).json();
       if (cfg.iceServers?.length) iceServers = cfg.iceServers;
       aiOn = !!cfg.ai;
+      aiFix = !!cfg.captionCorrection;
       const info = await (await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)).json();
       if (info.title) meetingTitle = info.title;
       $('lobbyTitle').textContent = meetingTitle;

@@ -265,3 +265,4 @@ body.light .error { color: var(--danger); }
 .cap-status.ok { color: #a7f3d0; background: rgba(52, 211, 153, .1); }
 .cap-status.warn { color: #fde68a; background: rgba(251, 191, 36, .1); }
 .cap-status.err { color: #fecdd3; background: rgba(229, 72, 77, .12); }
+.captions .cap .fixed { font-size: .75rem; opacity: .8; }

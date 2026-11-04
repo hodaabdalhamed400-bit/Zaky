@@ -51,6 +51,34 @@ async function translate(text, lang) {
   return out;
 }
 
+// ---------- تصحيح الكلام المكتوب ----------
+// التعرف على الكلام في المتصفح بيغلط كتير في العربي؛ Haiku بيصلّح الغلطات الواضحة بس.
+const correctionEnabled = enabled && process.env.CAPTION_CORRECTION !== 'off';
+async function fixTranscript(text, { title, context, speaker }) {
+  const res = await client.messages.create({
+    model: TRANSLATE_MODEL,
+    max_tokens: 1024,
+    output_config: { effort: 'low' },
+    system:
+      'You correct speech-to-text errors in live captions of a business meeting held mostly in Arabic (Egyptian, Gulf or other dialects, sometimes mixed with English). ' +
+      'The company is "ذكي smart", a business incubator and accelerator, so expect words about startups, incubation, acceleration, investment, programs, budgets and entrepreneurs. ' +
+      'Fix misrecognized words, broken word boundaries, missing hamza/taa marbuta and obvious homophone errors, and write English terms that were spoken in Latin letters when that is clearly intended. ' +
+      'Keep the speaker\'s dialect and wording; do not translate, formalize, summarize, add, or remove ideas. If you are not confident a word is wrong, keep it as is. ' +
+      'Reply with the corrected caption only — no quotes, notes or explanations.',
+    messages: [{
+      role: 'user',
+      content:
+        `Meeting title: ${title}\n` +
+        (context ? `Previous captions (context only, do not repeat):\n${context}\n\n` : '') +
+        `Caption to correct (spoken by ${speaker}):\n${text}`,
+    }],
+  });
+  const out = textOf(res);
+  // حماية: لو الرد غريب (فاضي أو أطول بكتير من الأصل) نرجع للنص الأصلي
+  if (!out || out.length > text.length * 2 + 40) return text;
+  return out;
+}
+
 // ---------- المساعد الذكي ----------
 function formatLog(room) {
   const t = (ts) => new Date(ts).toISOString().slice(11, 16);
@@ -86,4 +114,4 @@ async function ask(room, question, askerName) {
   return textOf(res);
 }
 
-module.exports = { enabled, model: MODEL, translateModel: TRANSLATE_MODEL, LANGS, translate, ask, friendlyError };
+module.exports = { enabled, correctionEnabled, model: MODEL, translateModel: TRANSLATE_MODEL, LANGS, translate, fixTranscript, ask, friendlyError };
