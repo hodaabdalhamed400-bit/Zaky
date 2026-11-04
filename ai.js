@@ -43,11 +43,12 @@ async function translate(text, lang, { title = '', context = '' } = {}) {
     output_config: { effort: TRANSLATE_EFFORT },
     system:
       `You are a professional simultaneous interpreter producing live ${target} subtitles for a business video meeting. ` +
-      'The company is "ذكي smart", a business incubator and accelerator; meetings are mostly in spoken Arabic (Egyptian, Saudi/Gulf and other dialects), sometimes mixed with English terms. ' +
+      'The company is "ذكي smart", a business incubator and accelerator. Participants speak Arabic (Egyptian, Saudi/Gulf and other dialects), English, or occasionally another language. ' +
       `Translate the caption into natural, fluent, idiomatic ${target}, the way a skilled human interpreter would: convey the meaning and intent, not word-for-word. ` +
       'Render dialect expressions and idioms by their meaning (for example Egyptian "دلوقتي" = "now", "عايزين" = "we want", "إن شاء الله" in a plan = "hopefully"). ' +
       'Use standard business and startup vocabulary where it fits (incubation, acceleration program, cohort, founders, pitch, investors, funding round, mentorship). ' +
       'Keep names, numbers, dates and brand names accurate. ' +
+      (lang === 'ar' ? 'Write clear, simple Modern Standard Arabic that any Arabic speaker understands, with natural Arabic business terms. ' : '') +
       'Captions come from speech recognition, so they can be fragments or contain recognition errors: use the previous captions only to understand references and the most likely intended meaning, and translate only the new caption. ' +
       'If the caption is a fragment, translate it as a natural fragment rather than inventing a full sentence. If it is already in the target language, return it unchanged. ' +
       'Reply with the translation only, with no quotes, labels, notes or explanations.',
@@ -74,7 +75,7 @@ async function fixTranscript(text, { title, context, speaker }) {
     max_tokens: 1024,
     output_config: { effort: 'low' },
     system:
-      'You correct speech-to-text errors in live captions of a business meeting held mostly in Arabic (Egyptian, Gulf or other dialects, sometimes mixed with English). ' +
+      'You correct speech-to-text errors in live captions of a business meeting. Participants speak Arabic (Egyptian, Gulf or other dialects), English, or occasionally another language, and Arabic speech is sometimes mixed with English terms. Correct each caption in its own language. ' +
       'The company is "ذكي smart", a business incubator and accelerator, so expect words about startups, incubation, acceleration, investment, programs, budgets and entrepreneurs. ' +
       'Fix misrecognized words, broken word boundaries, missing hamza/taa marbuta and obvious homophone errors, and write English terms that were spoken in Latin letters when that is clearly intended. ' +
       'Keep the speaker\'s dialect and wording; do not translate, formalize, summarize, add, or remove ideas. If you are not confident a word is wrong, keep it as is. ' +

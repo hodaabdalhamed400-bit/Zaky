@@ -484,7 +484,15 @@
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null;
   let captionsOn = false;
-  let translateTo = store.get('meet:tr') || '';
+  // اللغة الافتراضية حسب لغة موبايل/متصفح الشخص (علشان الضيف الأجنبي ما يتكتبش كلامه على إنه عربي)
+  const navLang = (navigator.language || 'ar').toLowerCase();
+  const DEFAULT_SPEAK = navLang.startsWith('ar')
+    ? (navLang === 'ar-ae' ? 'ar-AE' : /^ar-(sa|kw|qa|bh|om)$/.test(navLang) ? 'ar-SA' : 'ar-EG')
+    : ({ en: navLang === 'en-gb' ? 'en-GB' : 'en-US', fr: 'fr-FR', tr: 'tr-TR', ur: 'ur-PK', hi: 'hi-IN', zh: 'zh-CN', es: 'es-ES', de: 'de-DE' }[navLang.slice(0, 2)] || 'en-US');
+  const DEFAULT_TR = navLang.startsWith('ar') ? 'ar'
+    : (['en', 'fr', 'tr', 'ur', 'hi', 'zh', 'es', 'de'].includes(navLang.slice(0, 2)) ? navLang.slice(0, 2) : 'en');
+  const speakLang = () => store.get('meet:lang') || DEFAULT_SPEAK;
+  let translateTo = store.get('meet:tr') ?? DEFAULT_TR;
   let aiOn = false;
   let aiFix = false;
   function toggleCaptions() { captionsOn ? stopCaptions() : startCaptions(); refreshControls(); }
@@ -507,7 +515,7 @@
     el.hidden = !text;
   }
   let srFailures = [];
-  function startCaptions() {
+  function startCaptions(fromLobby = false) {
     if (!SR) {
       const msg = isIOS ? 'تحويل الكلام لنص على الآيفون محتاج Safari (مش Chrome).' : 'تحويل الكلام لنص محتاج Chrome أو Edge أو Safari حديث.';
       toast(msg); capStatus(msg, 'err');
@@ -516,7 +524,7 @@
     captionsOn = true;
     srFailures = [];
     recognizer = new SR();
-    recognizer.lang = store.get('meet:lang') || 'ar-EG';
+    recognizer.lang = speakLang();
     recognizer.continuous = !isIOS; // Safari على الآيفون أثبت مع جمل منفصلة وإعادة التشغيل
     recognizer.interimResults = true;
     recognizer.onstart = () => capStatus(me.mic ? '🎙️ بيسمعك دلوقتي… اتكلم' : '🔇 الميكروفون مقفول — افتحه علشان كلامك يتكتب', me.mic ? 'ok' : 'warn');
@@ -553,7 +561,7 @@
     };
     try {
       recognizer.start();
-      toast(window.innerWidth < 820 ? 'تم التفعيل — اقفل اللوحة علشان تشوف الكلام على الشاشة' : 'تم تفعيل تحويل الكلام إلى نص', 4000);
+      if (!fromLobby) toast(window.innerWidth < 820 ? 'تم التفعيل — اقفل اللوحة علشان تشوف الكلام على الشاشة' : 'تم تفعيل تحويل الكلام إلى نص', 4000);
     } catch (err) {
       capStatus('مقدرتش أشغّل التعرف على الكلام — جرّب تاني.', 'err');
     }
@@ -582,7 +590,10 @@
     expire(final ? 4000 : 7000);
     if (final) addMinute('speech', text, name, ts);
     // ترجمة كلام المشاركين الآخرين للغة اللي اخترتها
-    if (final && translateTo && aiOn && from !== me.id) {
+    // ما نترجمش عربي لعربي (توفير): لو الجملة أغلبها حروف عربية واللغة المطلوبة عربي
+    const arabicRatio = (text.match(/[\u0600-\u06FF]/g) || []).length / Math.max(1, text.replace(/\s/g, '').length);
+    const alreadyTarget = translateTo === 'ar' && arabicRatio > 0.5;
+    if (final && translateTo && aiOn && from !== me.id && !alreadyTarget) {
       expire(9000);
       socket.emit('ai-translate', { text, lang: translateTo }, (res) => {
         if (res?.text && el._seq === seq && el.isConnected) {
@@ -597,7 +608,7 @@
   }
 
   // لوحة الترجمة
-  $('setLang').value = store.get('meet:lang') || 'ar-EG';
+  $('setLang').value = speakLang();
   $('setTranslate').value = translateTo;
   $('setLang').onchange = () => {
     store.set('meet:lang', $('setLang').value);
@@ -904,6 +915,11 @@
   $('pMic').onclick = async () => { await enableMic(!me.mic); refreshPreview(); };
   $('pCam').onclick = async () => { await enableCam(!me.cam); refreshPreview(); };
   $('lobbyName').value = me.name;
+  $('lobbySpeak').innerHTML = $('setLang').innerHTML;
+  $('lobbyTr').innerHTML = $('setTranslate').innerHTML;
+  $('lobbySpeak').value = speakLang();
+  $('lobbyTr').value = translateTo;
+  $('lobbyCap').checked = store.get('meet:cap') !== '0';
   $('lobbyName').oninput = refreshPreview;
   preview.classList.add('mirror');
 
@@ -933,6 +949,8 @@
     $('aiOff').hidden = aiOn;
     setAiBusy(false);
     $('setTranslate').disabled = !aiOn;
+    $('lobbyTr').disabled = !aiOn;
+    if (!aiOn) $('lobbyTr').value = '';
     $('translateNote').textContent = aiOn
       ? 'الترجمة بتشتغل على كلام المشاركين اللي مفعّلين "تحويل الكلام إلى نص".'
       : 'الترجمة للغات أخرى تحتاج تفعيل الذكاء الاصطناعي على الخادم. تحويل الكلام لنص شغال عادي.';
@@ -953,9 +971,21 @@
     $('lobby').hidden = true;
     $('meeting').hidden = false;
     $('meetingTitle').textContent = meetingTitle;
+    // إعدادات اللغة من شاشة الدخول
+    store.set('meet:lang', $('lobbySpeak').value);
+    $('setLang').value = $('lobbySpeak').value;
+    if (aiOn) {
+      translateTo = $('lobbyTr').value;
+      store.set('meet:tr', translateTo);
+      $('setTranslate').value = translateTo;
+    }
+    store.set('meet:cap', $('lobbyCap').checked ? '1' : '0');
+
     makeTile('me', me.name, true);
     refreshControls();
     connect();
+    // لازم يبدأ هنا (جوه ضغطة الزرار) علشان الآيفون يسمح بالتعرف على الكلام
+    if ($('lobbyCap').checked && SR) { startCaptions(true); refreshControls(); }
   };
   $('lobbyName').addEventListener('keydown', (e) => e.key === 'Enter' && $('joinBtn').click());
 

@@ -266,3 +266,8 @@ body.light .error { color: var(--danger); }
 .cap-status.warn { color: #fde68a; background: rgba(251, 191, 36, .1); }
 .cap-status.err { color: #fecdd3; background: rgba(229, 72, 77, .12); }
 .captions .cap .fixed { font-size: .75rem; opacity: .8; }
+.lang-box { border: 1px solid var(--line); border-radius: 14px; padding: .8rem .8rem .2rem; margin-bottom: .9rem; background: var(--bg-2); }
+.lang-box .field select { background: var(--surface); }
+.check { display: flex; gap: .6rem; align-items: flex-start; margin-bottom: .8rem; font-size: .9rem; line-height: 1.5; cursor: pointer; }
+.check input { width: 20px; height: 20px; margin-top: .15rem; accent-color: var(--brand); flex: none; }
+.check small { color: var(--muted); }

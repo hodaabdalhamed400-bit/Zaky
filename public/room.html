@@ -31,9 +31,14 @@
         <p class="muted" id="lobbyInfo">جاري التحقق من الاجتماع…</p>
         <label class="field">
           <span>اسمك</span>
-          <input id="lobbyName" maxlength="40" placeholder="اكتب اسمك" autocomplete="name">
+          <input id="lobbyName" maxlength="40" placeholder="اكتب اسمك · Your name" autocomplete="name">
         </label>
-        <button id="joinBtn" class="btn btn-primary btn-block">انضم الآن</button>
+        <div class="lang-box">
+          <label class="field"><span>لغة كلامك · Language you speak</span><select id="lobbySpeak"></select></label>
+          <label class="field"><span>اعرض كلام الآخرين بـ · Show others' speech in</span><select id="lobbyTr"></select></label>
+          <label class="check"><input type="checkbox" id="lobbyCap"><span>حوّل كلامي لنص — مطلوب علشان الترجمة توصل للآخرين<br><small>Caption my speech — needed so others get the translation</small></span></label>
+        </div>
+        <button id="joinBtn" class="btn btn-primary btn-block">انضم الآن · Join</button>
         <p id="lobbyErr" class="error" role="alert"></p>
       </div>
     </div>
@@ -153,11 +158,17 @@
             <option value="en-US">English (US)</option>
             <option value="en-GB">English (UK)</option>
             <option value="fr-FR">Français</option>
+            <option value="tr-TR">Türkçe</option>
+            <option value="ur-PK">اردو</option>
+            <option value="hi-IN">हिन्दी</option>
+            <option value="zh-CN">中文</option>
+            <option value="es-ES">Español</option>
+            <option value="de-DE">Deutsch</option>
           </select>
         </label>
         <label class="field"><span>ترجم كلام المشاركين إلى</span>
           <select id="setTranslate">
-            <option value="">بدون ترجمة (النص الأصلي)</option>
+            <option value="">بدون ترجمة · No translation</option>
             <option value="ar">العربية</option>
             <option value="en">English</option>
             <option value="fr">Français</option>
