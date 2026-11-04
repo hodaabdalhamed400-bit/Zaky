@@ -18,7 +18,9 @@
   <div class="hp-bg" aria-hidden="true">
     <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
     <span class="grid-lines"></span>
+    <canvas id="net"></canvas>
   </div>
+  <div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
 
   <header class="hp-nav reveal" style="--d:0">
     <img src="/img/logo-light.png" alt="ذكي smart لحاضنات ومسرعات الأعمال" class="hp-logo">
@@ -28,10 +30,10 @@
   <main class="hp-main">
     <section class="hp-hero">
       <p class="hp-eyebrow reveal" style="--d:1">منصة اجتماعات ذكي لحاضنات ومسرعات الأعمال</p>
-      <h1 class="reveal" style="--d:2">اجتماعات <span class="rot" id="rot">ذكية</span><br>لكل رواد الأعمال</h1>
+      <h1 class="reveal" style="--d:2">اجتماعات <span class="rot" id="rot">ذكية</span><span class="caret" aria-hidden="true"></span><br>لكل رواد الأعمال</h1>
       <p class="hp-lead reveal" style="--d:3">اجتمع بالفيديو مع فريقك والشركات الناشئة والمستثمرين من أي جهاز — مع مساعد ذكي يلخّص ويطلّع المهام، وترجمة فورية بين العربي والإنجليزي.</p>
 
-      <div class="hp-start reveal" style="--d:4">
+      <div class="hp-start reveal glow-border" style="--d:4">
         <label class="hp-field">
           <span>اسمك</span>
           <input id="name" maxlength="40" placeholder="اكتب اسمك" autocomplete="name">
@@ -64,26 +66,45 @@
 
     <!-- معاينة حيّة لاجتماع -->
     <section class="hp-preview reveal" style="--d:3" aria-hidden="true">
-      <div class="pv-window">
+      <div class="pv-window" id="pvWindow">
         <div class="pv-top">
           <span class="pv-dots"><i></i><i></i><i></i></span>
           <span class="pv-title">لجنة تقييم الدفعة الجديدة</span>
           <span class="pv-rec"><i></i>REC</span>
         </div>
         <div class="pv-grid">
-          <div class="pv-tile s1"><span class="pv-av" style="--a:#1faec1">م</span><span class="pv-nm">محمود</span></div>
-          <div class="pv-tile s2"><span class="pv-av" style="--a:#7c5cff">S</span><span class="pv-nm">Sara</span></div>
-          <div class="pv-tile s3"><span class="pv-av" style="--a:#f59e0b">أ</span><span class="pv-nm">أحمد</span></div>
-          <div class="pv-tile s4"><span class="pv-av" style="--a:#22c55e">J</span><span class="pv-nm">John</span></div>
+          <div class="pv-tile s1"><span class="pv-av" style="--a:#1faec1">م</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="pv-nm">محمود</span></div>
+          <div class="pv-tile s2"><span class="pv-av" style="--a:#7c5cff">S</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="pv-nm">Sara</span></div>
+          <div class="pv-tile s3"><span class="pv-av" style="--a:#f59e0b">أ</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="pv-nm">أحمد</span></div>
+          <div class="pv-tile s4"><span class="pv-av" style="--a:#22c55e">J</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="pv-nm">John</span></div>
+          <div class="pv-emojis" id="pvEmojis"></div>
         </div>
-        <div class="pv-caps">
-          <div class="pv-cap c1"><b>Sara</b> نحب ننضم للدفعة الجاية <small>We'd love to join the next cohort</small></div>
-          <div class="pv-cap c2"><b>John</b> The pitch deck is ready <small>العرض التقديمي جاهز</small></div>
-        </div>
+        <div class="pv-caps"><div class="pv-cap" id="pvCap"><b id="pvWho">Sara</b> <span id="pvText"></span><small id="pvTr"></small></div></div>
         <div class="pv-dock"><i class="o1"></i><i class="o2"></i><i class="o3"></i><i class="o4"></i><i class="o5"></i></div>
       </div>
       <div class="pv-float f1"><span data-icon="sparkles" data-size="16"></span> ملخص جاهز · 3 قرارات · 5 مهام</div>
       <div class="pv-float f2"><span data-icon="globe" data-size="16"></span> عربي ⇄ English</div>
+    </section>
+
+    <section class="hp-stats" aria-label="أرقام">
+      <div class="stat sr"><b data-count="9">0</b><span>لغات ترجمة فورية</span></div>
+      <div class="stat sr"><b data-count="8">0</b><span>مشاركين في الاجتماع</span></div>
+      <div class="stat sr"><b data-count="0" data-suffix="">0</b><span>تطبيقات تتنزّل — من المتصفح على طول</span></div>
+      <div class="stat sr"><b data-count="100" data-suffix="%">0</b><span>عربي من أول شاشة لآخر ملخص</span></div>
+    </section>
+
+    <div class="hp-marquee" aria-hidden="true">
+      <div class="mq-track">
+        <span>🎥 فيديو بجودة عالية</span><span>✨ مساعد ذكي</span><span>🌐 ترجمة فورية</span><span>📝 محضر تلقائي</span><span>👑 تحكم المنظّم</span><span>🚪 غرفة انتظار</span><span>🖥️ مشاركة الشاشة</span><span>⏺️ تسجيل</span><span>🔐 كود الشركة</span><span>✋ رفع اليد</span>
+        <span>🎥 فيديو بجودة عالية</span><span>✨ مساعد ذكي</span><span>🌐 ترجمة فورية</span><span>📝 محضر تلقائي</span><span>👑 تحكم المنظّم</span><span>🚪 غرفة انتظار</span><span>🖥️ مشاركة الشاشة</span><span>⏺️ تسجيل</span><span>🔐 كود الشركة</span><span>✋ رفع اليد</span>
+      </div>
+    </div>
+
+    <section class="hp-features">
+      <article class="fcard sr tilt" style="--c1:#7c5cff;--c2:#1faec1"><span class="f-orb" data-icon="sparkles" data-size="26"></span><h3>مساعد ذكي جوه الاجتماع</h3><p>اسأله في أي وقت: لخّص اللي اتقال، إيه القرارات، مين مسؤول عن إيه.</p></article>
+      <article class="fcard sr tilt" style="--c1:#3b82f6;--c2:#1faec1"><span class="f-orb" data-icon="globe" data-size="26"></span><h3>ترجمة فورية بين اللغات</h3><p>كل واحد بيشوف كلام التاني بلغته وهو بيتكلم — عربي، إنجليزي، و7 لغات تانية.</p></article>
+      <article class="fcard sr tilt" style="--c1:#f59e0b;--c2:#ef4444"><span class="f-orb" data-icon="users" data-size="26"></span><h3>المنظّم ماسك الاجتماع</h3><p>غرفة انتظار، كتم صوت الكل، قفل الاجتماع، وإخراج أي حد بضغطة.</p></article>
+      <article class="fcard sr tilt" style="--c1:#22c55e;--c2:#0f766e"><span class="f-orb" data-icon="notes" data-size="26"></span><h3>محضر وملخص في الآخر</h3><p>كل كلمة اتقالت أو اتكتبت محفوظة، وملخص منظّم أول ما الاجتماع يخلص.</p></article>
     </section>
 
     <section class="hp-recent reveal" id="recent" hidden style="--d:6">
@@ -105,16 +126,144 @@
     $('name').value = store.get('meet:name') || '';
     const saveName = () => { const n = $('name').value.trim(); if (n) store.set('meet:name', n); };
 
-    // الكلمة اللي بتتغيّر في العنوان
-    const words = ['ذكية', 'مترجمة', 'منظّمة', 'آمنة'];
-    let wi = 0;
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setInterval(() => {
-        const el = $('rot');
-        el.classList.add('out');
-        setTimeout(() => { wi = (wi + 1) % words.length; el.textContent = words[wi]; el.classList.remove('out'); }, 350);
-      }, 2600);
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const finePointer = matchMedia('(pointer: fine)').matches;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const chars = (t) => Array.from(t); // علشان الحروف العربية والإيموجي
+
+    // ---- الكلمة اللي بتتكتب وتتمسح في العنوان ----
+    (async () => {
+      if (reduced) return;
+      const words = ['ذكية', 'مترجمة', 'منظّمة', 'آمنة', 'أسرع'];
+      const el = $('rot');
+      await sleep(2200);
+      for (let i = 1; ; i++) {
+        let t = el.textContent;
+        while (t.length) { t = chars(t).slice(0, -1).join(''); el.textContent = t || '\u200b'; await sleep(55); }
+        await sleep(200);
+        for (const c of chars(words[i % words.length])) { t += c; el.textContent = t; await sleep(95); }
+        await sleep(2300);
+      }
+    })();
+
+    // ---- خلفية الشبكة المتفاعلة ----
+    (() => {
+      const cv = $('net');
+      const ctx = cv.getContext('2d');
+      let w, h, dpr, pts = [];
+      const mouse = { x: -9999, y: -9999 };
+      const N = () => Math.min(90, Math.round((w * h) / (finePointer ? 16000 : 11000)));
+      function resize() {
+        dpr = Math.min(2, window.devicePixelRatio || 1);
+        w = cv.width = innerWidth * dpr; h = cv.height = innerHeight * dpr;
+        cv.style.width = `${innerWidth}px`; cv.style.height = `${innerHeight}px`;
+        pts = Array.from({ length: N() }, () => ({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - .5) * .35 * dpr, vy: (Math.random() - .5) * .35 * dpr, r: (Math.random() * 1.4 + .6) * dpr }));
+      }
+      resize(); addEventListener('resize', resize);
+      addEventListener('pointermove', (e) => { mouse.x = e.clientX * dpr; mouse.y = e.clientY * dpr; });
+      addEventListener('pointerleave', () => { mouse.x = mouse.y = -9999; });
+      const link = 130;
+      function frame() {
+        ctx.clearRect(0, 0, w, h);
+        for (const p of pts) {
+          const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+          if (d < 140 * dpr && d > 0) { p.x += (dx / d) * 1.4 * dpr; p.y += (dy / d) * 1.4 * dpr; } // بتبعد عن صباعك
+          if (!reduced) { p.x += p.vx; p.y += p.vy; }
+          if (p.x < 0 || p.x > w) p.vx *= -1;
+          if (p.y < 0 || p.y > h) p.vy *= -1;
+        }
+        for (let i = 0; i < pts.length; i++) {
+          for (let j = i + 1; j < pts.length; j++) {
+            const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+            if (d < link * dpr) { ctx.strokeStyle = `rgba(79,209,224,${(1 - d / (link * dpr)) * .28})`; ctx.lineWidth = dpr * .8; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+          }
+          const p = pts[i], near = Math.hypot(p.x - mouse.x, p.y - mouse.y) < 180 * dpr;
+          ctx.fillStyle = near ? 'rgba(167,139,250,.95)' : 'rgba(79,209,224,.7)';
+          ctx.beginPath(); ctx.arc(p.x, p.y, near ? p.r * 1.8 : p.r, 0, Math.PI * 2); ctx.fill();
+        }
+        if (!document.hidden) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) requestAnimationFrame(frame); });
+    })();
+
+    // ---- نور بيمشي مع الماوس + ميل المعاينة ----
+    if (finePointer && !reduced) {
+      const glow = $('cursorGlow');
+      const win = $('pvWindow');
+      addEventListener('pointermove', (e) => {
+        glow.style.transform = `translate(${e.clientX - 200}px, ${e.clientY - 200}px)`;
+        glow.style.opacity = '1';
+        const r = win.getBoundingClientRect();
+        const rx = ((e.clientY - (r.top + r.height / 2)) / innerHeight) * -14;
+        const ry = ((e.clientX - (r.left + r.width / 2)) / innerWidth) * 18;
+        win.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+      });
+      // ميل الكروت
+      document.querySelectorAll('.tilt').forEach((c) => {
+        c.addEventListener('pointermove', (e) => {
+          const r = c.getBoundingClientRect();
+          const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+          c.style.transform = `perspective(700px) rotateX(${y * -10}deg) rotateY(${x * 12}deg) translateY(-4px)`;
+          c.style.setProperty('--mx', `${(x + .5) * 100}%`); c.style.setProperty('--my', `${(y + .5) * 100}%`);
+        });
+        c.addEventListener('pointerleave', () => { c.style.transform = ''; });
+      });
     }
+
+    // ---- الترجمة اللي بتتكتب في المعاينة ----
+    (async () => {
+      const lines = [
+        ['Sara', 'نحب ننضم للدفعة الجاية', "We'd love to join the next cohort", 's2'],
+        ['John', 'The pitch deck is ready', 'العرض التقديمي جاهز', 's4'],
+        ['محمود', 'هنبدأ التقييم يوم الأحد', "We'll start the evaluation on Sunday", 's1'],
+        ['أحمد', 'الميزانية اتعتمدت', 'The budget has been approved', 's3'],
+      ];
+      const cap = $('pvCap');
+      for (let i = 0; ; i = (i + 1) % lines.length) {
+        const [who, text, tr, tile] = lines[i];
+        document.querySelectorAll('.pv-tile').forEach((t) => t.classList.toggle('on', t.classList.contains(tile)));
+        $('pvWho').textContent = who; $('pvText').textContent = ''; $('pvTr').textContent = '';
+        cap.classList.add('show');
+        if (reduced) { $('pvText').textContent = text; $('pvTr').textContent = tr; await sleep(4000); continue; }
+        let t = ''; for (const c of chars(text)) { t += c; $('pvText').textContent = t; await sleep(45); }
+        await sleep(350);
+        $('pvTr').textContent = tr; $('pvTr').classList.remove('in'); void $('pvTr').offsetWidth; $('pvTr').classList.add('in');
+        await sleep(2400);
+        cap.classList.remove('show');
+        await sleep(450);
+      }
+    })();
+
+    // ---- إيموجي بتطلع من المعاينة ----
+    if (!reduced) {
+      const em = ['👏', '👍', '🎉', '❤️', '🚀', '💡'];
+      setInterval(() => {
+        const s = document.createElement('span');
+        s.textContent = em[Math.floor(Math.random() * em.length)];
+        s.style.insetInlineStart = `${10 + Math.random() * 80}%`;
+        $('pvEmojis').append(s);
+        setTimeout(() => s.remove(), 2600);
+      }, 1400);
+    }
+
+    // ---- ظهور العناصر مع النزول + العدّاد ----
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+        const b = e.target.querySelector('[data-count]');
+        if (b) {
+          const end = Number(b.dataset.count), suf = b.dataset.suffix ?? '';
+          if (reduced || end === 0) { b.textContent = end + suf; continue; }
+          const t0 = performance.now();
+          const step = (t) => { const k = Math.min(1, (t - t0) / 1400); b.textContent = Math.round(end * (1 - Math.pow(1 - k, 3))) + suf; if (k < 1) requestAnimationFrame(step); };
+          requestAnimationFrame(step);
+        }
+      }
+    }, { threshold: .25 });
+    document.querySelectorAll('.sr').forEach((el, i) => { el.style.setProperty('--sd', i % 4); io.observe(el); });
 
     // اجتماعاتك الأخيرة (محفوظة على الجهاز ده بس)
     try {
