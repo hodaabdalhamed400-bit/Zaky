@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f4f8fb">
+  <meta name="theme-color" content="#07111f">
   <title>smart Meet | ذكي</title>
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
@@ -11,68 +11,93 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/home.css">
 </head>
-<body class="light">
-  <header class="site-nav">
-    <div class="brand" data-brand="light"></div>
-    <span class="nav-tag">smart Meet</span>
+<body class="hp">
+  <!-- خلفية متحركة -->
+  <div class="hp-bg" aria-hidden="true">
+    <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+    <span class="grid-lines"></span>
+  </div>
+
+  <header class="hp-nav reveal" style="--d:0">
+    <img src="/img/logo-light.png" alt="ذكي smart لحاضنات ومسرعات الأعمال" class="hp-logo">
+    <span class="hp-tag"><i></i> smart Meet</span>
   </header>
 
-  <main class="home-main">
-    <section class="hero">
-      <h1>اجتماعات <em>ذكية</em> لرواد الأعمال وفريق ذكي</h1>
-      <p>اجتمع بالفيديو مع فريقك والشركات الناشئة والمستثمرين من أي جهاز، مع مساعد ذكي يلخّص ويطلّع المهام، وترجمة فورية بين العربي والإنجليزي.</p>
-      <ul class="features">
-        <li><span class="f-ic" data-icon="sparkles"></span><span><b>مساعد ذكي</b><small>ملخص الاجتماع، القرارات، والمهام ومسؤول كل مهمة.</small></span></li>
-        <li><span class="f-ic" data-icon="globe"></span><span><b>ترجمة فورية</b><small>كل واحد يشوف كلام التاني بلغته وهو بيتكلم.</small></span></li>
-        <li><span class="f-ic" data-icon="notes"></span><span><b>محضر تلقائي</b><small>كل اللي اتقال واتكتب محفوظ وقابل للتحميل.</small></span></li>
-      </ul>
-    </section>
+  <main class="hp-main">
+    <section class="hp-hero">
+      <p class="hp-eyebrow reveal" style="--d:1">منصة اجتماعات ذكي لحاضنات ومسرعات الأعمال</p>
+      <h1 class="reveal" style="--d:2">اجتماعات <span class="rot" id="rot">ذكية</span><br>لكل رواد الأعمال</h1>
+      <p class="hp-lead reveal" style="--d:3">اجتمع بالفيديو مع فريقك والشركات الناشئة والمستثمرين من أي جهاز — مع مساعد ذكي يلخّص ويطلّع المهام، وترجمة فورية بين العربي والإنجليزي.</p>
 
-    <section class="card start-card">
-      <div class="seg" role="tablist">
-        <button class="on" data-mode="new" role="tab">اجتماع جديد</button>
-        <button data-mode="join" role="tab">انضم لاجتماع</button>
-      </div>
-
-      <label class="field">
-        <span>اسمك</span>
-        <input id="name" maxlength="40" placeholder="مثلاً: محمود عبد الحميد" autocomplete="name">
-      </label>
-
-      <div data-pane="new">
-        <label class="field">
+      <div class="hp-start reveal" style="--d:4">
+        <label class="hp-field">
+          <span>اسمك</span>
+          <input id="name" maxlength="40" placeholder="اكتب اسمك" autocomplete="name">
+        </label>
+        <label class="hp-field" id="titleField">
           <span>عنوان الاجتماع (اختياري)</span>
           <input id="title" maxlength="80" placeholder="مثلاً: لجنة تقييم الدفعة الجديدة">
         </label>
-        <label class="field" id="accessField" hidden>
+        <label class="hp-field" id="accessField" hidden>
           <span>كود الشركة (للموظفين)</span>
           <input id="access" type="password" autocomplete="current-password" placeholder="••••••">
         </label>
-        <button id="create" class="btn btn-primary btn-block"><span data-icon="plus"></span> ابدأ الاجتماع</button>
+        <div class="hp-actions">
+          <button id="create" class="hp-cta"><span data-icon="cam" data-size="20"></span> اجتماع جديد</button>
+          <div class="hp-join">
+            <input id="code" dir="ltr" placeholder="كود الاجتماع" autocapitalize="off" autocomplete="off" aria-label="كود أو رابط الاجتماع">
+            <button id="join" class="hp-join-btn">انضم</button>
+          </div>
+        </div>
+        <p id="err" class="error" role="alert"></p>
       </div>
 
-      <div data-pane="join" hidden>
-        <label class="field">
-          <span>كود أو رابط الاجتماع</span>
-          <input id="code" dir="ltr" placeholder="abc-defg-hijk" autocapitalize="off" autocomplete="off">
-        </label>
-        <button id="join" class="btn btn-primary btn-block"><span data-icon="login"></span> انضمام</button>
-      </div>
-      <p id="err" class="error" role="alert"></p>
+      <ul class="hp-points reveal" style="--d:5">
+        <li><span data-icon="sparkles" data-size="18"></span> مساعد ذكي</li>
+        <li><span data-icon="globe" data-size="18"></span> ترجمة فورية</li>
+        <li><span data-icon="notes" data-size="18"></span> محضر تلقائي</li>
+        <li><span data-icon="users" data-size="18"></span> تحكم المنظّم</li>
+      </ul>
     </section>
 
-    <section class="recent" id="recent" hidden>
+    <!-- معاينة حيّة لاجتماع -->
+    <section class="hp-preview reveal" style="--d:3" aria-hidden="true">
+      <div class="pv-window">
+        <div class="pv-top">
+          <span class="pv-dots"><i></i><i></i><i></i></span>
+          <span class="pv-title">لجنة تقييم الدفعة الجديدة</span>
+          <span class="pv-rec"><i></i>REC</span>
+        </div>
+        <div class="pv-grid">
+          <div class="pv-tile s1"><span class="pv-av" style="--a:#1faec1">م</span><span class="pv-nm">محمود</span></div>
+          <div class="pv-tile s2"><span class="pv-av" style="--a:#7c5cff">S</span><span class="pv-nm">Sara</span></div>
+          <div class="pv-tile s3"><span class="pv-av" style="--a:#f59e0b">أ</span><span class="pv-nm">أحمد</span></div>
+          <div class="pv-tile s4"><span class="pv-av" style="--a:#22c55e">J</span><span class="pv-nm">John</span></div>
+        </div>
+        <div class="pv-caps">
+          <div class="pv-cap c1"><b>Sara</b> نحب ننضم للدفعة الجاية <small>We'd love to join the next cohort</small></div>
+          <div class="pv-cap c2"><b>John</b> The pitch deck is ready <small>العرض التقديمي جاهز</small></div>
+        </div>
+        <div class="pv-dock"><i class="o1"></i><i class="o2"></i><i class="o3"></i><i class="o4"></i><i class="o5"></i></div>
+      </div>
+      <div class="pv-float f1"><span data-icon="sparkles" data-size="16"></span> ملخص جاهز · 3 قرارات · 5 مهام</div>
+      <div class="pv-float f2"><span data-icon="globe" data-size="16"></span> عربي ⇄ English</div>
+    </section>
+
+    <section class="hp-recent reveal" id="recent" hidden style="--d:6">
       <h2>اجتماعاتك الأخيرة</h2>
       <ul id="recentList"></ul>
     </section>
   </main>
-  <footer class="site-foot">ذكي smart لحاضنات ومسرعات الأعمال</footer>
+
+  <footer class="hp-foot">ذكي smart لحاضنات ومسرعات الأعمال</footer>
 
   <script src="/js/config.js"></script>
   <script src="/js/icons.js"></script>
   <script>
-    renderBrand(); hydrateIcons();
+    hydrateIcons();
     const $ = (id) => document.getElementById(id);
     const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
                     set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -80,22 +105,27 @@
     $('name').value = store.get('meet:name') || '';
     const saveName = () => { const n = $('name').value.trim(); if (n) store.set('meet:name', n); };
 
-    // تبديل بين "اجتماع جديد" و "انضم"
-    document.querySelectorAll('.seg button').forEach((b) => b.onclick = () => {
-      document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === b));
-      document.querySelectorAll('[data-pane]').forEach((p) => { p.hidden = p.dataset.pane !== b.dataset.mode; });
-      $('err').textContent = '';
-    });
+    // الكلمة اللي بتتغيّر في العنوان
+    const words = ['ذكية', 'مترجمة', 'منظّمة', 'آمنة'];
+    let wi = 0;
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setInterval(() => {
+        const el = $('rot');
+        el.classList.add('out');
+        setTimeout(() => { wi = (wi + 1) % words.length; el.textContent = words[wi]; el.classList.remove('out'); }, 350);
+      }, 2600);
+    }
 
     // اجتماعاتك الأخيرة (محفوظة على الجهاز ده بس)
     try {
       const recent = JSON.parse(store.get('meet:recent') || '[]');
       if (recent.length) {
         const fmt = (ts) => new Date(ts).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-        $('recentList').innerHTML = recent.slice(0, 6).map((r) => `
-          <li><a href="/m/${encodeURIComponent(r.id)}">
-            <span class="r-ic">${icon('cam', 20)}</span>
-            <span class="r-t"><b>${esc(r.title || 'اجتماع')}</b><small dir="ltr">${esc(r.id)}</small> · <small>${fmt(r.ts)}</small></span>
+        $('recentList').innerHTML = recent.slice(0, 6).map((r, i) => `
+          <li style="--i:${i}"><a href="/m/${encodeURIComponent(r.id)}">
+            <span class="r-ic">${icon('cam', 18)}</span>
+            <span class="r-t"><b>${esc(r.title || 'اجتماع')}</b><small>${fmt(r.ts)}</small></span>
+            <span class="r-go">${icon('login', 18)}</span>
           </a></li>`).join('');
         $('recent').hidden = false;
       }
@@ -108,11 +138,14 @@
       $('accessField').hidden = !needCode || !!store.get('meet:access');
     }).catch(() => {});
 
+    const busy = (b, on) => { b.disabled = on; b.classList.toggle('loading', on); };
     $('create').onclick = async () => {
       saveName();
       $('err').textContent = '';
+      if (!$('name').value.trim()) { $('err').textContent = 'اكتب اسمك الأول.'; $('name').focus(); return; }
       const code = $('access').value.trim() || store.get('meet:access') || '';
       if (needCode && !code) { $('accessField').hidden = false; $('err').textContent = 'اكتب كود الشركة علشان تعمل اجتماع جديد.'; $('access').focus(); return; }
+      busy($('create'), true);
       try {
         const r = await fetch('/api/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
         if (r.status === 401) {
@@ -129,12 +162,13 @@
         const t = $('title').value.trim();
         location.href = `/m/${data.id}${t ? `?t=${encodeURIComponent(t)}` : ''}`;
       } catch { $('err').textContent = 'تعذر إنشاء الاجتماع، حاول مرة أخرى.'; }
+      finally { busy($('create'), false); }
     };
     const join = () => {
       saveName();
       const raw = $('code').value.trim().toLowerCase().split(/[?#]/)[0];
       const m = raw.match(/([a-z0-9-]{3,40})\/?$/);
-      if (!m) { $('err').textContent = 'اكتب كود اجتماع صحيح.'; return; }
+      if (!m) { $('err').textContent = 'اكتب كود الاجتماع أو الصق الرابط.'; $('code').focus(); return; }
       location.href = `/m/${m[1]}`;
     };
     $('join').onclick = join;
