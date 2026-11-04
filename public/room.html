@@ -70,6 +70,7 @@
         <div class="grid" id="grid"></div>
         <div class="captions" id="captions" aria-live="polite"></div>
         <div class="reactions-layer" id="reactionsLayer"></div>
+        <canvas class="fx-canvas" id="fxCanvas"></canvas>
       </main>
 
       <!-- اللوحة الجانبية بتبويبات -->
@@ -189,7 +190,17 @@
       <button class="ctl" id="moreBtn"><span class="orb" data-icon="more"></span><span class="lbl">المزيد</span></button>
       <button class="ctl leave" id="leaveBtn"><span class="orb" data-icon="leave"></span><span class="lbl">مغادرة</span></button>
       <div class="emoji-bar" id="emojiBar" hidden>
-        <button>👍</button><button>👏</button><button>😂</button><button>❤️</button><button>🎉</button><button>😮</button>
+        <div class="fx-row">
+          <button class="fx" data-fx="confetti" style="--c:#a78bfa"><span>🎉</span><small>احتفال</small></button>
+          <button class="fx" data-fx="hearts" style="--c:#f43f5e"><span>💖</span><small>حب</small></button>
+          <button class="fx" data-fx="applause" style="--c:#f59e0b"><span>👏</span><small>تصفيق</small></button>
+          <button class="fx" data-fx="rocket" style="--c:#1faec1"><span>🚀</span><small>انطلاق</small></button>
+          <button class="fx" data-fx="fire" style="--c:#fb923c"><span>🔥</span><small>نار</small></button>
+        </div>
+        <div class="emo-tabs" role="tablist">
+          <button class="on" data-set="0">😀</button><button data-set="1">👍</button><button data-set="2">💼</button><button data-set="3">🎊</button>
+        </div>
+        <div class="emo-grid" id="emoGrid"></div>
       </div>
     </nav>
 

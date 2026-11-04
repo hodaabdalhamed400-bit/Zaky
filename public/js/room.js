@@ -475,7 +475,7 @@
       renderPeople();
     });
     socket.on('chat', onChat);
-    socket.on('reaction', ({ name, emoji }) => floatEmoji(emoji, name));
+    socket.on('reaction', onReaction);
     socket.on('caption', showCaption);
   }
 
@@ -625,10 +625,30 @@
     actions[actBtn.dataset.action]?.();
   });
 
+  // ---- لوحة التفاعلات ----
+  const EMO_SETS = [
+    ['😀', '😂', '🤣', '😍', '🥰', '😎', '🤩', '😮', '😢', '🤔', '😅', '🙏'],
+    ['👍', '👎', '👌', '✌️', '🤝', '💪', '🙌', '👋', '✋', '☝️', '🫶', '🤞'],
+    ['💡', '✅', '❌', '📈', '💰', '🎯', '📌', '⏰', '📊', '🧠', '🏆', '⭐'],
+    ['🎉', '🥳', '🎊', '🎈', '🎁', '🍀', '☕', '🌟', '✨', '💯', '❤️', '🔥'],
+  ];
+  const renderEmoSet = (i) => {
+    $('emoGrid').innerHTML = EMO_SETS[i].map((e, k) => `<button style="--k:${k}">${e}</button>`).join('');
+    document.querySelectorAll('.emo-tabs button').forEach((t) => t.classList.toggle('on', Number(t.dataset.set) === i));
+  };
+  renderEmoSet(0);
+  let lastReact = 0;
   $('emojiBar').addEventListener('click', (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    socket.emit('reaction', b.textContent);
+    const tab = e.target.closest('[data-set]');
+    if (tab) { renderEmoSet(Number(tab.dataset.set)); return; }
+    const fx = e.target.closest('[data-fx]');
+    const b = e.target.closest('.emo-grid button');
+    if (!fx && !b) return;
+    if (Date.now() - lastReact < 350) return;
+    lastReact = Date.now();
+    (fx || b).classList.remove('sent'); void (fx || b).offsetWidth; (fx || b).classList.add('sent');
+    socket.emit('reaction', fx ? `fx:${fx.dataset.fx}` : b.textContent);
+    if (fx) setTimeout(() => { $('emojiBar').hidden = true; }, 250);
   });
 
   function toggleHand() {
@@ -870,13 +890,137 @@
   $('aiSummary').onclick = () => { openPanel('assistant'); aiAsk('اكتب ملخصًا منظمًا للاجتماع: أهم النقاط، القرارات، المهام ومسؤول كل مهمة، والخطوات التالية.'); };
 
   // ===================== التفاعلات =====================
-  function floatEmoji(emoji, name) {
+  const FX = {
+    confetti: { emoji: '🎉', label: 'احتفال' },
+    hearts: { emoji: '💖', label: 'بيبعت حب' },
+    applause: { emoji: '👏', label: 'بيصقّف' },
+    rocket: { emoji: '🚀', label: 'انطلاق' },
+    fire: { emoji: '🔥', label: 'نار' },
+  };
+  // مكان طلوع التفاعل: من مربع الشخص اللي بعته
+  function originFor(from) {
+    const stage = $('stage').getBoundingClientRect();
+    const tile = from === me.id ? $('tile-me') : peers.get(from)?.tile;
+    if (!tile) return { x: stage.width * (.2 + Math.random() * .6), y: stage.height - 20 };
+    const r = tile.getBoundingClientRect();
+    return { x: r.left - stage.left + r.width / 2, y: r.top - stage.top + r.height * .7 };
+  }
+  function pulseTile(from) {
+    const tile = from === me.id ? $('tile-me') : peers.get(from)?.tile;
+    if (!tile) return;
+    tile.classList.remove('reacted'); void tile.offsetWidth; tile.classList.add('reacted');
+    setTimeout(() => tile.classList.remove('reacted'), 900);
+  }
+  function floatEmoji(emoji, name, from) {
+    const o = originFor(from);
     const el = document.createElement('div');
     el.className = 'float-emoji';
-    el.style.insetInlineStart = `${10 + Math.random() * 75}%`;
-    el.innerHTML = `${esc(emoji)}<small>${esc(name)}</small>`;
+    el.style.left = `${o.x}px`;
+    el.style.top = `${o.y}px`;
+    el.style.setProperty('--dx', `${(Math.random() - .5) * 120}px`);
+    el.style.setProperty('--rot', `${(Math.random() - .5) * 50}deg`);
+    el.innerHTML = `<span class="fe">${esc(emoji)}</span><small>${esc(name)}</small>`;
     $('reactionsLayer').append(el);
-    setTimeout(() => el.remove(), 3100);
+    pulseTile(from);
+    setTimeout(() => el.remove(), 3200);
+  }
+  function onReaction({ from, name, emoji }) {
+    if (emoji.startsWith('fx:')) {
+      const kind = emoji.slice(3);
+      if (!FX[kind]) return;
+      runEffect(kind, from);
+      banner(`${FX[kind].emoji} ${name} — ${FX[kind].label}`);
+      pulseTile(from);
+      return;
+    }
+    floatEmoji(emoji, name, from);
+  }
+  function banner(text) {
+    const el = document.createElement('div');
+    el.className = 'fx-banner';
+    el.textContent = text;
+    $('reactionsLayer').append(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  // ---- مؤثرات كبيرة على Canvas ----
+  const fxCanvas = $('fxCanvas');
+  const fctx = fxCanvas.getContext('2d');
+  let parts = [];
+  let fxRunning = false;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function sizeFx() {
+    const r = $('stage').getBoundingClientRect();
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    fxCanvas.width = r.width * dpr; fxCanvas.height = r.height * dpr;
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener('resize', sizeFx);
+  const COLORS_FX = ['#1faec1', '#4fd1e0', '#a78bfa', '#f59e0b', '#f43f5e', '#22c55e', '#ffffff'];
+  function spawn(kind, o) {
+    const W = fxCanvas.clientWidth, H = fxCanvas.clientHeight;
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    if (kind === 'confetti') {
+      for (let i = 0; i < 140; i++) parts.push({ t: 'rect', x: W / 2 + rnd(-40, 40), y: H * .55, vx: rnd(-9, 9), vy: rnd(-16, -6), g: .35, w: rnd(6, 11), h: rnd(3, 6), rot: rnd(0, 6), vr: rnd(-.3, .3), c: COLORS_FX[i % COLORS_FX.length], life: rnd(110, 160) });
+    } else if (kind === 'hearts') {
+      for (let i = 0; i < 34; i++) parts.push({ t: 'emoji', s: ['💖', '❤️', '💕', '💗'][i % 4], x: rnd(0, W), y: H + rnd(0, 120), vx: rnd(-.6, .6), vy: rnd(-4.5, -2.2), g: 0, size: rnd(20, 40), sway: rnd(0, 6), life: rnd(140, 200) });
+    } else if (kind === 'applause') {
+      for (let i = 0; i < 26; i++) parts.push({ t: 'emoji', s: '👏', x: o.x + rnd(-30, 30), y: o.y, vx: rnd(-5, 5), vy: rnd(-11, -5), g: .22, size: rnd(22, 38), life: rnd(80, 120), spin: rnd(-.08, .08) });
+    } else if (kind === 'rocket') {
+      parts.push({ t: 'rocket', x: W * .2, y: H + 30, vx: W * .006, vy: -H * .014, life: 90, trail: [] });
+    } else if (kind === 'fire') {
+      for (let i = 0; i < 60; i++) parts.push({ t: 'flame', x: rnd(0, W), y: H + rnd(0, 40), vx: rnd(-.4, .4), vy: rnd(-5, -2.5), g: 0, r: rnd(8, 22), life: rnd(50, 90) });
+      for (let i = 0; i < 8; i++) parts.push({ t: 'emoji', s: '🔥', x: rnd(0, W), y: H + 20, vx: 0, vy: rnd(-4, -2.5), g: 0, size: rnd(26, 42), life: rnd(90, 130) });
+    }
+  }
+  function burst(x, y) {
+    for (let i = 0; i < 70; i++) {
+      const a = (Math.PI * 2 * i) / 70, sp = 2 + Math.random() * 5;
+      parts.push({ t: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: .06, r: 2.4, c: COLORS_FX[i % COLORS_FX.length], life: 70 + Math.random() * 30 });
+    }
+  }
+  function runEffect(kind, from) {
+    if (reducedMotion) { floatEmoji(FX[kind].emoji, '', from); return; }
+    sizeFx();
+    spawn(kind, originFor(from));
+    if (!fxRunning) { fxRunning = true; requestAnimationFrame(tickFx); }
+  }
+  function tickFx() {
+    const W = fxCanvas.clientWidth, H = fxCanvas.clientHeight;
+    fctx.clearRect(0, 0, W, H);
+    for (const p of parts) {
+      p.life--;
+      p.vy += p.g || 0;
+      p.x += p.vx + (p.sway ? Math.sin(p.life / 10) * .8 : 0);
+      p.y += p.vy;
+      const a = Math.max(0, Math.min(1, p.life / 40));
+      fctx.globalAlpha = a;
+      if (p.t === 'rect') {
+        p.rot += p.vr; p.vx *= .99;
+        fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot); fctx.fillStyle = p.c; fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore();
+      } else if (p.t === 'emoji') {
+        fctx.save(); fctx.translate(p.x, p.y); if (p.spin) fctx.rotate(p.life * p.spin);
+        fctx.font = `${p.size}px serif`; fctx.textAlign = 'center'; fctx.textBaseline = 'middle'; fctx.fillText(p.s, 0, 0); fctx.restore();
+      } else if (p.t === 'spark') {
+        p.vx *= .97; p.vy *= .97;
+        fctx.fillStyle = p.c; fctx.beginPath(); fctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); fctx.fill();
+      } else if (p.t === 'flame') {
+        p.r *= .985;
+        const g = fctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        g.addColorStop(0, 'rgba(255,240,180,.9)'); g.addColorStop(.4, 'rgba(251,146,60,.7)'); g.addColorStop(1, 'rgba(239,68,68,0)');
+        fctx.fillStyle = g; fctx.beginPath(); fctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); fctx.fill();
+      } else if (p.t === 'rocket') {
+        p.trail.push({ x: p.x, y: p.y }); if (p.trail.length > 18) p.trail.shift();
+        p.trail.forEach((q, i) => { fctx.globalAlpha = i / 18 * .7; fctx.fillStyle = i % 2 ? '#fb923c' : '#fde68a'; fctx.beginPath(); fctx.arc(q.x, q.y + 10, 6 * i / 18 + 1, 0, Math.PI * 2); fctx.fill(); });
+        fctx.globalAlpha = 1;
+        fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(Math.atan2(p.vy, p.vx) + Math.PI / 4); fctx.font = '40px serif'; fctx.textAlign = 'center'; fctx.textBaseline = 'middle'; fctx.fillText('🚀', 0, 0); fctx.restore();
+        if (p.life <= 1 || p.y < H * .25) { p.life = 0; burst(p.x, p.y); setTimeout(() => burst(W * (.3 + Math.random() * .4), H * (.25 + Math.random() * .2)), 250); }
+      }
+    }
+    fctx.globalAlpha = 1;
+    parts = parts.filter((p) => p.life > 0 && p.y < H + 200 && p.y > -200);
+    if (parts.length) requestAnimationFrame(tickFx);
+    else { fxRunning = false; fctx.clearRect(0, 0, W, H); }
   }
 
   // ===================== المحادثة =====================
@@ -1183,6 +1327,7 @@
 
     $('lobby').hidden = true;
     $('meeting').hidden = false;
+    document.body.classList.add('in-meeting');
     $('meetingTitle').textContent = meetingTitle;
     // إعدادات اللغة من شاشة الدخول
     store.set('meet:lang', $('lobbySpeak').value);

@@ -341,10 +341,14 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('chat', { from: socket.id, name: p.name, text: t, ts: Date.now() });
   });
 
+  let reactCount = 0;
+  let reactWindow = Date.now();
   socket.on('reaction', (emoji) => {
     const p = peer();
-    const e = clean(emoji, 8);
+    const e = clean(emoji, 16);
     if (!p || !e) return;
+    if (Date.now() - reactWindow > 10_000) { reactWindow = Date.now(); reactCount = 0; }
+    if (++reactCount > 25) return; // منع الإغراق
     io.to(roomId).emit('reaction', { from: socket.id, name: p.name, emoji: e });
   });
 

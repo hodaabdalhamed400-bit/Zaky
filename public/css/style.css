@@ -148,7 +148,7 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 /* =========================================================
    غرفة الاجتماع
    ========================================================= */
-.meeting { height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; position: relative; }
+.meeting { isolation: isolate; height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; position: relative; }
 
 /* --- الشريط العلوي --- */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem;
@@ -227,12 +227,10 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 .captions .cap .orig { display: block; font-size: .8rem; color: #cbd5e1; opacity: .75; }
 .captions .cap .fixed { font-size: .75rem; opacity: .8; }
 .reactions-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
-.float-emoji { position: absolute; bottom: 10px; font-size: 2.4rem; animation: floatUp 3s ease-out forwards; text-align: center; }
-.float-emoji small { display: block; font-size: .7rem; background: rgba(0, 0, 0, .6); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
-@keyframes floatUp { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(-60vh); opacity: 0; } }
+
 
 /* --- أزرار التحكم (تحت) --- */
-.controls { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+.controls { position: relative; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
   margin: 4px 12px max(12px, env(safe-area-inset-bottom)); padding: 8px; border-radius: 26px;
   background: linear-gradient(180deg, rgba(25, 48, 77, .75), rgba(13, 27, 46, .9)); border: 1px solid var(--line-2);
   backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06); }
@@ -266,13 +264,87 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 @keyframes flip { 50% { transform: rotateY(90deg) scale(.9); } }
 @keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
 
-.emoji-bar { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); display: flex; gap: 2px; padding: 6px;
-  border-radius: 999px; background: var(--glass); border: 1px solid var(--line-2); backdrop-filter: blur(14px); z-index: 15;
-  animation: popUp .3s cubic-bezier(.34, 1.56, .64, 1); }
-.emoji-bar button { background: none; border: 0; font-size: 1.7rem; width: 46px; height: 46px; border-radius: 50%; transition: transform .15s; }
-.emoji-bar button:hover { transform: scale(1.25) translateY(-4px); }
-.emoji-bar button:active { transform: scale(.85); }
-@keyframes popUp { from { transform: translateX(-50%) translateY(14px) scale(.8); opacity: 0; } }
+/* =========== لوحة التفاعلات =========== */
+.emoji-bar { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(400px, calc(100vw - 24px));
+  padding: 12px; border-radius: 24px; background: linear-gradient(180deg, rgba(25, 48, 77, .97), rgba(13, 27, 46, .98));
+  border: 1px solid var(--line-2); backdrop-filter: blur(16px); box-shadow: 0 -10px 50px rgba(0, 0, 0, .55); z-index: 26;
+  animation: popUp .35s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes popUp { from { transform: translateX(-50%) translateY(18px) scale(.85); opacity: 0; } }
+.fx-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
+.fx { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 6px; border-radius: 16px; border: 1px solid var(--line);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c) 25%, transparent), transparent); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), border-color .2s; }
+.fx span { font-size: 1.7rem; display: block; transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+.fx small { font-size: .68rem; color: var(--muted); font-weight: 600; }
+.fx:hover { transform: translateY(-4px); border-color: var(--c); }
+.fx:hover span { transform: scale(1.2) rotate(-10deg); }
+.emo-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(7, 17, 31, .5); margin-bottom: 8px; }
+.emo-tabs button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: .3rem; font-size: 1.05rem; filter: grayscale(.7); opacity: .7; transition: all .2s; }
+.emo-tabs button.on { background: var(--surface-2); filter: none; opacity: 1; }
+.emo-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
+.emo-grid button { border: 0; background: transparent; font-size: 1.65rem; height: 46px; border-radius: 12px;
+  opacity: 0; animation: emoIn .35s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: calc(var(--k) * 22ms); transition: transform .15s, background .15s; }
+@keyframes emoIn { from { opacity: 0; transform: scale(.3) translateY(8px); } to { opacity: 1; transform: none; } }
+.emo-grid button:hover { background: rgba(255, 255, 255, .07); transform: scale(1.25) translateY(-3px); }
+.sent { animation: sent .45s ease !important; }
+@keyframes sent { 30% { transform: scale(.75); } 60% { transform: scale(1.3) rotate(10deg); } }
+
+/* --- طيران الإيموجي من مربع الشخص --- */
+.float-emoji { position: absolute; z-index: 7; transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+  animation: emoFly 3s cubic-bezier(.2, .7, .3, 1) forwards; }
+.float-emoji .fe { display: block; font-size: 2.8rem; filter: drop-shadow(0 6px 12px rgba(0, 0, 0, .45)); animation: emoPop .5s cubic-bezier(.34, 1.8, .64, 1); }
+.float-emoji small { display: inline-block; margin-top: 2px; font-size: .7rem; font-weight: 600; background: rgba(7, 17, 31, .8); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+@keyframes emoFly {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% - 260px)) rotate(var(--rot)); }
+}
+@keyframes emoPop { 0% { transform: scale(0); } 60% { transform: scale(1.5); } 100% { transform: scale(1); } }
+.fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8; }
+.fx-banner { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 9; white-space: nowrap; font-weight: 700;
+  padding: .55rem 1.1rem; border-radius: 999px; background: linear-gradient(135deg, rgba(124, 92, 255, .9), rgba(31, 174, 193, .9));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .4); animation: banner 2.6s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+@keyframes banner { 0% { opacity: 0; transform: translateX(-50%) translateY(-20px) scale(.8); } 12%, 82% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+.tile.reacted { animation: tileBump .8s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes tileBump { 30% { transform: scale(1.025); box-shadow: 0 0 0 3px rgba(167, 139, 250, .7), 0 0 40px rgba(167, 139, 250, .4); } }
+
+/* =========== حركات غرفة الاجتماع =========== */
+.meeting::before { content: ''; position: absolute; inset: -20%; z-index: -1; pointer-events: none;
+  background: radial-gradient(40% 35% at 80% 10%, rgba(31, 174, 193, .16), transparent 70%), radial-gradient(35% 30% at 10% 90%, rgba(124, 92, 255, .12), transparent 70%);
+  animation: aurora 20s ease-in-out infinite alternate; }
+@keyframes aurora { to { transform: translate(-6%, 5%) rotate(6deg) scale(1.1); } }
+.topbar { animation: slideDown .6s cubic-bezier(.2, .8, .2, 1); }
+@keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } }
+.controls { animation: slideUp .7s cubic-bezier(.34, 1.3, .64, 1); }
+@keyframes slideUp { from { transform: translateY(60px); opacity: 0; } }
+.controls .ctl { opacity: 0; animation: ctlIn .5s cubic-bezier(.34, 1.56, .64, 1) forwards; }
+.controls .ctl:nth-child(1) { animation-delay: .25s; } .controls .ctl:nth-child(2) { animation-delay: .32s; } .controls .ctl:nth-child(3) { animation-delay: .39s; }
+.controls .ctl:nth-child(4) { animation-delay: .46s; } .controls .ctl:nth-child(5) { animation-delay: .53s; }
+@keyframes ctlIn { from { opacity: 0; transform: translateY(14px) scale(.8); } to { opacity: 1; transform: none; } }
+/* الشخص اللي بيتكلم: حد منوّر بيلف */
+.tile.speaking::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none; z-index: 3;
+  background: conic-gradient(from var(--ang, 0deg), #1faec1, #a78bfa, #4fd1e0, #1faec1);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: spinBorder 3s linear infinite; }
+@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes spinBorder { to { --ang: 360deg; } }
+/* رفع اليد */
+.tile .badges .hand:not([hidden]) { animation: wave 1s ease-in-out 3, handGlow 1.6s ease-in-out infinite; }
+@keyframes handGlow { 50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, .25); } }
+/* النبض حوالين التسجيل */
+.pill.rec { animation: recIn .5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes recIn { from { transform: scale(.5); opacity: 0; } }
+/* الرسائل والترجمة */
+.messages li { animation: msgIn .35s cubic-bezier(.34, 1.4, .64, 1); }
+.messages li.mine { transform-origin: 100% 100%; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(10px) scale(.92); } }
+.captions .cap { animation: capIn .3s ease-out; }
+@keyframes capIn { from { opacity: 0; transform: translateY(8px); filter: blur(3px); } }
+.panel:not([hidden]) .panel-body.show { animation: fadeUp .3s ease-out; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } }
+.tabs button.active { animation: tabPop .3s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes tabPop { 50% { transform: scale(1.08); } }
+.badge { animation: pop .35s cubic-bezier(.34, 1.56, .64, 1); }
 
 /* --- لوحة الخدمات (مربعات الأيقونات) --- */
 .tools { position: absolute; z-index: 25; inset-inline: 12px; bottom: calc(116px + max(12px, env(safe-area-inset-bottom)));
@@ -317,8 +389,7 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 @keyframes speak { 0% { box-shadow: 0 0 0 0 rgba(31, 174, 193, .5), 0 0 0 0 rgba(31, 174, 193, .25); } 100% { box-shadow: 0 0 0 16px rgba(31, 174, 193, 0), 0 0 0 30px rgba(31, 174, 193, 0); } }
 .toast { animation: toastIn .4s cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes toastIn { from { transform: translateY(-18px) scale(.9); opacity: 0; } }
-.float-emoji { animation: floatUp 3s ease-out forwards, wobble 1s ease-in-out infinite; }
-@keyframes wobble { 50% { margin-inline-start: 14px; } }
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -451,3 +522,6 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 .end-summary li { margin: .2rem 0; }
 .end-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
 .btn-wa { background: #25d366; color: #fff; }
+
+body.in-meeting { overflow: hidden; height: 100dvh; }
+.meeting, .stage, .reactions-layer { overflow: clip; }
