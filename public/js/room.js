@@ -1,0 +1,797 @@
+/* Zaky Meet — منطق غرفة الاجتماع (WebRTC mesh + Socket.IO signaling) */
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const roomId = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+  const params = new URLSearchParams(location.search);
+  const store = {
+    get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
+  };
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const initial = (name) => (String(name).trim()[0] || '?').toUpperCase();
+  const COLORS = ['#1f6f5c', '#3b4fa8', '#8a3b8f', '#a8553b', '#2f7a9c', '#6b5bd6', '#9c2f55', '#4d7a2f'];
+  const colorFor = (key) => { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
+  const fmtClock = (ts) => new Date(ts).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+  document.title = BRAND.title;
+  renderBrand();
+  hydrateIcons();
+
+  // ===================== الحالة =====================
+  const me = {
+    id: null,
+    name: store.get('meet:name') || '',
+    mic: store.get('meet:mic') !== '0',
+    cam: store.get('meet:cam') !== '0',
+    hand: false,
+    screen: false,
+    rec: false,
+  };
+  let micTrack = null;
+  let camTrack = null;
+  let screenTrack = null;
+  let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  let socket = null;
+  let startedAt = Date.now();
+  let meetingTitle = params.get('t') || 'اجتماع';
+  const peers = new Map(); // id -> { id, name, state, pc, stream, tile, audioSender, videoSender, pending, initiator }
+  const localStream = new MediaStream();
+
+  // ===================== Toasts =====================
+  function toast(msg, ms = 3000) {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = msg;
+    $('toasts').append(el);
+    setTimeout(() => el.remove(), ms);
+  }
+
+  // ===================== الوسائط =====================
+  async function getTrack(kind, deviceId) {
+    const constraints = kind === 'audio'
+      ? { audio: { deviceId: deviceId ? { exact: deviceId } : undefined, echoCancellation: true, noiseSuppression: true } }
+      : { video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' } };
+    const s = await navigator.mediaDevices.getUserMedia(constraints);
+    return s.getTracks()[0];
+  }
+
+  function setLocalTrack(kind, track) {
+    localStream.getTracks().filter((t) => t.kind === kind).forEach((t) => localStream.removeTrack(t));
+    if (track) localStream.addTrack(track);
+  }
+
+  const currentVideo = () => (me.screen && screenTrack) || (me.cam && camTrack) || null;
+
+  function pushTracksToPeers() {
+    for (const p of peers.values()) {
+      p.audioSender?.replaceTrack(micTrack).catch(() => {});
+      p.videoSender?.replaceTrack(currentVideo()).catch(() => {});
+    }
+  }
+
+  async function enableMic(on) {
+    if (on && !micTrack) {
+      try {
+        micTrack = await getTrack('audio', store.get('meet:micId'));
+        setLocalTrack('audio', micTrack);
+        watchLevel('me', localStream);
+      } catch (e) {
+        toast('تعذر تشغيل الميكروفون — تأكد من السماح بالوصول إليه.');
+        on = false;
+      }
+    }
+    if (micTrack) micTrack.enabled = on;
+    me.mic = on;
+    store.set('meet:mic', on ? '1' : '0');
+    pushTracksToPeers();
+  }
+
+  async function enableCam(on) {
+    if (on && !camTrack) {
+      try {
+        camTrack = await getTrack('video', store.get('meet:camId'));
+      } catch (e) {
+        toast('تعذر تشغيل الكاميرا — تأكد من السماح بالوصول إليها.');
+        on = false;
+      }
+    }
+    if (!on && camTrack) { camTrack.stop(); camTrack = null; }
+    me.cam = on;
+    store.set('meet:cam', on ? '1' : '0');
+    if (!me.screen) setLocalTrack('video', camTrack);
+    pushTracksToPeers();
+  }
+
+  // ===================== مستوى الصوت (من يتكلم) =====================
+  let audioCtx = null;
+  const meters = new Map(); // key -> { analyser, data, source }
+  function watchLevel(key, stream) {
+    if (!audioCtx || !stream.getAudioTracks().length) return;
+    meters.get(key)?.source.disconnect();
+    try {
+      const source = audioCtx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      meters.set(key, { analyser, source, data: new Uint8Array(analyser.fftSize) });
+    } catch { /* ignore */ }
+  }
+  setInterval(() => {
+    for (const [key, m] of meters) {
+      m.analyser.getByteTimeDomainData(m.data);
+      let sum = 0;
+      for (const v of m.data) sum += (v - 128) ** 2;
+      const rms = Math.sqrt(sum / m.data.length);
+      const muted = key === 'me' ? !me.mic : !peers.get(key)?.state.mic;
+      const tile = key === 'me' ? $('tile-me') : peers.get(key)?.tile;
+      tile?.classList.toggle('speaking', rms > 4 && !muted);
+    }
+  }, 200);
+
+  // ===================== البلاطات (Tiles) =====================
+  function makeTile(id, name, isMe) {
+    const el = document.createElement('div');
+    el.className = 'tile';
+    el.id = `tile-${id}`;
+    el.innerHTML = `
+      <video autoplay playsinline ${isMe ? 'muted' : ''}></video>
+      <div class="avatar"></div>
+      <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span></div>
+      <div class="label"><span class="nm"></span></div>`;
+    $('grid').append(el);
+    updateTile(el, { name, isMe, key: isMe ? me.id || 'me' : id });
+    return el;
+  }
+
+  function updateTile(el, { name, isMe, state, key, stream }) {
+    if (!el) return;
+    if (name !== undefined) {
+      el.querySelector('.nm').textContent = isMe ? `${name} · أنت` : name;
+      const av = el.querySelector('.avatar');
+      av.textContent = initial(name);
+      av.style.setProperty('--avatar', colorFor(key || name));
+    }
+    if (stream) {
+      const v = el.querySelector('video');
+      if (v.srcObject !== stream) v.srcObject = stream;
+      v.play().catch(() => {});
+    }
+    if (state) {
+      el.classList.toggle('video-on', !!(state.cam || state.screen));
+      el.classList.toggle('screen', !!state.screen);
+      el.classList.toggle('spotlight', !!state.screen);
+      el.classList.toggle('mirror', !!isMe && !state.screen);
+      el.querySelector('.mic-off').hidden = !!state.mic;
+      el.querySelector('.hand').hidden = !state.hand;
+    }
+  }
+
+  function renderSelf() {
+    updateTile($('tile-me'), { name: me.name, isMe: true, state: me, key: me.id, stream: localStream });
+  }
+
+  function layout() {
+    const grid = $('grid');
+    const n = grid.children.length;
+    grid.dataset.count = String(Math.min(n, 7));
+    grid.toggleAttribute('data-many', n > 6);
+    grid.classList.toggle('has-spotlight', !!grid.querySelector('.tile.spotlight'));
+    $('count').textContent = n;
+    $('peopleBadge').textContent = n;
+    renderPeople();
+  }
+
+  function renderPeople() {
+    const all = [{ id: me.id, name: me.name, state: me, isMe: true }, ...[...peers.values()].map((p) => ({ ...p, isMe: false }))];
+    $('people').innerHTML = all.map((p) => `
+      <li>
+        <span class="av" style="--avatar:${colorFor(p.id || p.name)}">${esc(initial(p.name))}</span>
+        <span class="nm">${esc(p.name)}${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}</span>
+        <span class="ic">
+          ${p.state.hand ? `<span title="رافع يده" style="color:var(--warn)">${icon('hand', 18)}</span>` : ''}
+          ${p.state.screen ? `<span title="يشارك الشاشة">${icon('screen', 18)}</span>` : ''}
+          <span class="${p.state.mic ? '' : 'off'}">${icon(p.state.mic ? 'mic' : 'micOff', 18)}</span>
+          <span class="${p.state.cam ? '' : 'off'}">${icon(p.state.cam ? 'cam' : 'camOff', 18)}</span>
+        </span>
+      </li>`).join('');
+  }
+
+  // ===================== WebRTC =====================
+  function createPeer(info, initiator) {
+    const p = {
+      id: info.id, name: info.name, state: { ...info.state }, initiator,
+      stream: new MediaStream(), pending: [], audioSender: null, videoSender: null,
+    };
+    const pc = new RTCPeerConnection({ iceServers });
+    p.pc = pc;
+
+    if (initiator) {
+      p.audioSender = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender;
+      p.videoSender = pc.addTransceiver('video', { direction: 'sendrecv' }).sender;
+      p.audioSender.replaceTrack(micTrack);
+      p.videoSender.replaceTrack(currentVideo());
+    }
+
+    pc.onicecandidate = (e) => { if (e.candidate) socket.emit('signal', { to: p.id, data: { candidate: e.candidate } }); };
+    pc.ontrack = (e) => {
+      p.stream.getTracks().filter((t) => t.kind === e.track.kind).forEach((t) => p.stream.removeTrack(t));
+      p.stream.addTrack(e.track);
+      updateTile(p.tile, { stream: p.stream });
+      if (e.track.kind === 'audio') watchLevel(p.id, p.stream);
+    };
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' && p.initiator) {
+        pc.restartIce();
+        negotiate(p, true);
+      }
+    };
+
+    p.tile = makeTile(p.id, p.name, false);
+    updateTile(p.tile, { state: p.state, stream: p.stream });
+    peers.set(p.id, p);
+    layout();
+    return p;
+  }
+
+  async function negotiate(p, iceRestart = false) {
+    try {
+      const offer = await p.pc.createOffer({ iceRestart });
+      await p.pc.setLocalDescription(offer);
+      socket.emit('signal', { to: p.id, data: { sdp: p.pc.localDescription } });
+    } catch (e) { console.error('offer failed', e); }
+  }
+
+  async function onSignal({ from, data }) {
+    let p = peers.get(from);
+    if (!p) return;
+    const pc = p.pc;
+    try {
+      if (data.sdp) {
+        await pc.setRemoteDescription(data.sdp);
+        if (data.sdp.type === 'offer') {
+          for (const t of pc.getTransceivers()) {
+            const kind = t.receiver.track.kind;
+            t.direction = 'sendrecv';
+            if (kind === 'audio') p.audioSender = t.sender;
+            if (kind === 'video') p.videoSender = t.sender;
+          }
+          await p.audioSender?.replaceTrack(micTrack);
+          await p.videoSender?.replaceTrack(currentVideo());
+          await pc.setLocalDescription(await pc.createAnswer());
+          socket.emit('signal', { to: from, data: { sdp: pc.localDescription } });
+        }
+        for (const c of p.pending.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+      } else if (data.candidate) {
+        if (pc.remoteDescription) await pc.addIceCandidate(data.candidate).catch(() => {});
+        else p.pending.push(data.candidate);
+      }
+    } catch (e) { console.error('signal error', e); }
+  }
+
+  function removePeer(id) {
+    const p = peers.get(id);
+    if (!p) return;
+    p.pc.close();
+    p.tile.remove();
+    meters.get(id)?.source.disconnect();
+    meters.delete(id);
+    peers.delete(id);
+    layout();
+  }
+
+  const sendState = () => socket?.emit('state', { mic: me.mic, cam: me.cam, hand: me.hand, screen: me.screen, rec: me.rec });
+
+  // ===================== الاتصال بالخادم =====================
+  function connect() {
+    socket = io({ transports: ['websocket', 'polling'] });
+    let joinedOnce = false;
+
+    socket.on('connect', () => {
+      setStatus(true);
+      // عند إعادة الاتصال نبدأ من جديد مع كل المشاركين
+      for (const id of [...peers.keys()]) removePeer(id);
+      socket.emit('join', { roomId, name: me.name, title: meetingTitle, state: { mic: me.mic, cam: me.cam } }, (res) => {
+        if (res?.error === 'full') { alert(`الاجتماع ممتلئ (الحد الأقصى ${res.max} مشاركين).`); location.href = '/'; return; }
+        if (res?.error) { alert('رابط الاجتماع غير صحيح.'); location.href = '/'; return; }
+        me.id = res.selfId;
+        startedAt = res.startedAt;
+        meetingTitle = res.title;
+        $('meetingTitle').textContent = meetingTitle;
+        document.title = `${meetingTitle} — ${BRAND.title}`;
+        renderSelf();
+        for (const info of res.peers) negotiate(createPeer(info, true));
+        sendState();
+        if (!joinedOnce) addMinute('sys', `بدأتَ حضور الاجتماع "${meetingTitle}"`);
+        joinedOnce = true;
+        layout();
+      });
+    });
+    socket.on('disconnect', () => setStatus(false));
+
+    socket.on('peer-joined', (info) => {
+      createPeer(info, false);
+      toast(`${info.name} انضم للاجتماع`);
+      addMinute('sys', `${info.name} انضم`);
+    });
+    socket.on('peer-left', ({ id }) => {
+      const p = peers.get(id);
+      if (p) { toast(`${p.name} غادر الاجتماع`); addMinute('sys', `${p.name} غادر`); }
+      removePeer(id);
+    });
+    socket.on('signal', onSignal);
+    socket.on('peer-state', ({ id, state }) => {
+      const p = peers.get(id);
+      if (!p) return;
+      if (state.hand && !p.state.hand) toast(`✋ ${p.name} رفع يده`);
+      p.state = state;
+      updateTile(p.tile, { state });
+      updateRecIndicator();
+      layout();
+    });
+    socket.on('peer-renamed', ({ id, name }) => {
+      const p = peers.get(id);
+      if (!p) return;
+      p.name = name;
+      updateTile(p.tile, { name, key: id });
+      renderPeople();
+    });
+    socket.on('chat', onChat);
+    socket.on('reaction', ({ name, emoji }) => floatEmoji(emoji, name));
+    socket.on('caption', showCaption);
+  }
+
+  function setStatus(ok) {
+    const s = $('status');
+    s.classList.toggle('bad', !ok);
+    s.querySelector('span').textContent = ok ? 'متصل' : 'جاري إعادة الاتصال…';
+  }
+
+  setInterval(() => {
+    const t = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+    $('timer').textContent = [t / 3600, (t % 3600) / 60, t % 60].map((v) => String(Math.floor(v)).padStart(2, '0')).join(':');
+  }, 1000);
+
+  // ===================== أزرار التحكم =====================
+  function refreshControls() {
+    const mic = $('micBtn'); const cam = $('camBtn');
+    mic.classList.toggle('off', !me.mic);
+    mic.querySelector('[data-icon]').innerHTML = icon(me.mic ? 'mic' : 'micOff');
+    cam.classList.toggle('off', !me.cam);
+    cam.querySelector('[data-icon]').innerHTML = icon(me.cam ? 'cam' : 'camOff');
+    document.querySelector('[data-action="hand"]').classList.toggle('active', me.hand);
+    document.querySelector('[data-action="screen"]').classList.toggle('active', me.screen);
+    document.querySelector('[data-action="captions"]').classList.toggle('active', captionsOn);
+    const rec = document.querySelector('[data-action="record"]');
+    rec.classList.toggle('active', me.rec);
+    rec.querySelector('.lbl').textContent = me.rec ? 'إيقاف التسجيل' : 'تسجيل';
+    renderSelf();
+    renderPeople();
+    layout();
+  }
+
+  $('micBtn').onclick = async () => { await enableMic(!me.mic); sendState(); refreshControls(); };
+  $('camBtn').onclick = async () => { await enableCam(!me.cam); sendState(); refreshControls(); };
+  $('leaveBtn').onclick = () => leave();
+  $('moreBtn').onclick = () => toggleTools();
+
+  function toggleTools(force) {
+    const open = force ?? $('tools').hidden;
+    $('tools').hidden = !open;
+    $('emojiBar').hidden = true;
+    const btn = $('moreBtn');
+    btn.classList.toggle('active', open);
+    btn.querySelector('[data-icon]').innerHTML = icon(open ? 'close' : 'more');
+  }
+
+  function leave() {
+    if (me.rec) stopRecording();
+    stopCaptions();
+    for (const id of [...peers.keys()]) removePeer(id);
+    socket?.disconnect();
+    [micTrack, camTrack, screenTrack].forEach((t) => t?.stop());
+    location.href = '/';
+  }
+
+  document.addEventListener('click', (e) => {
+    const panelBtn = e.target.closest('[data-panel]');
+    if (panelBtn) { openPanel(panelBtn.dataset.panel); return; }
+    const actBtn = e.target.closest('[data-action]');
+    if (!actBtn) return;
+    const actions = { record: toggleRecording, screen: toggleScreen, captions: toggleCaptions, hand: toggleHand, reactions: () => { $('emojiBar').hidden = !$('emojiBar').hidden; }, invite };
+    actions[actBtn.dataset.action]?.();
+  });
+
+  $('emojiBar').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    socket.emit('reaction', b.textContent);
+  });
+
+  function toggleHand() {
+    me.hand = !me.hand;
+    sendState();
+    refreshControls();
+    toast(me.hand ? 'رفعت يدك ✋' : 'أنزلت يدك');
+  }
+
+  async function invite() {
+    const url = `${location.origin}/m/${roomId}`;
+    const text = `انضم لاجتماع "${meetingTitle}" على ${BRAND.title}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: BRAND.title, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast('تم نسخ رابط الدعوة ✔'); }
+    catch { prompt('انسخ رابط الدعوة:', url); }
+  }
+
+  // ===================== مشاركة الشاشة =====================
+  async function toggleScreen() {
+    if (me.screen) return stopScreen();
+    if (!navigator.mediaDevices.getDisplayMedia) { toast('مشاركة الشاشة غير مدعومة على هذا الجهاز.'); return; }
+    try {
+      const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+      screenTrack = s.getVideoTracks()[0];
+      screenTrack.contentHint = 'detail';
+      screenTrack.onended = stopScreen;
+      me.screen = true;
+      setLocalTrack('video', screenTrack);
+      pushTracksToPeers();
+      sendState();
+      refreshControls();
+      toggleTools(false);
+    } catch { /* المستخدم ألغى */ }
+  }
+  function stopScreen() {
+    if (!me.screen) return;
+    screenTrack?.stop();
+    screenTrack = null;
+    me.screen = false;
+    setLocalTrack('video', camTrack);
+    pushTracksToPeers();
+    sendState();
+    refreshControls();
+  }
+
+  // ===================== الترجمة النصية (Live captions) =====================
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognizer = null;
+  let captionsOn = false;
+  function toggleCaptions() { captionsOn ? stopCaptions() : startCaptions(); refreshControls(); }
+  function startCaptions() {
+    if (!SR) { toast('الترجمة النصية تحتاج متصفح Chrome أو Edge أو Safari حديث.'); return; }
+    captionsOn = true;
+    recognizer = new SR();
+    recognizer.lang = store.get('meet:lang') || 'ar-EG';
+    recognizer.continuous = true;
+    recognizer.interimResults = true;
+    recognizer.onresult = (e) => {
+      if (!me.mic) return;
+      const r = e.results[e.results.length - 1];
+      const text = r[0].transcript.trim();
+      if (!text) return;
+      socket.emit('caption', { text, final: r.isFinal });
+      showCaption({ from: me.id, name: me.name, text, final: r.isFinal, ts: Date.now() });
+    };
+    recognizer.onerror = (e) => { if (e.error === 'not-allowed') { toast('لم يتم السماح بالتعرف على الكلام.'); stopCaptions(); refreshControls(); } };
+    recognizer.onend = () => { if (captionsOn) try { recognizer.start(); } catch { /* ignore */ } };
+    try { recognizer.start(); toast('تم تفعيل الترجمة النصية'); } catch { /* ignore */ }
+  }
+  function stopCaptions() {
+    captionsOn = false;
+    try { recognizer?.stop(); } catch { /* ignore */ }
+    recognizer = null;
+  }
+  const captionEls = new Map();
+  function showCaption({ from, name, text, final, ts }) {
+    let el = captionEls.get(from);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'cap';
+      $('captions').append(el);
+      captionEls.set(from, el);
+    }
+    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}`;
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.remove(); captionEls.delete(from); }, final ? 4000 : 7000);
+    if (final) addMinute('speech', text, name, ts);
+  }
+
+  // ===================== التفاعلات =====================
+  function floatEmoji(emoji, name) {
+    const el = document.createElement('div');
+    el.className = 'float-emoji';
+    el.style.insetInlineStart = `${10 + Math.random() * 75}%`;
+    el.innerHTML = `${esc(emoji)}<small>${esc(name)}</small>`;
+    $('reactionsLayer').append(el);
+    setTimeout(() => el.remove(), 3100);
+  }
+
+  // ===================== المحادثة =====================
+  let unread = 0;
+  function onChat(m) {
+    const list = $('messages');
+    list.querySelector('.empty')?.remove();
+    const li = document.createElement('li');
+    if (m.from === me.id) li.className = 'mine';
+    li.innerHTML = `<div class="who">${esc(m.from === me.id ? 'أنت' : m.name)} · ${fmtClock(m.ts)}</div><div class="bubble">${esc(m.text)}</div>`;
+    list.append(li);
+    list.scrollTop = list.scrollHeight;
+    addMinute('chat', m.text, m.name, m.ts);
+    if (currentPanel !== 'chat' && m.from !== me.id) {
+      unread++;
+      $('chatBadge').hidden = false;
+      $('chatBadge').textContent = unread;
+      toast(`💬 ${m.name}: ${m.text.slice(0, 60)}`);
+    }
+  }
+  $('messages').innerHTML = '<li class="empty">لا توجد رسائل بعد</li>';
+  $('chatForm').onsubmit = (e) => {
+    e.preventDefault();
+    const t = $('chatInput').value.trim();
+    if (!t) return;
+    socket.emit('chat', t);
+    $('chatInput').value = '';
+  };
+
+  // ===================== محضر الاجتماع =====================
+  const minutes = [];
+  function addMinute(type, text, who, ts = Date.now()) {
+    minutes.push({ type, text, who, ts });
+    const li = document.createElement('li');
+    if (type === 'sys') li.className = 'sys';
+    const tag = type === 'chat' ? '💬 ' : type === 'speech' ? '🎙️ ' : '';
+    li.innerHTML = `<time>${fmtClock(ts)}</time>${tag}${who ? `<b>${esc(who)}:</b> ` : ''}${esc(text)}`;
+    $('minutes').append(li);
+  }
+  $('downloadMinutes').onclick = () => {
+    const lines = [
+      `محضر اجتماع: ${meetingTitle}`,
+      `التاريخ: ${new Date(startedAt).toLocaleString('ar-EG')}`,
+      `كود الاجتماع: ${roomId}`,
+      `الحاضرون حاليًا: ${[me.name, ...[...peers.values()].map((p) => p.name)].join('، ')}`,
+      '----------------------------------------',
+      ...minutes.map((m) => `[${fmtClock(m.ts)}] ${m.type === 'chat' ? '(محادثة) ' : m.type === 'speech' ? '(كلام) ' : ''}${m.who ? `${m.who}: ` : ''}${m.text}`),
+    ];
+    download(new Blob(['﻿' + lines.join('\n')], { type: 'text/plain;charset=utf-8' }), `minutes-${roomId}.txt`);
+  };
+
+  function download(blob, filename) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  // ===================== التسجيل =====================
+  // يرسم كل البلاطات على Canvas ويخلط كل الأصوات، ثم يحفظ ملف فيديو على جهازك.
+  let recorder = null;
+  let recChunks = [];
+  let recTimer = null;
+  let recMix = null;
+  function toggleRecording() { me.rec ? stopRecording() : startRecording(); }
+  function startRecording() {
+    if (!audioCtx || !window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) { toast('التسجيل غير مدعوم على هذا المتصفح.'); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280; canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    const draw = () => {
+      ctx.fillStyle = '#0b1020';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const tiles = [...$('grid').children];
+      const n = tiles.length;
+      const cols = Math.ceil(Math.sqrt(n));
+      const rows = Math.ceil(n / cols);
+      const w = canvas.width / cols; const h = canvas.height / rows;
+      tiles.forEach((tile, i) => {
+        const x = (i % cols) * w; const y = Math.floor(i / cols) * h;
+        const v = tile.querySelector('video');
+        ctx.fillStyle = '#172039';
+        ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
+        if (tile.classList.contains('video-on') && v.videoWidth) {
+          const contain = tile.classList.contains('screen');
+          const s = contain ? Math.min((w - 8) / v.videoWidth, (h - 8) / v.videoHeight) : Math.max((w - 8) / v.videoWidth, (h - 8) / v.videoHeight);
+          const dw = v.videoWidth * s; const dh = v.videoHeight * s;
+          ctx.save();
+          ctx.beginPath(); ctx.rect(x + 4, y + 4, w - 8, h - 8); ctx.clip();
+          ctx.drawImage(v, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+          ctx.restore();
+        } else {
+          const av = tile.querySelector('.avatar');
+          ctx.fillStyle = getComputedStyle(av).getPropertyValue('--avatar') || '#1f6f5c';
+          const r = Math.min(w, h) * 0.18;
+          ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.font = `bold ${r}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(av.textContent, x + w / 2, y + h / 2);
+        }
+        ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x + 12, y + h - 44, Math.min(w - 24, 260), 30);
+        ctx.fillStyle = '#fff'; ctx.font = '16px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.direction = 'rtl';
+        ctx.fillText(tile.querySelector('.nm').textContent, x + Math.min(w - 24, 260) + 4, y + h - 29);
+      });
+    };
+    recTimer = setInterval(draw, 1000 / 24);
+
+    const dest = audioCtx.createMediaStreamDestination();
+    recMix = [];
+    const addAudio = (stream) => {
+      if (!stream.getAudioTracks().length) return;
+      const src = audioCtx.createMediaStreamSource(new MediaStream(stream.getAudioTracks()));
+      src.connect(dest);
+      recMix.push(src);
+    };
+    if (micTrack) addAudio(localStream);
+    for (const p of peers.values()) addAudio(p.stream);
+
+    const out = new MediaStream([...canvas.captureStream(24).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const mime = ['video/mp4;codecs=avc1,mp4a', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+      .find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    recChunks = [];
+    const rec = new MediaRecorder(out, mime ? { mimeType: mime } : undefined);
+    recorder = rec;
+    rec.ondataavailable = (e) => e.data.size && recChunks.push(e.data);
+    rec.onstop = () => {
+      out.getTracks().forEach((t) => t.stop());
+      const type = rec.mimeType || 'video/webm';
+      const ext = type.includes('mp4') ? 'mp4' : 'webm';
+      download(new Blob(recChunks, { type }), `meeting-${roomId}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.${ext}`);
+      toast('تم حفظ التسجيل على جهازك ✔');
+    };
+    recorder.start(1000);
+    me.rec = true;
+    sendState();
+    updateRecIndicator();
+    refreshControls();
+    toast('بدأ التسجيل — سيتم إعلام المشاركين');
+    addMinute('sys', `${me.name} بدأ تسجيل الاجتماع`);
+  }
+  function stopRecording() {
+    if (!recorder) return;
+    clearInterval(recTimer);
+    recorder.stop();
+    recMix?.forEach((s) => s.disconnect());
+    recorder = null;
+    me.rec = false;
+    sendState();
+    updateRecIndicator();
+    refreshControls();
+    addMinute('sys', `${me.name} أوقف التسجيل`);
+  }
+  function updateRecIndicator() {
+    $('recChip').hidden = !(me.rec || [...peers.values()].some((p) => p.state.rec));
+  }
+
+  // ===================== اللوحة الجانبية =====================
+  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات' };
+  let currentPanel = null;
+  function openPanel(name) {
+    currentPanel = name;
+    $('panel').hidden = false;
+    $('panelTitle').textContent = PANEL_TITLES[name];
+    document.querySelectorAll('.panel-body').forEach((b) => b.classList.toggle('show', b.dataset.view === name));
+    if (name === 'chat') {
+      unread = 0;
+      $('chatBadge').hidden = true;
+      setTimeout(() => $('chatInput').focus(), 50);
+    }
+    if (name === 'settings') fillSettings();
+    if (name === 'people') renderPeople();
+  }
+  $('panelClose').onclick = () => { $('panel').hidden = true; currentPanel = null; };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('panelClose').click(); });
+
+  async function fillSettings() {
+    $('setName').value = me.name;
+    $('setLang').value = store.get('meet:lang') || 'ar-EG';
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const fill = (sel, kind, current) => {
+        const list = devices.filter((d) => d.kind === kind);
+        sel.innerHTML = list.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || `جهاز ${i + 1}`)}</option>`).join('') || '<option value="">لا يوجد</option>';
+        if (current) sel.value = current;
+      };
+      fill($('setMic'), 'audioinput', micTrack?.getSettings().deviceId || store.get('meet:micId'));
+      fill($('setCam'), 'videoinput', camTrack?.getSettings().deviceId || store.get('meet:camId'));
+    } catch { /* ignore */ }
+  }
+  $('saveSettings').onclick = async () => {
+    const name = $('setName').value.trim();
+    if (name && name !== me.name) {
+      me.name = name;
+      store.set('meet:name', name);
+      socket.emit('rename', name);
+      renderSelf();
+    }
+    const lang = $('setLang').value;
+    if (lang !== (store.get('meet:lang') || 'ar-EG')) {
+      store.set('meet:lang', lang);
+      if (captionsOn) { stopCaptions(); startCaptions(); }
+    }
+    const micId = $('setMic').value; const camId = $('setCam').value;
+    if (micId && micId !== micTrack?.getSettings().deviceId) {
+      store.set('meet:micId', micId);
+      if (micTrack) {
+        const wasOn = me.mic;
+        micTrack.stop(); micTrack = null;
+        await enableMic(true);
+        if (!wasOn) await enableMic(false);
+      }
+    }
+    if (camId && camId !== camTrack?.getSettings().deviceId) {
+      store.set('meet:camId', camId);
+      if (camTrack) { camTrack.stop(); camTrack = null; await enableCam(true); }
+    }
+    refreshControls();
+    toast('تم حفظ الإعدادات');
+    $('panelClose').click();
+  };
+
+  // ===================== شاشة ما قبل الدخول =====================
+  const preview = document.querySelector('.preview');
+  function refreshPreview() {
+    preview.classList.toggle('video-on', !!camTrack && me.cam);
+    $('previewVideo').srcObject = localStream;
+    $('previewAvatar').textContent = initial($('lobbyName').value || '؟');
+    $('pMic').classList.toggle('off', !me.mic);
+    $('pMic').innerHTML = icon(me.mic ? 'mic' : 'micOff');
+    $('pCam').classList.toggle('off', !me.cam);
+    $('pCam').innerHTML = icon(me.cam ? 'cam' : 'camOff');
+  }
+  $('pMic').onclick = async () => { await enableMic(!me.mic); refreshPreview(); };
+  $('pCam').onclick = async () => { await enableCam(!me.cam); refreshPreview(); };
+  $('lobbyName').value = me.name;
+  $('lobbyName').oninput = refreshPreview;
+  preview.classList.add('mirror');
+
+  async function initLobby() {
+    $('meetingCode').textContent = roomId;
+    try {
+      const cfg = await (await fetch('/api/config')).json();
+      if (cfg.iceServers?.length) iceServers = cfg.iceServers;
+      const info = await (await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)).json();
+      if (info.title) meetingTitle = info.title;
+      $('lobbyTitle').textContent = meetingTitle;
+      $('lobbyInfo').textContent = info.participants
+        ? `${info.participants} ${info.participants === 1 ? 'مشارك' : 'مشاركين'} في الاجتماع الآن`
+        : 'لا يوجد أحد في الاجتماع بعد — ستكون أول المنضمين.';
+      if (info.participants >= cfg.maxParticipants) $('lobbyErr').textContent = 'الاجتماع ممتلئ حاليًا.';
+    } catch { $('lobbyInfo').textContent = ''; }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      $('lobbyErr').textContent = 'المتصفح لا يسمح بالكاميرا/الميكروفون — افتح الموقع عبر https.';
+      me.mic = false; me.cam = false;
+    } else {
+      if (me.mic) await enableMic(true);
+      if (me.cam) await enableCam(true);
+    }
+    refreshPreview();
+    $('lobbyName').focus();
+  }
+
+  $('joinBtn').onclick = () => {
+    const name = $('lobbyName').value.trim();
+    if (!name) { $('lobbyErr').textContent = 'اكتب اسمك أولاً.'; $('lobbyName').focus(); return; }
+    me.name = name;
+    store.set('meet:name', name);
+    // AudioContext لازم يبدأ بعد ضغطة المستخدم
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) { audioCtx = new AC(); audioCtx.resume?.(); }
+    watchLevel('me', localStream);
+
+    $('lobby').hidden = true;
+    $('meeting').hidden = false;
+    $('meetingTitle').textContent = meetingTitle;
+    makeTile('me', me.name, true);
+    refreshControls();
+    connect();
+  };
+  $('lobbyName').addEventListener('keydown', (e) => e.key === 'Enter' && $('joinBtn').click());
+
+  window.addEventListener('beforeunload', () => { if (me.rec) stopRecording(); });
+
+  initLobby();
+})();

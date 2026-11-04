@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>Meet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="room">
+
+  <!-- ===== شاشة ما قبل الدخول ===== -->
+  <section id="lobby" class="lobby">
+    <div class="brand" data-brand></div>
+    <div class="lobby-grid">
+      <div class="tile preview">
+        <video id="previewVideo" autoplay playsinline muted></video>
+        <div class="avatar" id="previewAvatar">؟</div>
+        <div class="preview-controls">
+          <button class="round" id="pMic" title="الميكروفون"><span data-icon="mic"></span></button>
+          <button class="round" id="pCam" title="الكاميرا"><span data-icon="cam"></span></button>
+        </div>
+      </div>
+      <div class="card">
+        <h2 id="lobbyTitle">جاهز للانضمام؟</h2>
+        <p class="muted" id="lobbyInfo">جاري التحقق من الاجتماع…</p>
+        <label class="field">
+          <span>اسمك</span>
+          <input id="lobbyName" maxlength="40" placeholder="اكتب اسمك" autocomplete="name">
+        </label>
+        <button id="joinBtn" class="btn btn-primary btn-block">انضم الآن</button>
+        <p id="lobbyErr" class="error" role="alert"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== الاجتماع ===== -->
+  <div id="meeting" class="meeting" hidden>
+    <header class="topbar">
+      <div class="brand" data-brand></div>
+      <div class="meta-row">
+        <button class="chip chip-btn" data-panel="minutes" title="محضر الاجتماع"><span data-icon="notes" data-size="18"></span> <span class="chip-txt">محضر الاجتماع</span></button>
+        <span class="chip status" id="status"><i class="dot"></i> <span>متصل</span></span>
+        <span class="chip" title="عدد المشاركين"><span data-icon="users" data-size="18"></span> <b id="count">1</b></span>
+        <span class="chip mono" title="مدة الاجتماع"><span data-icon="clock" data-size="18"></span> <b id="timer">00:00:00</b></span>
+        <span class="chip rec-chip" id="recChip" hidden><i class="dot"></i> جاري التسجيل</span>
+      </div>
+      <div class="title-row">
+        <h1 id="meetingTitle">اجتماع</h1>
+        <span class="muted small" id="meetingCode" dir="ltr"></span>
+      </div>
+    </header>
+
+    <main class="stage" id="stage">
+      <div class="grid" id="grid"></div>
+      <div class="captions" id="captions" aria-live="polite"></div>
+      <div class="reactions-layer" id="reactionsLayer"></div>
+    </main>
+
+    <!-- لوحة الأدوات (المزيد) -->
+    <section class="tools" id="tools" hidden>
+      <button class="tool" data-action="record"><span data-icon="record"></span><span class="lbl">تسجيل</span></button>
+      <button class="tool" data-panel="chat"><span data-icon="chat"></span><span class="lbl">المحادثة</span><b class="badge" id="chatBadge" hidden></b></button>
+      <button class="tool" data-panel="people"><span data-icon="users"></span><span class="lbl">المشاركون</span><b class="badge" id="peopleBadge">1</b></button>
+      <button class="tool" data-action="screen"><span data-icon="screen"></span><span class="lbl">مشاركة الشاشة</span></button>
+      <button class="tool" data-action="captions"><span data-icon="captions"></span><span class="lbl">الترجمة النصية</span></button>
+      <button class="tool" data-panel="settings"><span data-icon="settings"></span><span class="lbl">الإعدادات</span></button>
+      <button class="tool" data-action="hand"><span data-icon="hand"></span><span class="lbl">رفع اليد</span></button>
+      <button class="tool" data-action="reactions"><span data-icon="smile"></span><span class="lbl">التفاعلات</span></button>
+      <button class="tool" data-action="invite"><span data-icon="share"></span><span class="lbl">دعوة شخص</span></button>
+      <div class="emoji-bar" id="emojiBar" hidden>
+        <button>👍</button><button>👏</button><button>😂</button><button>❤️</button><button>🎉</button><button>😮</button>
+      </div>
+    </section>
+
+    <nav class="controls">
+      <button class="ctrl" id="moreBtn"><span data-icon="more"></span><span class="lbl">المزيد</span></button>
+      <button class="ctrl" id="micBtn"><span data-icon="mic"></span><span class="lbl">الميكروفون</span></button>
+      <button class="ctrl" id="camBtn"><span data-icon="cam"></span><span class="lbl">الكاميرا</span></button>
+      <button class="ctrl danger" id="leaveBtn"><span data-icon="leave"></span><span class="lbl">مغادرة</span></button>
+    </nav>
+
+    <!-- اللوحات الجانبية -->
+    <aside class="panel" id="panel" hidden>
+      <header class="panel-head">
+        <h2 id="panelTitle"></h2>
+        <button class="icon-btn" id="panelClose" aria-label="إغلاق"><span data-icon="close"></span></button>
+      </header>
+
+      <div class="panel-body" data-view="chat">
+        <ol class="messages" id="messages"></ol>
+        <form class="composer" id="chatForm">
+          <input id="chatInput" maxlength="2000" placeholder="اكتب رسالة…" autocomplete="off">
+          <button class="icon-btn primary" aria-label="إرسال"><span data-icon="send" data-size="20"></span></button>
+        </form>
+      </div>
+
+      <div class="panel-body" data-view="people">
+        <ul class="people" id="people"></ul>
+        <button class="btn btn-ghost btn-block" data-action="invite"><span data-icon="share"></span> دعوة شخص</button>
+      </div>
+
+      <div class="panel-body" data-view="minutes">
+        <p class="muted small">يُسجَّل هنا تلقائيًا: الدخول والخروج، المحادثة، والكلام المنطوق عند تفعيل الترجمة النصية.</p>
+        <ol class="minutes" id="minutes"></ol>
+        <button class="btn btn-primary btn-block" id="downloadMinutes"><span data-icon="download"></span> تحميل المحضر</button>
+      </div>
+
+      <div class="panel-body" data-view="settings">
+        <label class="field"><span>اسمك في الاجتماع</span><input id="setName" maxlength="40"></label>
+        <label class="field"><span>الميكروفون</span><select id="setMic"></select></label>
+        <label class="field"><span>الكاميرا</span><select id="setCam"></select></label>
+        <label class="field"><span>لغة الترجمة النصية</span>
+          <select id="setLang">
+            <option value="ar-EG">العربية (مصر)</option>
+            <option value="ar-SA">العربية (السعودية)</option>
+            <option value="en-US">English (US)</option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-block" id="saveSettings">حفظ</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/config.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/room.js"></script>
+</body>
+</html>

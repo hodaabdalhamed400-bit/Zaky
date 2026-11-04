@@ -1,0 +1,19 @@
+{
+  "name": "zaky-meet",
+  "version": "1.0.0",
+  "description": "نظام اجتماعات فيديو خاص بالشركة (WebRTC + Socket.IO)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "express": "^5.1.0",
+    "socket.io": "^4.8.1"
+  }
+}
