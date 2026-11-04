@@ -47,7 +47,7 @@
     @keyframes spFade { to { opacity: 1; } }
     #splash .sp-bar { width: 140px; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; opacity: 0; animation: spFade .4s ease 1.1s forwards; }
     #splash .sp-bar i { display: block; height: 100%; width: 100%; border-radius: inherit; background: linear-gradient(90deg, #1faec1, #a78bfa, #4fd1e0);
-      transform: scaleX(0); transform-origin: right; animation: spLoad 5.1s cubic-bezier(.45, 0, .25, 1) 1.15s forwards; }
+      transform: scaleX(0); transform-origin: right; animation: spLoad 10s cubic-bezier(.45, 0, .25, 1) 1.15s forwards; }
     @keyframes spLoad { to { transform: scaleX(1); } }
     #splash .sp-foot { position: absolute; bottom: max(28px, env(safe-area-inset-bottom)); font-size: .78rem; color: #6f86a1; opacity: 0; animation: spFade .6s ease 1.4s forwards; }
     #splash .sp-dots { position: absolute; inset: 0; pointer-events: none; }
@@ -90,7 +90,11 @@
         <span style="animation-delay:1.6s">🎥 اجتماعات فيديو</span>
         <span style="animation-delay:2.9s">✨ مساعد ذكي</span>
         <span style="animation-delay:4.2s">🌐 ترجمة فورية</span>
-        <span class="last" style="animation-delay:5.5s">🚀 يلا نبدأ</span>
+        <span style="animation-delay:5.5s">📝 محضر تلقائي</span>
+        <span style="animation-delay:6.8s">👑 تحكم المنظّم</span>
+        <span style="animation-delay:8.1s">🎉 تفاعلات واحتفالات</span>
+        <span style="animation-delay:9.4s">🔐 آمنة لفريق ذكي</span>
+        <span class="last" style="animation-delay:10.4s">🚀 يلا نبدأ</span>
       </div>
       <div class="sp-bar"><i></i></div>
     </div>
@@ -112,7 +116,7 @@
         setTimeout(() => document.documentElement.classList.remove('splashing'), 350);
         setTimeout(() => sp.remove(), 760);
       };
-      setTimeout(done, reduce ? 300 : 6250); // 6.25 ثانية + 0.75 انتقال = 7 ثواني
+      setTimeout(done, reduce ? 300 : 11250); // 11.25 ثانية + 0.75 انتقال = 12 ثانية
       sp.addEventListener('click', done); // ضغطة = تخطّي
     })();
   </script>
