@@ -525,3 +525,25 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 
 body.in-meeting { overflow: hidden; height: 100dvh; }
 .meeting, .stage, .reactions-layer { overflow: clip; }
+
+/* =========== فلاتر الكاميرا =========== */
+.tile-btn .orb { font-size: 1.6rem; }
+.tab-emo { font-size: 1rem; line-height: 1; }
+.fx-preview { position: relative; aspect-ratio: 16 / 10; border-radius: 18px; overflow: hidden; background: #000; border: 1px solid var(--line-2); flex: none; }
+.fx-preview video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.fx-nocam { position: absolute; inset: 0; margin: 0; display: grid; place-items: center; color: var(--muted); background: var(--surface); }
+.fx-loading { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: .5rem; background: rgba(7, 17, 31, .75); font-size: .9rem; }
+.fx-reset { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); border: 0; border-radius: 999px; padding: .35rem .9rem; font-size: .8rem; font-weight: 700;
+  background: rgba(7, 17, 31, .8); backdrop-filter: blur(6px); animation: pop .3s cubic-bezier(.34, 1.56, .64, 1); }
+.fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); gap: 6px; }
+.fx-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: .5rem .2rem .4rem; border-radius: 14px; border: 1px solid var(--line);
+  background: var(--surface); opacity: 0; animation: emoIn .35s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: calc(var(--i) * 25ms);
+  transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), border-color .2s, background .2s; }
+.fx-chip span { font-size: 1.5rem; line-height: 1.2; transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+.fx-chip small { font-size: .7rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.fx-chip:hover { transform: translateY(-3px); }
+.fx-chip:hover span { transform: scale(1.2) rotate(-8deg); }
+.fx-chip.on { border-color: #f472b6; background: linear-gradient(160deg, rgba(244, 114, 182, .22), rgba(168, 85, 247, .12)); }
+.fx-chip.on small { color: #f9a8d4; }
+.fx-chip.on span { animation: chipOn .5s cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes chipOn { 40% { transform: scale(1.35) rotate(12deg); } }

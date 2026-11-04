@@ -41,6 +41,7 @@
   const hostKey = store.get(`meet:host:${roomId}`) || '';
   let micTrack = null;
   let camTrack = null;
+  let fxTrack = null; // الكاميرا بعد الفلاتر
   let screenTrack = null;
   let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
   let socket = null;
@@ -72,7 +73,8 @@
     if (track) localStream.addTrack(track);
   }
 
-  const currentVideo = () => (me.screen && screenTrack) || (me.cam && camTrack) || null;
+  const camOut = () => (me.cam && (fxTrack || camTrack)) || null;
+  const currentVideo = () => (me.screen && screenTrack) || camOut();
 
   function pushTracksToPeers() {
     for (const p of peers.values()) {
@@ -110,9 +112,55 @@
     if (!on && camTrack) { camTrack.stop(); camTrack = null; }
     me.cam = on;
     store.set('meet:cam', on ? '1' : '0');
-    if (!me.screen) setLocalTrack('video', camTrack);
+    await refreshFx();
+  }
+
+  // ===================== فلاتر الكاميرا =====================
+  async function refreshFx() {
+    if (window.CamFX && camTrack && me.cam && CamFX.active()) fxTrack = await CamFX.apply(camTrack);
+    else { window.CamFX?.stop(); fxTrack = null; }
+    if (!me.screen) setLocalTrack('video', camOut());
+    $('fxPreview') && ($('fxPreview').srcObject = camOut() ? new MediaStream([camOut()]) : null);
+    renderSelf();
     pushTracksToPeers();
   }
+  const FX_GROUPS = {
+    sticker: [['none', '🚫', 'بدون'], ['glasses', '🕶️', 'نظارة'], ['crown', '👑', 'تاج'], ['cat', '🐱', 'قطة'], ['dog', '🐶', 'كلب'], ['party', '🥳', 'حفلة'],
+      ['clown', '🤡', 'مهرج'], ['mustache', '🥸', 'شنب'], ['hat', '🎩', 'برنيطة'], ['nerd', '🤓', 'نظارة طبية'], ['hearts', '😍', 'قلوب'], ['stars', '🤩', 'نجوم']],
+    bg: [['none', '🚫', 'بدون'], ['blur', '🌫️', 'تغبيش'], ['brand', '🔷', 'ذكي'], ['office', '🏢', 'مكتب'], ['space', '🪐', 'الفضاء']],
+    color: [['none', '🚫', 'طبيعي'], ['soft', '✨', 'تنعيم'], ['warm', '🌅', 'دافي'], ['cool', '❄️', 'بارد'], ['vivid', '🌈', 'حيوي'], ['vintage', '📜', 'قديم'], ['bw', '⚫', 'أبيض وأسود'], ['noir', '🎬', 'سينما'], ['invert', '🔮', 'عكس']],
+    fun: [['none', '🚫', 'بدون'], ['party', '🪩', 'ديسكو'], ['pixel', '👾', 'بكسل'], ['mirror', '🪞', 'مراية'], ['squeeze', '🤏', 'نحيف'], ['stretch', '↔️', 'عريض'], ['tv', '📺', 'تلفزيون قديم']],
+  };
+  function loadFxState() {
+    if (!window.CamFX) return;
+    try { const st = JSON.parse(store.get('meet:fx') || '{}'); for (const k of Object.keys(FX_GROUPS)) if (st[k]) CamFX.set(k, st[k]); } catch { /* ignore */ }
+  }
+  function renderFxPanel() {
+    if (!window.CamFX) return;
+    for (const [group, items] of Object.entries(FX_GROUPS)) {
+      $(`fx-${group}`).innerHTML = items.map(([id, ic, label], i) => `
+        <button class="fx-chip ${CamFX.state[group] === id ? 'on' : ''}" data-fxg="${group}" data-fxv="${id}" style="--i:${i}">
+          <span>${ic}</span><small>${label}</small></button>`).join('');
+    }
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-fxg]');
+    if (!b || !window.CamFX) return;
+    CamFX.set(b.dataset.fxg, b.dataset.fxv);
+    store.set('meet:fx', JSON.stringify(CamFX.state));
+    renderFxPanel();
+    if (!me.cam) { toast('افتح الكاميرا علشان الفلتر يشتغل 📷'); return; }
+    if (CamFX.needsAI() && !CamFX.aiReady()) { $('fxLoading').hidden = false; }
+    await refreshFx();
+    $('fxLoading').hidden = true;
+    $('fxReset').hidden = !CamFX.active();
+  });
+  $('fxReset').onclick = async () => {
+    for (const k of Object.keys(FX_GROUPS)) CamFX.set(k, 'none');
+    store.set('meet:fx', '{}');
+    renderFxPanel(); await refreshFx(); $('fxReset').hidden = true;
+  };
+  window.addEventListener('camfx-error', () => toast('الفلاتر الذكية مش مدعومة على الجهاز ده — جرّب فلاتر الألوان'));
 
   // ===================== مستوى الصوت (من يتكلم) =====================
   let audioCtx = null;
@@ -557,6 +605,7 @@
     if (me.rec) stopRecording();
     stopCaptions();
     for (const id of [...peers.keys()]) removePeer(id);
+    window.CamFX?.stop();
     [micTrack, camTrack, screenTrack].forEach((t) => t?.stop());
   }
   function leave() {
@@ -690,7 +739,7 @@
     screenTrack?.stop();
     screenTrack = null;
     me.screen = false;
-    setLocalTrack('video', camTrack);
+    setLocalTrack('video', camOut());
     pushTracksToPeers();
     sendState();
     refreshControls();
@@ -1181,7 +1230,7 @@
   }
 
   // ===================== اللوحة الجانبية =====================
-  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة' };
+  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة', filters: 'فلاتر الكاميرا' };
   let currentPanel = null;
   function openPanel(name) {
     // نفس الزرار مرتين = قفل (على الكمبيوتر)
@@ -1200,6 +1249,12 @@
       setTimeout(() => $('chatInput').focus(), 50);
     }
     if (name === 'settings') fillSettings();
+    if (name === 'filters') {
+      renderFxPanel();
+      $('fxPreview').srcObject = camOut() ? new MediaStream([camOut()]) : null;
+      $('fxNoCam').hidden = me.cam;
+      $('fxReset').hidden = !window.CamFX?.active();
+    }
     if (name === 'assistant' && aiOn) setTimeout(() => $('aiInput').focus(), 50);
     toggleTools(false);
     if (name === 'people') renderPeople();
@@ -1301,6 +1356,7 @@
       me.mic = false; me.cam = false;
     } else {
       if (me.mic) await enableMic(true);
+      loadFxState();
       if (me.cam) await enableCam(true);
     }
     $('aiOff').hidden = aiOn;

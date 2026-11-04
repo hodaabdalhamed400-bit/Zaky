@@ -102,6 +102,8 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render بيحط الـ IP الحقيقي في X-Forwarded-For
 app.use(express.json({ limit: '2kb' }));
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
+// مكتبة فلاتر الكاميرا (MediaPipe) من node_modules — بتتحمّل بس لما حد يختار فلتر ذكي
+app.use('/vendor/mediapipe', express.static(path.join(__dirname, 'node_modules/@mediapipe/tasks-vision'), { maxAge: '7d', immutable: true }));
 
 app.get('/healthz', (_req, res) => res.send('ok'));
 app.post('/api/new', (req, res) => {
