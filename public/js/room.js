@@ -375,7 +375,11 @@
       setStatus(true);
       // عند إعادة الاتصال نبدأ من جديد مع كل المشاركين
       for (const id of [...peers.keys()]) removePeer(id);
-      socket.emit('join', { roomId, name: me.name, title: meetingTitle, clientId, hostKey, state: { mic: me.mic, cam: me.cam } }, onJoined);
+      socket.emit('join', {
+        roomId, name: me.name, title: meetingTitle, clientId, hostKey,
+        email: store.get('meet:email') || '', lang: translateTo || speakLang(),
+        state: { mic: me.mic, cam: me.cam },
+      }, onJoined);
     });
     function onJoined(res) {
         $('waitingRoom').hidden = true;
@@ -383,6 +387,7 @@
         if (res?.error === 'full') { alert(`الاجتماع ممتلئ (الحد الأقصى ${res.max} مشاركين).`); location.href = '/'; return; }
         if (res?.error === 'too_many') { alert('محاولات غلط كتير — استنى ربع ساعة وحاول تاني.'); location.href = '/'; return; }
         if (res?.error === 'locked') { alert('المنظّم قفل الاجتماع، ومحدش جديد يقدر يدخل دلوقتي.'); location.href = '/'; return; }
+        if (res?.error === 'ended') { alert('الاجتماع ده انتهى.'); location.href = '/'; return; }
         if (res?.error === 'removed') { alert('المنظّم أخرجك من الاجتماع ده.'); location.href = '/'; return; }
         if (res?.error) { alert('رابط الاجتماع غير صحيح أو منتهي. اطلب الرابط تاني من منظّم الاجتماع.'); location.href = '/'; return; }
         me.id = res.selfId;
@@ -408,6 +413,8 @@
         layout();
     }
     socket.on('admitted', onJoined);
+    socket.on('meeting-ended', showEnded);
+    socket.on('meeting-summary', showSummary);
     socket.on('denied', () => { alert('المنظّم ما وافقش على دخولك.'); location.href = '/'; });
     socket.on('disconnect', () => setStatus(false));
 
@@ -505,7 +512,17 @@
 
   $('micBtn').onclick = async () => { await enableMic(!me.mic); sendState(); refreshControls(); };
   $('camBtn').onclick = async () => { await enableCam(!me.cam); sendState(); refreshControls(); };
-  $('leaveBtn').onclick = () => leave();
+  // المنظّم يختار: يخرج بس، ولا ينهي الاجتماع للكل
+  $('leaveBtn').onclick = () => {
+    if (!me.host) return leave();
+    $('leaveModal').hidden = false;
+  };
+  $('leaveModal').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-leave]');
+    if (e.target === $('leaveModal') || b?.dataset.leave === 'cancel') { $('leaveModal').hidden = true; return; }
+    if (b?.dataset.leave === 'self') leave();
+    if (b?.dataset.leave === 'all') { $('leaveModal').hidden = true; socket.emit('host:end'); }
+  });
   $('moreBtn').onclick = () => toggleTools();
 
   function toggleTools(force) {
@@ -519,14 +536,66 @@
   // الضغط على الفيديو يقفل القوايم المفتوحة
   $('stage').addEventListener('click', () => { if (!$('tools').hidden || !$('emojiBar').hidden) toggleTools(false); });
 
-  function leave() {
+  function teardown() {
     if (me.rec) stopRecording();
     stopCaptions();
     for (const id of [...peers.keys()]) removePeer(id);
-    socket?.disconnect();
     [micTrack, camTrack, screenTrack].forEach((t) => t?.stop());
+  }
+  function leave() {
+    teardown();
+    socket?.disconnect();
     location.href = '/';
   }
+
+  // ===================== نهاية الاجتماع + الملخص =====================
+  let summaryText = '';
+  function showEnded({ by, minutes }) {
+    teardown();
+    $('endScreen').hidden = false;
+    $('endBy').textContent = by ? `${by} أنهى الاجتماع` : 'انتهى الاجتماع';
+    $('endStats').textContent = `${meetingTitle} · ${minutes} دقيقة`;
+    $('endSummary').innerHTML = '<div class="spinner"></div><p class="muted">جاري تجهيز ملخص الاجتماع بالذكاء الاصطناعي…</p>';
+    $('endActions').hidden = true;
+  }
+  function renderSummaryHtml(text) {
+    const out = [];
+    let list = false;
+    for (const raw of text.split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('## ')) { if (list) { out.push('</ul>'); list = false; } out.push(`<h3>${esc(line.slice(3))}</h3>`); }
+      else if (/^[-•]\s+/.test(line)) { if (!list) { out.push('<ul>'); list = true; } out.push(`<li>${esc(line.replace(/^[-•]\s+/, ''))}</li>`); }
+      else { if (list) { out.push('</ul>'); list = false; } out.push(`<p>${esc(line)}</p>`); }
+    }
+    if (list) out.push('</ul>');
+    return out.join('');
+  }
+  function showSummary({ summaries = {}, emailed = 0, recipients = 0, emailEnabled, reason }) {
+    const lang = (translateTo || speakLang()).startsWith('ar') ? 'ar' : 'en';
+    summaryText = summaries[lang] || summaries.ar || Object.values(summaries)[0] || '';
+    const note = [];
+    if (summaryText) {
+      $('endSummary').innerHTML = `<div class="summary" dir="${lang === 'ar' || !summaries.en ? 'rtl' : 'ltr'}">${renderSummaryHtml(summaryText)}</div>`;
+      if (emailed) note.push(`📧 الملخص اتبعت على ${emailed} ${emailed === 1 ? 'إيميل' : 'إيميلات'}.`);
+      else if (recipients && !emailEnabled) note.push('📧 إرسال الإيميلات مش مفعّل على الخادم لسه.');
+    } else {
+      const why = { ai_off: 'الملخص الذكي مش مفعّل على الخادم.', empty: 'مفيش كلام اتكتب أو اتقال في المحادثة علشان يتلخّص. (فعّلوا "تحويل الكلام لنص" المرة الجاية.)', ai_error: 'حصلت مشكلة في تجهيز الملخص.' }[reason] || '';
+      $('endSummary').innerHTML = `<p class="muted">${why}</p>`;
+      summaryText = minutes.map((m) => `[${fmtClock(m.ts)}] ${m.who ? `${m.who}: ` : ''}${m.text}`).join('\n');
+      if (summaryText) note.push('تقدر تحمّل محضر الاجتماع الكامل بدل الملخص.');
+    }
+    $('endNote').textContent = note.join(' ');
+    $('endActions').hidden = !summaryText;
+  }
+  $('endActions').addEventListener('click', async (e) => {
+    const act = e.target.closest('[data-end]')?.dataset.end;
+    if (!act) return;
+    const plain = `ملخص اجتماع: ${meetingTitle}\n\n${summaryText.replace(/^## /gm, '▪ ')}`;
+    if (act === 'whatsapp') window.open(`https://wa.me/?text=${encodeURIComponent(plain.slice(0, 3500))}`, '_blank');
+    if (act === 'copy') { try { await navigator.clipboard.writeText(plain); toast('اتنسخ ✔'); } catch { prompt('انسخ الملخص:', plain); } }
+    if (act === 'download') download(new Blob(['\ufeff' + plain], { type: 'text/plain;charset=utf-8' }), `summary-${roomId}.txt`);
+  });
 
   document.addEventListener('click', (e) => {
     const panelBtn = e.target.closest('[data-panel]');
@@ -1044,6 +1113,7 @@
   $('lobbySpeak').value = speakLang();
   $('lobbyTr').value = translateTo;
   $('lobbyCap').checked = store.get('meet:cap') !== '0';
+  $('lobbyEmail').value = store.get('meet:email') || '';
   $('lobbyName').oninput = refreshPreview;
   preview.classList.add('mirror');
 
@@ -1109,6 +1179,8 @@
       $('setTranslate').value = translateTo;
     }
     store.set('meet:cap', $('lobbyCap').checked ? '1' : '0');
+    const em = $('lobbyEmail').value.trim();
+    store.set('meet:email', /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em) ? em : '');
 
     makeTile('me', me.name, true);
     refreshControls();

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const ai = require('./ai');
+const mailer = require('./mailer');
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_PARTICIPANTS = Number(process.env.MAX_PARTICIPANTS) || 8;
@@ -24,6 +25,9 @@ function logEvent(room, entry) {
   if (room.log.length > MAX_LOG) room.log.shift();
 }
 const rooms = new Map();
+// الاجتماعات اللي المنظّم أنهاها للجميع: الرابط بيفضل مقفول 12 ساعة
+const endedRooms = new Map();
+setInterval(() => { for (const [id, ts] of endedRooms) if (Date.now() - ts > 12 * 3600_000) endedRooms.delete(id); }, 3600_000).unref();
 
 // ---------- كود الشركة ----------
 // لو ACCESS_CODE موجود: إنشاء اجتماع جديد محتاج الكود، وكل رابط اجتماع عليه "توقيع" من الخادم
@@ -113,7 +117,7 @@ app.post('/api/new', (req, res) => {
   res.json({ id, hostKey: hostKeyFor(id) });
 });
 app.get('/api/config', (_req, res) => res.json({
-  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, languages: Object.keys(ai.LANGS),
+  iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, email: mailer.enabled, languages: Object.keys(ai.LANGS),
 }));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
@@ -126,6 +130,42 @@ app.get('/m/:id', (req, res) => {
   if (!ROOM_ID_RE.test(req.params.id)) return res.redirect('/');
   res.sendFile(path.join(PUBLIC_DIR, 'room.html'));
 });
+
+// ---------- نهاية الاجتماع: ملخص ذكي + إيميلات ----------
+async function finishMeeting(room, id) {
+  if (room.finished) return room.finishResult || { summaries: {} };
+  room.finished = true;
+  const content = room.log.filter((e) => e.type === 'speech' || e.type === 'chat').length;
+  const langs = new Set(['ar', ...room.langs, ...[...room.recipients.values()].map((r) => r.lang)]);
+  const summaries = {};
+  let reason = null;
+  if (!ai.enabled) reason = 'ai_off';
+  else if (!content) reason = 'empty';
+  else {
+    for (const lang of langs) {
+      try { summaries[lang] = await ai.summarize(room, lang); } catch (err) { console.error(`summary (${lang}) failed:`, err.message); }
+    }
+    if (!Object.keys(summaries).length) reason = 'ai_error';
+  }
+  let emailed = 0;
+  if (mailer.enabled && Object.keys(summaries).length) {
+    const minutes = Math.max(1, Math.round((Date.now() - room.startedAt) / 60000));
+    const attendees = [...new Set(room.log.filter((e) => e.type === 'join').map((e) => e.name))].join('، ');
+    for (const [email, r] of room.recipients) {
+      try {
+        await mailer.sendSummary(email, {
+          title: room.title, startedAt: room.startedAt, minutes, attendees, lang: r.lang,
+          summary: summaries[r.lang] || summaries.ar || Object.values(summaries)[0],
+          link: process.env.PUBLIC_URL || '',
+        });
+        emailed++;
+      } catch (err) { console.error('email failed:', err.message); }
+    }
+  }
+  room.finishResult = { summaries, emailed, recipients: room.recipients.size, emailEnabled: mailer.enabled, reason };
+  console.log(`meeting ${id} finished: ${Object.keys(summaries).join(',') || 'no'} summary, ${emailed}/${room.recipients.size} emails`);
+  return room.finishResult;
+}
 
 const publicPeer = (p) => ({ id: p.id, name: p.name, state: p.state, host: !!p.host });
 const hasHost = (room) => [...room.peers.values()].some((p) => p.host);
@@ -153,6 +193,7 @@ io.on('connection', (socket) => {
     if (roomId || waitingIn || !ROOM_ID_RE.test(id)) return ack?.({ error: 'invalid' });
 
     let room = rooms.get(id);
+    if (!room && endedRooms.has(id)) return ack?.({ error: 'ended' });
     if (!room) {
       const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address;
       if (tooManyFailures(ip)) return ack?.({ error: 'too_many' });
@@ -160,11 +201,15 @@ io.on('connection', (socket) => {
       room = {
         title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [],
         waitlist: new Map(), admitted: new Set(), banned: new Set(), coHosts: new Set(), locked: false, waiting: false,
+        recipients: new Map(), langs: new Set(['ar']), finished: false, emptyTimer: null,
       };
       rooms.set(id, room);
     }
 
+    if (room.finished) return ack?.({ error: 'ended' });
     const clientId = clean(payload.clientId, 64) || socket.id;
+    const email = clean(payload.email, 120).toLowerCase();
+    const sumLang = String(payload.lang || 'ar').startsWith('ar') ? 'ar' : 'en';
     const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId);
     const name = clean(payload.name, 40) || 'ضيف';
     if (room.banned.has(clientId) && !isHost) return ack?.({ error: 'removed' });
@@ -183,6 +228,9 @@ io.on('connection', (socket) => {
       };
       roomId = id;
       socket.join(id);
+      clearTimeout(room.emptyTimer);
+      room.langs.add(sumLang);
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) room.recipients.set(email, { name, lang: sumLang });
       const others = [...room.peers.values()].map(publicPeer);
       room.peers.set(socket.id, info);
       room.admitted.add(clientId);
@@ -262,6 +310,19 @@ io.on('connection', (socket) => {
     io.to(q.id).emit('waitlist', waitlistOf(room));
     logEvent(room, { type: 'host', name: me.name, text: `خلّى ${q.name} منظّم مشارك` });
   }));
+  socket.on('host:end', hostOnly(async (room, me) => {
+    const id = roomId;
+    const minutes = Math.max(1, Math.round((Date.now() - room.startedAt) / 60000));
+    io.to(id).emit('meeting-ended', { by: me.name, minutes });
+    for (const w of room.waitlist.values()) w.deny();
+    room.waitlist.clear();
+    logEvent(room, { type: 'host', name: me.name, text: 'أنهى الاجتماع للجميع' });
+    if (rooms.get(id) === room) rooms.delete(id);
+    endedRooms.set(id, Date.now());
+    const result = await finishMeeting(room, id);
+    io.to(id).emit('meeting-summary', result);
+  }));
+
   socket.on('host:settings', hostOnly((room, me, opts = {}) => {
     if ('locked' in opts) room.locked = !!opts.locked;
     if ('waiting' in opts) {
@@ -395,12 +456,22 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('peer-left', { id: socket.id });
     // لو آخر منظّم خرج، اللي مستنيين يدخلوا علطول (مفيش حد يوافق عليهم)
     if (left?.host && !hasHost(room)) admitAll(room);
-    if (room.peers.size === 0) rooms.delete(roomId);
+    if (room.peers.size === 0) {
+      // مهلة دقيقتين قبل قفل الاجتماع (لو حد النت فصل عنده يرجع لنفس الاجتماع)
+      const id = roomId;
+      clearTimeout(room.emptyTimer);
+      room.emptyTimer = setTimeout(() => {
+        if (room.peers.size || rooms.get(id) !== room) return;
+        rooms.delete(id);
+        if (room.recipients.size) finishMeeting(room, id).catch((err) => console.error('finish failed:', err.message));
+      }, 120_000);
+    }
   });
 });
 
 server.listen(PORT, () => {
   console.log(`smart Meet running on http://localhost:${PORT}`);
+  console.log(mailer.enabled ? 'Summary emails: ON' : 'Summary emails: OFF — set SMTP_HOST, SMTP_USER, SMTP_PASS to email summaries');
   console.log(ACCESS_CODE ? 'Company access code: ON (new meetings need the code)' : 'Company access code: OFF — set ACCESS_CODE to restrict creating meetings');
   console.log(ai.enabled ? `AI services: ON (assistant: ${ai.model}, translation & caption correction: ${ai.translateModel}${ai.correctionEnabled ? '' : ', correction OFF'})` : 'AI services: OFF — set ANTHROPIC_API_KEY to enable the assistant and translation');
 });

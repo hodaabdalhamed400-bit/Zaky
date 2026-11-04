@@ -69,6 +69,7 @@ button:disabled { cursor: default; opacity: .55; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border: 1px solid transparent;
   border-radius: 14px; padding: .8rem 1.1rem; font-weight: 600; transition: transform .1s, filter .15s, background .15s; }
 .btn:active { transform: scale(.98); }
+a.btn { text-decoration: none; }
 .btn-block { width: 100%; }
 .btn-primary { background: linear-gradient(135deg, var(--brand), #178a9a); color: #fff; box-shadow: 0 8px 24px rgba(31, 174, 193, .25); }
 .btn-primary:hover { filter: brightness(1.07); }
@@ -383,3 +384,25 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 .waiting-mark { height: 46px; }
 .spinner { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--brand-soft); border-top-color: var(--brand); animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- نافذة الخروج للمنظّم --- */
+.modal { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: 20px; background: rgba(4, 10, 20, .7); backdrop-filter: blur(4px); }
+.modal-card { width: min(380px, 100%); background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 22px; padding: 1.4rem; display: grid; gap: .6rem; animation: rise .2s ease-out; }
+.modal-card h2 { margin: 0; font-size: 1.2rem; }
+.modal-card p { margin: 0 0 .4rem; line-height: 1.7; }
+.btn.link { background: none; color: var(--muted); }
+
+/* --- شاشة نهاية الاجتماع --- */
+.end-screen { position: fixed; inset: 0; z-index: 75; overflow: auto; padding: max(24px, env(safe-area-inset-top)) 16px 32px;
+  background: radial-gradient(700px 420px at 50% 0%, rgba(31, 174, 193, .18), transparent 60%), var(--bg); }
+.end-card { max-width: 680px; margin: 0 auto; display: grid; gap: .7rem; justify-items: center; text-align: center; }
+.end-card h2 { margin: .3rem 0 0; font-size: 1.5rem; }
+.end-card > p { margin: 0; }
+.end-summary { width: 100%; text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 1.2rem 1.3rem; display: grid; justify-items: center; gap: .6rem; }
+.end-summary .summary { width: 100%; justify-self: stretch; line-height: 1.8; }
+.end-summary h3 { margin: 1rem 0 .35rem; font-size: 1rem; color: var(--brand-2); border-inline-start: 4px solid var(--brand); padding-inline-start: .6rem; }
+.end-summary h3:first-child { margin-top: 0; }
+.end-summary ul { margin: 0; padding-inline-start: 1.2rem; }
+.end-summary li { margin: .2rem 0; }
+.end-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.btn-wa { background: #25d366; color: #fff; }
