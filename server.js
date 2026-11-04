@@ -125,6 +125,7 @@ app.get('/api/rooms/:id', (req, res) => {
   res.json({
     exists: !!room, valid: !!room || isAuthorizedRoomId(req.params.id),
     participants: room ? room.peers.size : 0, title: room?.title || null,
+    people: room ? [...room.peers.values()].slice(0, 5).map((p) => p.name) : [],
   });
 });
 app.get('/m/:id', (req, res) => {

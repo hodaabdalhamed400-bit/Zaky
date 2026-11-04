@@ -141,12 +141,16 @@
   function renderFxPanel() {
     if (!window.CamFX) return;
     for (const [group, items] of Object.entries(FX_GROUPS)) {
-      $(`fx-${group}`).innerHTML = items.map(([id, ic, label, grad], i) => (group === 'lens'
+      const html = items.map(([id, ic, label, grad], i) => (group === 'lens'
         ? `<button class="lens ${CamFX.state.lens === id ? 'on' : ''}" data-fxg="lens" data-fxv="${id}" style="--i:${i};--g:linear-gradient(145deg,${grad})">
              <span class="lens-orb">${ic}</span><small>${label}</small></button>`
         : `<button class="fx-chip ${CamFX.state[group] === id ? 'on' : ''}" data-fxg="${group}" data-fxv="${id}" style="--i:${i}">
              <span>${ic}</span><small>${label}</small></button>`)).join('');
+      $(`fx-${group}`).innerHTML = html;
+      if (group === 'lens' && $('lobbyLens')) $('lobbyLens').innerHTML = html;
     }
+    const lon = $('lobbyLens')?.querySelector('.lens.on');
+    if (lon && !$('lobbyLens').hidden) lon.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     const on = $('fx-lens').querySelector('.lens.on');
     if (on) on.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     const cur = FX_GROUPS.lens.find(([id]) => id === CamFX.state.lens);
@@ -161,9 +165,10 @@
     store.set('meet:fx2', JSON.stringify(CamFX.state));
     renderFxPanel();
     if (!me.cam) { toast('افتح الكاميرا علشان الفلتر يشتغل 📷'); return; }
-    if (CamFX.needsAI() && !CamFX.aiReady()) { $('fxLoading').hidden = false; }
+    if (CamFX.needsAI() && !CamFX.aiReady()) { $('fxLoading').hidden = false; $('lbFxLoading').hidden = false; }
     await refreshFx();
-    $('fxLoading').hidden = true;
+    $('fxLoading').hidden = true; $('lbFxLoading').hidden = true;
+    if (!$('lobby').hidden) refreshPreview();
     $('fxReset').hidden = !CamFX.active();
   });
   $('fxReset').onclick = async () => {
@@ -1324,14 +1329,84 @@
   function refreshPreview() {
     preview.classList.toggle('video-on', !!camTrack && me.cam);
     $('previewVideo').srcObject = localStream;
-    $('previewAvatar').textContent = initial($('lobbyName').value || '؟');
+    const nm = $('lobbyName').value.trim();
+    $('previewAvatar').textContent = initial(nm || '؟');
+    $('previewAvatar').style.setProperty('--avatar', colorFor(nm || 'x'));
+    $('lbYou').textContent = nm ? `${nm} · أنت` : '';
+    $('lbHello').textContent = nm ? `أهلاً يا ${nm.split(' ')[0]} 👋` : 'أهلاً بيك 👋';
+    $('chkCam').className = `lb-check ${me.cam && camTrack ? 'ok' : 'off'}`;
+    $('chkMic').className = `lb-check ${me.mic && micTrack ? 'ok' : 'off'}`;
+    $('pFx').hidden = !(me.cam && camTrack);
+    if (!(me.cam && camTrack)) $('lobbyLens').hidden = true;
     $('pMic').classList.toggle('off', !me.mic);
     $('pMic').innerHTML = icon(me.mic ? 'mic' : 'micOff');
     $('pCam').classList.toggle('off', !me.cam);
     $('pCam').innerHTML = icon(me.cam ? 'cam' : 'camOff');
   }
-  $('pMic').onclick = async () => { await enableMic(!me.mic); refreshPreview(); };
-  $('pCam').onclick = async () => { await enableCam(!me.cam); refreshPreview(); };
+  $('pMic').onclick = async () => { await enableMic(!me.mic); bump($('pMic'), me.mic ? 'flip' : 'shake'); refreshPreview(); lobbyMeter(); };
+  $('pCam').onclick = async () => { await enableCam(!me.cam); bump($('pCam'), me.cam ? 'flip' : 'shake'); refreshPreview(); };
+  $('pFx').onclick = () => {
+    const show = $('lobbyLens').hidden;
+    $('lobbyLens').hidden = !show;
+    $('pFx').classList.toggle('active', show);
+    if (show) renderFxPanel();
+  };
+  $('lbCode').onclick = () => invite();
+
+  // ---- مقياس المايك في شاشة الدخول ----
+  let lbAudio = null; let lbAnalyser = null; let lbSrc = null; let lbRaf = 0;
+  function lobbyMeter() {
+    if (!micTrack || !me.mic) { $('lbPreview').style.setProperty('--lvl', 0); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!lbAudio) lbAudio = new AC();
+      lbAudio.resume?.();
+      lbSrc?.disconnect();
+      lbSrc = lbAudio.createMediaStreamSource(new MediaStream([micTrack]));
+      lbAnalyser = lbAudio.createAnalyser(); lbAnalyser.fftSize = 256;
+      lbSrc.connect(lbAnalyser);
+    } catch { return; }
+    const data = new Uint8Array(lbAnalyser.frequencyBinCount);
+    const bars = [...$('lbMeter').children];
+    let heard = false;
+    cancelAnimationFrame(lbRaf);
+    const tick = () => {
+      if ($('lobby').hidden || !lbAnalyser) return;
+      lbAnalyser.getByteFrequencyData(data);
+      let sum = 0; for (let i = 2; i < 40; i++) sum += data[i];
+      const lvl = me.mic ? Math.min(1, sum / (38 * 140)) : 0;
+      $('lbPreview').style.setProperty('--lvl', lvl.toFixed(3));
+      bars.forEach((b, i) => { const v = data[3 + i * 5] / 255; b.style.transform = `scaleY(${(.15 + v * (me.mic ? 1 : 0)).toFixed(2)})`; });
+      if (lvl > .12 && !heard) { heard = true; $('chkMic').classList.add('heard'); $('chkMic').querySelector('b').textContent = 'المايك سامعك'; }
+      lbRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+  // بعض المتصفحات محتاجة ضغطة قبل تشغيل الصوت
+  document.addEventListener('pointerdown', () => { lbAudio?.resume?.(); }, { once: true });
+
+  // ---- نجوم/جزيئات خفيفة في الخلفية ----
+  (() => {
+    const cv = $('lbStars'); if (!cv) return;
+    const c = cv.getContext('2d'); let w; let h; let pts = [];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const size = () => {
+      const d = Math.min(2, devicePixelRatio || 1); w = cv.width = innerWidth * d; h = cv.height = innerHeight * d;
+      pts = Array.from({ length: Math.round(Math.min(70, innerWidth / 14)) }, () => ({ x: Math.random() * w, y: Math.random() * h, r: (Math.random() * 1.6 + .4) * d, v: (Math.random() * .35 + .1) * d, p: Math.random() * 6 }));
+    };
+    size(); addEventListener('resize', size);
+    const draw = (t) => {
+      if ($('lobby').hidden) return;
+      c.clearRect(0, 0, w, h);
+      for (const p of pts) {
+        if (!reduce) { p.y -= p.v; if (p.y < -5) { p.y = h + 5; p.x = Math.random() * w; } }
+        const a = .25 + (Math.sin(t / 700 + p.p) + 1) * .3;
+        c.fillStyle = `rgba(79,209,224,${a})`; c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill();
+      }
+      requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+  })();
   $('lobbyName').value = me.name;
   $('lobbySpeak').innerHTML = $('setLang').innerHTML;
   $('lobbyTr').innerHTML = $('setTranslate').innerHTML;
@@ -1343,6 +1418,7 @@
 
   async function initLobby() {
     $('meetingCode').textContent = roomId;
+    $('lbCodeTxt').textContent = roomId;
     try {
       const cfg = await (await fetch('/api/config')).json();
       if (cfg.iceServers?.length) iceServers = cfg.iceServers;
@@ -1351,16 +1427,20 @@
       const info = await (await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)).json();
       if (info.title) meetingTitle = info.title;
       $('lobbyTitle').textContent = meetingTitle;
-      $('lobbyInfo').textContent = info.participants
-        ? `${info.participants} ${info.participants === 1 ? 'مشارك' : 'مشاركين'} في الاجتماع الآن`
-        : 'لا يوجد أحد في الاجتماع بعد — ستكون أول المنضمين.';
+      const ppl = info.people || [];
+      $('lbFaces').innerHTML = ppl.map((n, i) => `<span class="lb-face" style="--avatar:${colorFor(n)};--i:${i}" title="${esc(n)}">${esc(initial(n))}</span>`).join('')
+        + (info.participants > ppl.length ? `<span class="lb-face more" style="--i:${ppl.length}">+${info.participants - ppl.length}</span>` : '');
+      $('lobbyInfo').innerHTML = info.participants
+        ? `<b>${esc(ppl.slice(0, 2).join(' و '))}</b>${info.participants > 2 ? ` و${info.participants - 2} كمان` : ''} ${info.participants === 1 ? 'موجود' : 'موجودين'} في الاجتماع دلوقتي <i class="live-dot"></i>`
+        : 'محدش دخل لسه — هتكون أول واحد ✨';
+      $('chkNet').className = 'lb-check ok';
       if (info.participants >= cfg.maxParticipants) $('lobbyErr').textContent = 'الاجتماع ممتلئ حاليًا.';
       if (info.valid === false) {
         $('lobbyInfo').textContent = '';
         $('lobbyErr').textContent = 'رابط الاجتماع غير صحيح. اطلب الرابط تاني من منظّم الاجتماع.';
         $('joinBtn').disabled = true;
       }
-    } catch { $('lobbyInfo').textContent = ''; }
+    } catch { $('lobbyInfo').textContent = ''; $('chkNet').className = 'lb-check off'; }
 
     if (!navigator.mediaDevices?.getUserMedia) {
       $('lobbyErr').textContent = 'المتصفح لا يسمح بالكاميرا/الميكروفون — افتح الموقع عبر https.';
@@ -1379,7 +1459,8 @@
       ? 'الترجمة بتشتغل على كلام المشاركين اللي مفعّلين "تحويل الكلام إلى نص".'
       : 'الترجمة للغات أخرى تحتاج تفعيل الذكاء الاصطناعي على الخادم. تحويل الكلام لنص شغال عادي.';
     refreshPreview();
-    $('lobbyName').focus();
+    lobbyMeter();
+    if (!$('lobbyName').value) $('lobbyName').focus();
   }
 
   $('joinBtn').onclick = () => {
@@ -1392,6 +1473,13 @@
     if (AC) { audioCtx = new AC(); audioCtx.resume?.(); }
     watchLevel('me', localStream);
 
+    const jr = $('joinBtn').getBoundingClientRect();
+    const warp = document.createElement('div');
+    warp.className = 'join-warp';
+    warp.style.setProperty('--x', `${jr.left + jr.width / 2}px`); warp.style.setProperty('--y', `${jr.top + jr.height / 2}px`);
+    document.body.append(warp);
+    setTimeout(() => warp.remove(), 1100);
+    cancelAnimationFrame(lbRaf); lbSrc?.disconnect();
     $('lobby').hidden = true;
     $('meeting').hidden = false;
     document.body.classList.add('in-meeting');

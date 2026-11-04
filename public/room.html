@@ -16,29 +16,66 @@
 
   <!-- ===== شاشة ما قبل الدخول ===== -->
   <section id="lobby" class="lobby">
-    <header class="lobby-head"><div class="brand" data-brand="dark"></div></header>
+    <div class="lb-bg" aria-hidden="true"><span class="lb-blob a"></span><span class="lb-blob b"></span><span class="lb-blob c"></span><span class="lb-grid"></span><canvas id="lbStars"></canvas></div>
+
+    <header class="lobby-head lb-in" style="--d:0">
+      <div class="brand" data-brand="dark"></div>
+      <button class="lb-code" id="lbCode" dir="ltr" title="انسخ رابط الاجتماع"><span data-icon="copy" data-size="16"></span><b id="lbCodeTxt"></b></button>
+    </header>
+
     <div class="lobby-grid">
-      <div class="tile preview">
-        <video id="previewVideo" autoplay playsinline muted></video>
-        <div class="avatar" id="previewAvatar">؟</div>
-        <div class="preview-controls">
-          <button class="round" id="pMic" title="الميكروفون"><span data-icon="mic"></span></button>
-          <button class="round" id="pCam" title="الكاميرا"><span data-icon="cam"></span></button>
+      <!-- المعاينة -->
+      <div class="lb-stage lb-in" style="--d:1">
+        <div class="tile preview" id="lbPreview">
+          <video id="previewVideo" autoplay playsinline muted></video>
+          <div class="lb-avatar-wrap">
+            <span class="lb-ring r1"></span><span class="lb-ring r2"></span><span class="lb-ring r3"></span>
+            <div class="avatar" id="previewAvatar">؟</div>
+          </div>
+          <div class="lb-meter" id="lbMeter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <span class="lb-you" id="lbYou"></span>
+          <div class="lb-fx-loading" id="lbFxLoading" hidden><div class="spinner"></div></div>
+          <div class="lens-rail lb-lens" id="lobbyLens" hidden></div>
+          <div class="preview-controls">
+            <button class="round" id="pMic" title="الميكروفون"><span data-icon="mic"></span></button>
+            <button class="round" id="pCam" title="الكاميرا"><span data-icon="cam"></span></button>
+            <button class="round fx" id="pFx" title="فلاتر"><span>😎</span></button>
+          </div>
+        </div>
+        <div class="lb-checks">
+          <span class="lb-check" id="chkCam"><i></i><b>الكاميرا</b></span>
+          <span class="lb-check" id="chkMic"><i></i><b>المايك</b></span>
+          <span class="lb-check" id="chkNet"><i></i><b>الاتصال</b></span>
         </div>
       </div>
-      <div class="card">
+
+      <!-- البيانات -->
+      <div class="card lb-card lb-in" style="--d:2">
+        <p class="lb-hello" id="lbHello">أهلاً بيك 👋</p>
         <h2 id="lobbyTitle">جاهز للانضمام؟</h2>
-        <p class="muted" id="lobbyInfo">جاري التحقق من الاجتماع…</p>
-        <label class="field">
-          <span>اسمك</span>
+        <div class="lb-people" id="lbPeople">
+          <div class="lb-faces" id="lbFaces"></div>
+          <p class="muted" id="lobbyInfo">جاري التحقق من الاجتماع…</p>
+        </div>
+
+        <label class="lb-field lb-in" style="--d:3">
+          <span data-icon="users" data-size="18"></span>
           <input id="lobbyName" maxlength="40" placeholder="اكتب اسمك · Your name" autocomplete="name">
         </label>
-        <div class="lang-box">
-          <label class="field"><span>لغة كلامك · Language you speak</span><select id="lobbySpeak"></select></label>
-          <label class="field"><span>اعرض كلام الآخرين بـ · Show others' speech in</span><select id="lobbyTr"></select></label>
-          <label class="check"><input type="checkbox" id="lobbyCap"><span>حوّل كلامي لنص — مطلوب علشان الترجمة توصل للآخرين<br><small>Caption my speech — needed so others get the translation</small></span></label>
+
+        <div class="lb-langs lb-in" style="--d:4">
+          <label class="lb-sel"><small>🗣️ لغة كلامك · I speak</small><select id="lobbySpeak"></select></label>
+          <span class="lb-swap" aria-hidden="true">⇄</span>
+          <label class="lb-sel"><small>🌐 أشوف كلامهم بـ · Show in</small><select id="lobbyTr"></select></label>
         </div>
-        <button id="joinBtn" class="btn btn-primary btn-block">انضم الآن · Join</button>
+
+        <label class="lb-switch lb-in" style="--d:5">
+          <input type="checkbox" id="lobbyCap">
+          <span class="sw"><i></i></span>
+          <span class="txt"><b>حوّل كلامي لنص</b><small>علشان الترجمة توصل للآخرين · Caption my speech</small></span>
+        </label>
+
+        <button id="joinBtn" class="lb-join lb-in" style="--d:6"><span class="lb-join-txt">انضم الآن · Join</span><span data-icon="login" data-size="20"></span></button>
         <p id="lobbyErr" class="error" role="alert"></p>
       </div>
     </div>
