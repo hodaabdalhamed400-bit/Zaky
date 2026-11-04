@@ -41,7 +41,6 @@
   const hostKey = store.get(`meet:host:${roomId}`) || '';
   let micTrack = null;
   let camTrack = null;
-  let fxTrack = null; // الكاميرا بعد الفلاتر
   let screenTrack = null;
   let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
   let socket = null;
@@ -73,7 +72,7 @@
     if (track) localStream.addTrack(track);
   }
 
-  const camOut = () => (me.cam && (fxTrack || camTrack)) || null;
+  const camOut = () => (me.cam && camTrack) || null;
   const currentVideo = () => (me.screen && screenTrack) || camOut();
 
   function pushTracksToPeers() {
@@ -112,66 +111,11 @@
     if (!on && camTrack) { camTrack.stop(); camTrack = null; }
     me.cam = on;
     store.set('meet:cam', on ? '1' : '0');
-    await refreshFx();
-  }
-
-  // ===================== فلاتر الكاميرا =====================
-  async function refreshFx() {
-    if (window.CamFX && camTrack && me.cam && CamFX.active()) fxTrack = await CamFX.apply(camTrack);
-    else { window.CamFX?.stop(); fxTrack = null; }
     if (!me.screen) setLocalTrack('video', camOut());
-    $('fxPreview') && ($('fxPreview').srcObject = camOut() ? new MediaStream([camOut()]) : null);
     renderSelf();
     pushTracksToPeers();
   }
-  const FX_GROUPS = {
-    lens: [['none', '🚫', 'بدون', '#334155,#1e293b'], ['light', '🌿', 'خفيف', '#bbf7d0,#16a34a'], ['smooth', '✨', 'تنعيم', '#f9a8d4,#a855f7'],
-      ['clear', '💎', 'صافية', '#bae6fd,#0284c7'], ['fresh', '🌸', 'نضارة', '#fecdd3,#e11d48'], ['glow', '☀️', 'إشراقة', '#fde68a,#f59e0b'],
-      ['bronze', '🍯', 'برونزي', '#fdba74,#9a3412'], ['fair', '🤍', 'فاتحة', '#f1f5f9,#94a3b8']],
-    bg: [['none', '🚫', 'بدون'], ['blur', '🌫️', 'تغبيش'], ['brand', '🔷', 'ذكي'], ['office', '🏢', 'مكتب'], ['space', '🪐', 'الفضاء']],
-  };
-  function loadFxState() {
-    if (!window.CamFX) return;
-    try { const st = JSON.parse(store.get('meet:skin') || '{}'); for (const k of Object.keys(FX_GROUPS)) if (st[k]) CamFX.set(k, st[k]); } catch { /* ignore */ }
-  }
-  function renderFxPanel() {
-    if (!window.CamFX) return;
-    for (const [group, items] of Object.entries(FX_GROUPS)) {
-      const html = items.map(([id, ic, label, grad], i) => (group === 'lens'
-        ? `<button class="lens ${CamFX.state.lens === id ? 'on' : ''}" data-fxg="lens" data-fxv="${id}" style="--i:${i};--g:linear-gradient(145deg,${grad})">
-             <span class="lens-orb">${ic}</span><small>${label}</small></button>`
-        : `<button class="fx-chip ${CamFX.state[group] === id ? 'on' : ''}" data-fxg="${group}" data-fxv="${id}" style="--i:${i}">
-             <span>${ic}</span><small>${label}</small></button>`)).join('');
-      $(`fx-${group}`).innerHTML = html;
-      if (group === 'lens' && $('lobbyLens')) $('lobbyLens').innerHTML = html;
-    }
-    const lon = $('lobbyLens')?.querySelector('.lens.on');
-    if (lon && !$('lobbyLens').hidden) lon.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-    const on = $('fx-lens').querySelector('.lens.on');
-    if (on) on.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-    const cur = FX_GROUPS.lens.find(([id]) => id === CamFX.state.lens);
-    $('fxLensName').textContent = cur && cur[0] !== 'none' ? `${cur[1]} ${cur[2]}` : '';
 
-  }
-  document.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-fxg]');
-    if (!b || !window.CamFX) return;
-    CamFX.set(b.dataset.fxg, b.dataset.fxv);
-    store.set('meet:skin', JSON.stringify(CamFX.state));
-    renderFxPanel();
-    if (!me.cam) { toast('افتح الكاميرا علشان الفلتر يشتغل 📷'); return; }
-    if (CamFX.needsAI() && !CamFX.aiReady()) { $('fxLoading').hidden = false; $('lbFxLoading').hidden = false; }
-    await refreshFx();
-    $('fxLoading').hidden = true; $('lbFxLoading').hidden = true;
-    if (!$('lobby').hidden) refreshPreview();
-    $('fxReset').hidden = !CamFX.active();
-  });
-  $('fxReset').onclick = async () => {
-    for (const k of Object.keys(FX_GROUPS)) CamFX.set(k, 'none');
-    store.set('meet:skin', '{}');
-    renderFxPanel(); await refreshFx(); $('fxReset').hidden = true;
-  };
-  window.addEventListener('camfx-error', () => toast('الفلاتر الذكية مش مدعومة على الجهاز ده — جرّب فلاتر الألوان'));
 
   // ===================== مستوى الصوت (من يتكلم) =====================
   let audioCtx = null;
@@ -616,7 +560,6 @@
     if (me.rec) stopRecording();
     stopCaptions();
     for (const id of [...peers.keys()]) removePeer(id);
-    window.CamFX?.stop();
     [micTrack, camTrack, screenTrack].forEach((t) => t?.stop());
   }
   function leave() {
@@ -1241,7 +1184,7 @@
   }
 
   // ===================== اللوحة الجانبية =====================
-  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة', filters: 'فلاتر الكاميرا' };
+  const PANEL_TITLES = { chat: 'المحادثة', people: 'المشاركون', minutes: 'محضر الاجتماع', settings: 'الإعدادات', assistant: '✨ المساعد الذكي', translate: 'الترجمة' };
   let currentPanel = null;
   function openPanel(name) {
     // نفس الزرار مرتين = قفل (على الكمبيوتر)
@@ -1260,12 +1203,6 @@
       setTimeout(() => $('chatInput').focus(), 50);
     }
     if (name === 'settings') fillSettings();
-    if (name === 'filters') {
-      renderFxPanel();
-      $('fxPreview').srcObject = camOut() ? new MediaStream([camOut()]) : null;
-      $('fxNoCam').hidden = me.cam;
-      $('fxReset').hidden = !window.CamFX?.active();
-    }
     if (name === 'assistant' && aiOn) setTimeout(() => $('aiInput').focus(), 50);
     toggleTools(false);
     if (name === 'people') renderPeople();
@@ -1331,8 +1268,6 @@
     $('lbHello').textContent = nm ? `أهلاً يا ${nm.split(' ')[0]} 👋` : 'أهلاً بيك 👋';
     $('chkCam').className = `lb-check ${me.cam && camTrack ? 'ok' : 'off'}`;
     $('chkMic').className = `lb-check ${me.mic && micTrack ? 'ok' : 'off'}`;
-    $('pFx').hidden = !(me.cam && camTrack);
-    if (!(me.cam && camTrack)) $('lobbyLens').hidden = true;
     $('pMic').classList.toggle('off', !me.mic);
     $('pMic').innerHTML = icon(me.mic ? 'mic' : 'micOff');
     $('pCam').classList.toggle('off', !me.cam);
@@ -1340,12 +1275,6 @@
   }
   $('pMic').onclick = async () => { await enableMic(!me.mic); bump($('pMic'), me.mic ? 'flip' : 'shake'); refreshPreview(); lobbyMeter(); };
   $('pCam').onclick = async () => { await enableCam(!me.cam); bump($('pCam'), me.cam ? 'flip' : 'shake'); refreshPreview(); };
-  $('pFx').onclick = () => {
-    const show = $('lobbyLens').hidden;
-    $('lobbyLens').hidden = !show;
-    $('pFx').classList.toggle('active', show);
-    if (show) renderFxPanel();
-  };
   $('lbCode').onclick = () => invite();
 
   // ---- مقياس المايك في شاشة الدخول ----
@@ -1442,7 +1371,6 @@
       me.mic = false; me.cam = false;
     } else {
       if (me.mic) await enableMic(true);
-      loadFxState();
       if (me.cam) await enableCam(true);
     }
     $('aiOff').hidden = aiOn;
