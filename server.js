@@ -51,6 +51,7 @@ const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim(
 app.disable('x-powered-by');
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
+app.get('/healthz', (_req, res) => res.send('ok'));
 app.get('/api/new', (_req, res) => res.json({ id: newRoomId() }));
 app.get('/api/config', (_req, res) => res.json({
   iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, languages: Object.keys(ai.LANGS),

@@ -1,0 +1,26 @@
+# نشر smart Meet على Render بضغطة واحدة (Blueprint)
+services:
+  - type: web
+    name: smart-meet
+    runtime: node
+    plan: starter          # الخطة المجانية بتنام بعد فترة خمول وبتقطع الاجتماعات — استخدم starter
+    region: frankfurt      # أقرب منطقة للشرق الأوسط
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MAX_PARTICIPANTS
+        value: "8"
+      - key: ANTHROPIC_API_KEY
+        sync: false        # هيطلب منك تكتبه وقت الإنشاء (ما بيتحفظش في الكود)
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USERNAME
+        sync: false
+      - key: TURN_PASSWORD
+        sync: false
+    domains:
+      - meet.startupsmart.net

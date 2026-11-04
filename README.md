@@ -44,6 +44,8 @@ npm start
 - **الألوان:** أول جزء في `public/css/style.css` — تركواز ذكي `#1faec1` وكحلي ذكي `#132e4d`.
 
 ## النشر على الإنترنت
+> 📘 **دليل النشر خطوة بخطوة على `meet.startupsmart.net`: [DEPLOY.md](DEPLOY.md)**
+
 > ⚠️ الكاميرا والميكروفون **لا يعملان إلا عبر HTTPS** (أو localhost).
 
 - أي استضافة تدعم Node.js (Render, Railway, Fly.io, VPS) — أمر التشغيل `npm start`.
