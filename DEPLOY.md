@@ -35,7 +35,18 @@
 2. هتلاقي `meet.startupsmart.net` مضاف، ولو مش موجود دوس **Add Custom Domain** واكتبه.
 3. Render هيعرض لك **قيمة CNAME**، غالبًا `smart-meet.onrender.com`. انسخها.
 
-### ب. في لوحة تحكم الدومين (DNS)
+### ب. في cPanel (استضافة startupsmart.net)
+1. ادخل cPanel، ومن **Tools** انزل لقسم **Domains** ودوس **Zone Editor**. أو اكتب `Zone Editor` في البحث 🔍.
+2. قدام `startupsmart.net` دوس **Manage**.
+3. دوس **+ Add Record** ← **Add CNAME Record**:
+   - **Name:** `meet` (هيكمّلها لوحده لـ `meet.startupsmart.net.`)
+   - **Record:** `smart-meet.onrender.com` (القيمة اللي نسخها من Render بالظبط)
+4. **Save Record**.
+
+> لو ظهرلك خطأ إن `meet` موجود قبل كده، امسح السجل القديم الأول. ولو فيه **Subdomain** اسمه `meet` معمول من صفحة **Domains**، امسحه هو كمان.
+> ما تشغّلش النظام على cPanel نفسه، لأن الاستضافة المشتركة ما بتدعمش الاتصال المستمر اللي الاجتماعات محتاجاه. cPanel هنا للدومين بس.
+
+### ب (بديل). لو الدومين مش متدار من cPanel
 لو مش عارف الدومين مسجّل فين، اكتب `startupsmart.net` في الموقع ده: **https://lookup.icann.org**. هيقولك اسم الشركة المسجّل عندها (Registrar)، والـ Name Servers. لو الـ Name Servers فيها كلمة `cloudflare`، يبقى الإعدادات من Cloudflare.
 
 ضيف سجل جديد بالشكل ده:
