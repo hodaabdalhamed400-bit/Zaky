@@ -487,29 +487,80 @@
   let translateTo = store.get('meet:tr') || '';
   let aiOn = false;
   function toggleCaptions() { captionsOn ? stopCaptions() : startCaptions(); refreshControls(); }
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const SR_ERRORS = {
+    'not-allowed': isIOS
+      ? 'الآيفون رافض التعرف على الكلام. فعّل الإملاء: الإعدادات ← عام ← لوحة المفاتيح ← تفعيل الإملاء، واسمح للموقع باستخدام الميكروفون.'
+      : 'المتصفح مش سامح بالتعرف على الكلام — اسمح للموقع باستخدام الميكروفون.',
+    'service-not-allowed': isIOS
+      ? 'خدمة التعرف على الكلام مقفولة. فعّل الإملاء وSiri: الإعدادات ← عام ← لوحة المفاتيح ← تفعيل الإملاء.'
+      : 'خدمة التعرف على الكلام مش متاحة على المتصفح ده — جرّب Chrome.',
+    'audio-capture': 'مش قادر يوصل للميكروفون — اقفل الميكروفون وافتحه تاني، أو اقفل أي تطبيق تاني بيستخدمه.',
+    'network': 'التعرف على الكلام محتاج إنترنت — اتأكد من الاتصال.',
+    'language-not-supported': 'اللغة المختارة مش مدعومة على جهازك — جرّب "العربية (السعودية)" أو English.',
+  };
+  function capStatus(text, kind = '') {
+    const el = $('captionStatus');
+    el.textContent = text;
+    el.className = `cap-status ${kind}`;
+    el.hidden = !text;
+  }
+  let srFailures = [];
   function startCaptions() {
-    if (!SR) { toast('الترجمة النصية تحتاج متصفح Chrome أو Edge أو Safari حديث.'); return; }
+    if (!SR) {
+      const msg = isIOS ? 'تحويل الكلام لنص على الآيفون محتاج Safari (مش Chrome).' : 'تحويل الكلام لنص محتاج Chrome أو Edge أو Safari حديث.';
+      toast(msg); capStatus(msg, 'err');
+      return;
+    }
     captionsOn = true;
+    srFailures = [];
     recognizer = new SR();
     recognizer.lang = store.get('meet:lang') || 'ar-EG';
-    recognizer.continuous = true;
+    recognizer.continuous = !isIOS; // Safari على الآيفون أثبت مع جمل منفصلة وإعادة التشغيل
     recognizer.interimResults = true;
+    recognizer.onstart = () => capStatus(me.mic ? '🎙️ بيسمعك دلوقتي… اتكلم' : '🔇 الميكروفون مقفول — افتحه علشان كلامك يتكتب', me.mic ? 'ok' : 'warn');
     recognizer.onresult = (e) => {
       if (!me.mic) return;
       const r = e.results[e.results.length - 1];
       const text = r[0].transcript.trim();
       if (!text) return;
+      srFailures = [];
+      capStatus(`🎙️ آخر كلام اتسمع: "${text}"`, 'ok');
       socket.emit('caption', { text, final: r.isFinal });
       showCaption({ from: me.id, name: me.name, text, final: r.isFinal, ts: Date.now() });
     };
-    recognizer.onerror = (e) => { if (e.error === 'not-allowed') { toast('لم يتم السماح بالتعرف على الكلام.'); stopCaptions(); refreshControls(); } };
-    recognizer.onend = () => { if (captionsOn) try { recognizer.start(); } catch { /* ignore */ } };
-    try { recognizer.start(); toast('تم تفعيل تحويل الكلام إلى نص'); } catch { /* ignore */ }
+    recognizer.onerror = (e) => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      const msg = SR_ERRORS[e.error] || `حصلت مشكلة في التعرف على الكلام (${e.error}).`;
+      if (['not-allowed', 'service-not-allowed', 'language-not-supported'].includes(e.error)) {
+        stopCaptions(); refreshControls(); toast(msg, 6000);
+      }
+      capStatus(msg, 'err');
+    };
+    recognizer.onend = () => {
+      if (!captionsOn) return;
+      // حماية من حلقة إعادة تشغيل سريعة لو الخدمة بتفشل على طول
+      const now = Date.now();
+      srFailures = srFailures.filter((t) => now - t < 10000).concat(now);
+      if (srFailures.length > 8) {
+        stopCaptions(); refreshControls();
+        capStatus('التعرف على الكلام بيقف لوحده على الجهاز ده. جرّب تقفله وتفتحه تاني، أو استخدم Chrome على الكمبيوتر.', 'err');
+        return;
+      }
+      setTimeout(() => { if (captionsOn && recognizer) try { recognizer.start(); } catch { /* ignore */ } }, 250);
+    };
+    try {
+      recognizer.start();
+      toast(window.innerWidth < 820 ? 'تم التفعيل — اقفل اللوحة علشان تشوف الكلام على الشاشة' : 'تم تفعيل تحويل الكلام إلى نص', 4000);
+    } catch (err) {
+      capStatus('مقدرتش أشغّل التعرف على الكلام — جرّب تاني.', 'err');
+    }
   }
   function stopCaptions() {
     captionsOn = false;
-    try { recognizer?.stop(); } catch { /* ignore */ }
+    try { recognizer?.abort(); } catch { /* ignore */ }
     recognizer = null;
+    if (!$('captionStatus').classList.contains('err')) capStatus('');
   }
   const captionEls = new Map();
   function showCaption({ from, name, text, final, ts }) {
