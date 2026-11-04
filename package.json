@@ -1,6 +1,6 @@
 {
   "name": "smart-meet",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "smart Meet — منصة اجتماعات ذكي لحاضنات ومسرعات الأعمال",
   "main": "server.js",
   "scripts": {

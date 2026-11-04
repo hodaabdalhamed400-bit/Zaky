@@ -106,6 +106,21 @@ app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 app.use('/vendor/mediapipe', express.static(path.join(__dirname, 'node_modules/@mediapipe/tasks-vision'), { maxAge: '7d', immutable: true }));
 
 app.get('/healthz', (_req, res) => res.send('ok'));
+// ---------- إصدار المنصة وحالة الأنظمة ----------
+const PKG = require('./package.json');
+const BOOTED = Date.now();
+const riyadh = (ts, opts) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', hour12: false, ...opts }).formatToParts(new Date(ts))
+  .reduce((o, p) => ({ ...o, [p.type]: p.value }), {});
+const BUILD = (() => { const p = riyadh(BOOTED, { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); return `${p.year}${p.month}${p.day}.${p.hour}${p.minute}${p.second}`; })();
+app.get('/api/status', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    version: PKG.version, build: BUILD, commit: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null,
+    updatedAt: BOOTED, now: Date.now(), uptime: Math.round(process.uptime()),
+    services: { server: true, ai: ai.enabled, turn: !!process.env.TURN_URL },
+    meetings: rooms.size,
+  });
+});
 app.post('/api/new', (req, res) => {
   if (ACCESS_CODE) {
     if (tooManyFailures(req.ip)) return res.status(429).json({ error: 'too_many' });

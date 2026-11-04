@@ -113,7 +113,42 @@
     </section>
   </main>
 
-  <footer class="hp-foot">ذكي smart لحاضنات ومسرعات الأعمال</footer>
+  <footer class="sf sr" id="siteFoot">
+    <div class="sf-glow" aria-hidden="true"></div>
+    <div class="sf-inner">
+      <div class="sf-brand">
+        <span class="sf-mark"><img src="/img/mark-light.png" alt=""></span>
+        <div>
+          <p class="sf-name"><b>smart</b> MEET <span>· اجتماعات ذكي</span></p>
+          <p class="sf-copy">© <span id="sfYear">2026</span> ذكي smart لحاضنات ومسرعات الأعمال. جميع الحقوق محفوظة.</p>
+          <p class="sf-own">منصة مملوكة ومطوّرة لصالح ذكي smart</p>
+        </div>
+      </div>
+
+      <div class="sf-panel">
+        <div class="sf-status" id="sfStatus" data-state="loading">
+          <span class="sf-dot"><i></i></span>
+          <div>
+            <b id="sfStatusTxt">بنتأكد من الأنظمة…</b>
+            <div class="sf-services" id="sfServices"></div>
+          </div>
+        </div>
+        <div class="sf-meta">
+          <div class="sf-row"><span class="sf-k"><span data-icon="sparkles" data-size="16"></span> إصدار المنصة</span><span class="sf-ver" id="sfVer">v—</span></div>
+          <div class="sf-row"><span class="sf-k"><span data-icon="settings" data-size="16"></span> رقم البناء</span><span class="sf-build" id="sfBuild" dir="ltr">—</span></div>
+          <div class="sf-row"><span class="sf-k"><span data-icon="clock" data-size="16"></span> آخر تحديث</span><span class="sf-time"><b id="sfUpdated" dir="ltr">—</b> <small>بتوقيت الرياض</small></span></div>
+        </div>
+      </div>
+
+      <nav class="sf-links">
+        <a href="/terms">الشروط والأحكام</a>
+        <i></i>
+        <a href="/privacy">سياسة الخصوصية</a>
+        <i></i>
+        <a href="https://startupsmart.net" target="_blank" rel="noopener">موقع ذكي smart</a>
+      </nav>
+    </div>
+  </footer>
 
   <script src="/js/config.js"></script>
   <script src="/js/icons.js"></script>
@@ -246,6 +281,29 @@
         setTimeout(() => s.remove(), 2600);
       }, 1400);
     }
+
+    // ---- الفوتر: الإصدار وحالة الأنظمة ----
+    async function loadStatus() {
+      const box = $('sfStatus');
+      try {
+        const st = await (await fetch('/api/status', { cache: 'no-store' })).json();
+        $('sfVer').textContent = `v${st.version}`;
+        $('sfBuild').textContent = `Build ${st.build}${st.commit ? ` · ${st.commit}` : ''}`;
+        $('sfUpdated').textContent = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Riyadh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(st.updatedAt));
+        $('sfYear').textContent = new Date(st.now).getFullYear();
+        const svc = [['server', 'الخادم', true], ['ai', 'الذكاء الاصطناعي', st.services.ai], ['rtc', 'الفيديو والصوت', true]];
+        if (st.services.turn) svc.push(['turn', 'الاتصال عبر الشبكات', true]);
+        $('sfServices').innerHTML = svc.map(([k, label, ok], i) => `<span class="sf-svc ${ok ? 'ok' : 'warn'}" style="--i:${i}"><i></i>${label}</span>`).join('');
+        const allOk = svc.every(([, , ok]) => ok);
+        box.dataset.state = allOk ? 'ok' : 'partial';
+        $('sfStatusTxt').textContent = allOk ? 'جميع الأنظمة تعمل' : 'المنصة تعمل · بعض الخدمات غير مفعّلة';
+      } catch {
+        box.dataset.state = 'down';
+        $('sfStatusTxt').textContent = 'تعذّر الوصول للخادم';
+      }
+    }
+    loadStatus();
+    setInterval(loadStatus, 60000);
 
     // ---- ظهور العناصر مع النزول + العدّاد ----
     const io = new IntersectionObserver((entries) => {
