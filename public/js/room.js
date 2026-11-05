@@ -78,9 +78,35 @@
   function pushTracksToPeers() {
     for (const p of peers.values()) {
       p.audioSender?.replaceTrack(micTrack).catch(() => {});
-      p.videoSender?.replaceTrack(currentVideo()).catch(() => {});
+      p.videoSender?.replaceTrack(currentVideo()).then(() => tuneSender(p)).catch(() => {});
     }
   }
+
+  // ===================== ظبط جودة الإرسال =====================
+  // كل مشارك بيستقبل نسخة منفصلة (mesh)، فلازم نحدد السرعة علشان النت والجهاز ما يتخنقوش.
+  function tuneSender(p) {
+    const sender = p.videoSender;
+    if (!sender?.track || !sender.getParameters) return;
+    const n = Math.max(1, peers.size);
+    const params = sender.getParameters();
+    if (!params.encodings || !params.encodings.length) return; // لسه ما اتفاوضش — هنعيد بعد الاتصال
+    const enc = params.encodings[0];
+    if (me.screen && sender.track === screenTrack) {
+      const st = screenTrack.getSettings();
+      const h = st.height || 1080;
+      enc.maxBitrate = n <= 1 ? 2_500_000 : n <= 3 ? 1_500_000 : 900_000;
+      enc.maxFramerate = 15;
+      enc.scaleResolutionDownBy = Math.max(1, h / (n <= 3 ? 1080 : 720));
+      params.degradationPreference = 'maintain-resolution'; // الكلام والكتابة تفضل واضحة
+    } else {
+      enc.maxBitrate = n <= 1 ? 1_200_000 : n <= 3 ? 800_000 : 500_000;
+      enc.maxFramerate = 24;
+      enc.scaleResolutionDownBy = n <= 3 ? 1 : 1.5;
+      params.degradationPreference = 'balanced';
+    }
+    sender.setParameters(params).catch(() => {});
+  }
+  const tuneAll = () => peers.forEach((p) => tuneSender(p));
 
   async function enableMic(on) {
     if (on && !micTrack) {
@@ -202,7 +228,25 @@
   }
 
   function renderSelf() {
-    updateTile($('tile-me'), { name: me.name, isMe: true, state: me, key: me.id, stream: localStream });
+    const el = $('tile-me');
+    if (!el) return;
+    updateTile(el, { name: me.name, isMe: true, state: me, key: me.id, stream: me.screen ? null : localStream });
+    // اللي بيشارك شاشته ما بيشوفهاش جوه الصفحة (عرضها تقيل جدًا على الجهاز)
+    el.classList.toggle('self-sharing', me.screen);
+    if (me.screen) {
+      el.classList.remove('spotlight', 'video-on');
+      el.querySelector('video').srcObject = null;
+      if (!el.querySelector('.share-note')) {
+        const n = document.createElement('div');
+        n.className = 'share-note';
+        n.innerHTML = `<span class="sn-ic">${icon('screen', 30)}</span><b>إنت بتشارك شاشتك</b><small>الكل شايفها دلوقتي</small><button class="sn-stop" data-action="screen">إيقاف المشاركة</button>`;
+        el.append(n);
+      }
+    } else {
+      el.querySelector('.share-note')?.remove();
+      const v = el.querySelector('video');
+      if (v.srcObject !== localStream) { v.srcObject = localStream; v.play().catch(() => {}); }
+    }
   }
 
   function layout() {
@@ -211,6 +255,8 @@
     grid.dataset.count = String(Math.min(n, 7));
     grid.toggleAttribute('data-many', n > 6);
     grid.classList.toggle('has-spotlight', !!grid.querySelector('.tile.spotlight'));
+    // وقت مشاركة الشاشة: نوقف الحركات الديكورية التقيلة
+    $('meeting').classList.toggle('screen-on', !!grid.querySelector('.tile.screen') || me.screen);
     $('count').textContent = n;
     $('peopleBadge').textContent = n;
     renderPeople();
@@ -309,6 +355,7 @@
       }
     };
     pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'connected') { tuneSender(p); tuneAll(); }
       if (pc.connectionState === 'failed' && p.initiator) {
         pc.restartIce();
         negotiate(p, true);
@@ -358,6 +405,7 @@
   }
 
   function removePeer(id) {
+    setTimeout(tuneAll, 500);
     const p = peers.get(id);
     if (!p) return;
     p.pc.close();
@@ -676,9 +724,14 @@
     if (me.screen) return stopScreen();
     if (!navigator.mediaDevices.getDisplayMedia) { toast('مشاركة الشاشة غير مدعومة على هذا الجهاز.'); return; }
     try {
-      const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+      const s = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: { max: 1920 }, height: { max: 1080 }, frameRate: { ideal: 12, max: 15 } },
+        audio: false,
+      });
       screenTrack = s.getVideoTracks()[0];
       screenTrack.contentHint = 'detail';
+      // بعض المتصفحات بتتجاهل الحدود في الطلب الأول
+      screenTrack.applyConstraints({ width: { max: 1920 }, height: { max: 1080 }, frameRate: { max: 15 } }).catch(() => {});
       screenTrack.onended = stopScreen;
       me.screen = true;
       setLocalTrack('video', screenTrack);

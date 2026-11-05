@@ -645,3 +645,18 @@ body.light .btn-primary { background: linear-gradient(135deg, var(--navy), #1d44
 body.in-meeting { overflow: hidden; height: 100dvh; }
 .meeting, .stage, .reactions-layer { overflow: clip; }
 
+
+/* =========== مشاركة الشاشة: أخف =========== */
+.tile.self-sharing { display: grid; place-items: center; background: linear-gradient(145deg, rgba(31, 174, 193, .16), rgba(19, 46, 77, .6)); }
+.tile.self-sharing .avatar, .tile.self-sharing video { display: none; }
+.share-note { display: grid; justify-items: center; gap: .3rem; text-align: center; padding: 1rem; z-index: 2; }
+.share-note .sn-ic { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #14b8a6, #0f766e); margin-bottom: .3rem; }
+.share-note small { color: var(--muted); }
+.sn-stop { margin-top: .5rem; border: 0; border-radius: 999px; padding: .5rem 1rem; font-weight: 700; color: #fff; background: var(--danger); }
+/* وقف الحركات التقيلة طول ما فيه شاشة متشاركة */
+.meeting.screen-on::before { animation: none; }
+.meeting.screen-on .tile.speaking::after { animation: none; }
+.meeting.screen-on .tile.speaking .avatar { animation: none; }
+.meeting.screen-on .tile .label, .meeting.screen-on .tile .badges > span { backdrop-filter: none; }
+.meeting.screen-on .tile.screen { border-color: var(--line); box-shadow: none; }
+.meeting.screen-on .tile.screen video { background: #000; }
