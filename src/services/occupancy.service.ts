@@ -2,13 +2,17 @@ import { Prisma } from "@prisma/client";
 import type { Db } from "@/lib/db";
 import { dateOnly, todayInRiyadh } from "@/lib/dates";
 
+/** حالات العقد التي تعني أن العقد كان ساريًا فعلًا خلال فترته (لا تشمل المسودة والملغى وبانتظار الاعتماد). */
+export const IN_FORCE_STATUSES = ["ACTIVE", "EXPIRED", "RENEWED", "TERMINATED"] as const;
+
 /**
  * حساب الإشغال — تعريفات معتمدة وموحدة لكل النظام (لوحة التحكم، الفروع، التقارير):
  *
  * المخزون القابل للتأجير = الوحدات غير المؤرشفة وحالتها ليست "غير نشطة"، ونوعها يُؤجر بعقود
  *   (وحدات الصيانة تبقى ضمن المخزون لأنها طاقة معطلة مؤقتًا؛ قاعات الاجتماعات خارجه لأنها
  *   تُدار بحجوزات منفصلة بالساعة/اليوم — قرار معتمد).
- * الوحدة "مشغولة" في تاريخ معين = مرتبطة بعقد حالته "نشط" يغطي هذا التاريخ.
+ * الوحدة "مشغولة" في تاريخ معين = مرتبطة بعقد كان ساريًا فعلًا ويغطي هذا التاريخ
+ *   (نشط، أو منتهٍ/مجدد/منهى ضمن فترته الفعلية — المنهى تُقص فترته عند تاريخ الخروج).
  *
  * ثلاث نسب، ويُذكر أساس النسبة دائمًا عند عرضها:
  *  1) حسب عدد الوحدات: الوحدات المشغولة (ولو بمقعد واحد) ÷ عدد الوحدات.
@@ -91,7 +95,7 @@ export async function computeOccupancy(db: Db, branchIds: string[] | null, onDat
       SELECT cu.unit_id, SUM(cu.seats)::int AS seats
       FROM contract_units cu
       JOIN contracts c ON c.id = cu.contract_id
-      WHERE c.status = 'ACTIVE' AND ${dateOnly(onDate)}::date BETWEEN cu.start_date AND cu.end_date
+      WHERE c.status IN ('ACTIVE','EXPIRED','RENEWED','TERMINATED') AND ${dateOnly(onDate)}::date BETWEEN cu.start_date AND cu.end_date
       GROUP BY cu.unit_id
     )
     SELECT inv.branch_id,
@@ -151,7 +155,7 @@ export async function unitOccupancyToday(db: Db, unitIds: string[], onDate = tod
   const rows = await db.$queryRaw<{ unit_id: string; seats: number }[]>`
     SELECT cu.unit_id, SUM(cu.seats)::int AS seats
     FROM contract_units cu JOIN contracts c ON c.id = cu.contract_id
-    WHERE c.status = 'ACTIVE' AND cu.unit_id = ANY(${unitIds}::uuid[])
+    WHERE c.status IN ('ACTIVE','EXPIRED','RENEWED','TERMINATED') AND cu.unit_id = ANY(${unitIds}::uuid[])
       AND ${dateOnly(onDate)}::date BETWEEN cu.start_date AND cu.end_date
     GROUP BY cu.unit_id`;
   return new Map(rows.map((r) => [r.unit_id, r.seats]));
@@ -163,7 +167,8 @@ export async function unitHasCurrentOrFutureBookings(db: Db, unitId: string, onD
     where: {
       unitId,
       endDate: { gte: dateOnly(onDate) },
-      contract: { status: { in: ["ACTIVE", "PENDING_APPROVAL"] } },
+      blocksOccupancy: true,
+      contract: { status: { in: ["ACTIVE", "PENDING_APPROVAL", "TERMINATED"] } },
     },
   });
   return n > 0;

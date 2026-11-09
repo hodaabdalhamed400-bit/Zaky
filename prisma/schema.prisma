@@ -69,6 +69,12 @@ enum ContractStatus {
   RENEWED // مجدد (حل محله عقد لاحق)
 }
 
+// سياسة الأقساط المستقبلية غير المدفوعة عند الخروج المبكر — تُحدد لكل عقد حسب الاتفاق (قرار معتمد)
+enum EarlyExitPolicy {
+  KEEP_DUE // تبقى مستحقة على العميل
+  CANCEL_FUTURE // تُلغى الأقساط التي تبدأ بعد تاريخ الخروج
+}
+
 enum BillingCycle {
   MONTHLY
   QUARTERLY
@@ -408,33 +414,37 @@ model TenantInteraction {
 // ───────────────────────────── العقود ─────────────────────────────
 
 model Contract {
-  id                 String         @id @default(uuid()) @db.Uuid
-  contractNo         String         @unique @map("contract_no")
-  tenantId           String         @map("tenant_id") @db.Uuid
-  branchId           String         @map("branch_id") @db.Uuid
-  status             ContractStatus @default(DRAFT)
-  startDate          DateTime       @map("start_date") @db.Date
-  endDate            DateTime       @map("end_date") @db.Date
-  billingCycle       BillingCycle   @map("billing_cycle")
-  rentAmount         Decimal        @map("rent_amount") @db.Decimal(14, 2) // إجمالي الإيجار قبل الخصم والضريبة
-  discountAmount     Decimal        @default(0) @map("discount_amount") @db.Decimal(14, 2)
-  vatRate            Decimal        @default(0) @map("vat_rate") @db.Decimal(5, 4) // 0.1500 = 15%
-  vatAmount          Decimal        @default(0) @map("vat_amount") @db.Decimal(14, 2)
-  totalAmount        Decimal        @map("total_amount") @db.Decimal(14, 2)
-  depositAmount      Decimal        @default(0) @map("deposit_amount") @db.Decimal(14, 2)
+  id                 String           @id @default(uuid()) @db.Uuid
+  contractNo         String           @unique @map("contract_no")
+  tenantId           String           @map("tenant_id") @db.Uuid
+  branchId           String           @map("branch_id") @db.Uuid
+  status             ContractStatus   @default(DRAFT)
+  startDate          DateTime         @map("start_date") @db.Date
+  endDate            DateTime         @map("end_date") @db.Date
+  billingCycle       BillingCycle     @map("billing_cycle")
+  durationMonths     Int              @map("duration_months") // مدة العقد بالأشهر الكاملة
+  // المبالغ شاملة ضريبة القيمة المضافة (قرار معتمد): rent = مجموع الأسعار الشهرية × المدة
+  rentAmount         Decimal          @map("rent_amount") @db.Decimal(14, 2) // إجمالي الإيجار قبل الخصم (شامل الضريبة)
+  discountAmount     Decimal          @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  vatRate            Decimal          @default(0) @map("vat_rate") @db.Decimal(5, 4) // 0.1500 = 15%
+  vatAmount          Decimal          @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  totalAmount        Decimal          @map("total_amount") @db.Decimal(14, 2)
+  depositAmount      Decimal          @default(0) @map("deposit_amount") @db.Decimal(14, 2)
   terms              String?
   notes              String?
-  previousContractId String?        @unique @map("previous_contract_id") @db.Uuid
-  currentVersion     Int            @default(1) @map("current_version")
-  submittedAt        DateTime?      @map("submitted_at") @db.Timestamptz(3)
-  approvedById       String?        @map("approved_by_id") @db.Uuid
-  approvedAt         DateTime?      @map("approved_at") @db.Timestamptz(3)
-  endedAt            DateTime?      @map("ended_at") @db.Date
-  endReason          String?        @map("end_reason")
-  createdById        String?        @map("created_by_id") @db.Uuid
-  archivedAt         DateTime?      @map("archived_at") @db.Timestamptz(3)
-  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  previousContractId String?          @unique @map("previous_contract_id") @db.Uuid
+  currentVersion     Int              @default(1) @map("current_version")
+  submittedAt        DateTime?        @map("submitted_at") @db.Timestamptz(3)
+  approvedById       String?          @map("approved_by_id") @db.Uuid
+  approvedAt         DateTime?        @map("approved_at") @db.Timestamptz(3)
+  endedAt            DateTime?        @map("ended_at") @db.Date
+  endReason          String?          @map("end_reason")
+  earlyExitPolicy    EarlyExitPolicy? @map("early_exit_policy")
+  rejectionReason    String?          @map("rejection_reason")
+  createdById        String?          @map("created_by_id") @db.Uuid
+  archivedAt         DateTime?        @map("archived_at") @db.Timestamptz(3)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   branch           Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
@@ -461,7 +471,7 @@ model ContractUnit {
   unitId          String        @map("unit_id") @db.Uuid
   branchId        String        @map("branch_id") @db.Uuid
   seats           Int           @default(1) // للوحدات المشتركة
-  price           Decimal       @db.Decimal(14, 2) // سعر هذه الوحدة ضمن العقد لكل دورة
+  price           Decimal       @db.Decimal(14, 2) // الإيجار الشهري لهذه الوحدة ضمن العقد (شامل الضريبة؛ للمشتركة = كل المقاعد)
   startDate       DateTime      @map("start_date") @db.Date
   endDate         DateTime      @map("end_date") @db.Date
   // true فقط عندما يكون العقد في حالة تحجز الوحدة (بانتظار الاعتماد/نشط)

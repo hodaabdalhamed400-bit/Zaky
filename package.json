@@ -19,7 +19,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/e2e/smoke.mjs",
-    "test:e2e:phase2": "node tests/e2e/phase2.mjs"
+    "test:e2e:phase2": "node tests/e2e/phase2.mjs",
+    "job:daily": "tsx scripts/daily.ts",
+    "test:e2e:phase3": "node tests/e2e/phase3.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",

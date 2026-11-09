@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
 import { getDashboardStats } from "@/services/dashboard.service";
 import { formatSAR } from "@/lib/money";
-import { formatDateTime } from "@/lib/dates";
+import { addDays, dateOnly, formatDate, formatDateTime, todayInRiyadh } from "@/lib/dates";
 import { AUDIT_ACTION_LABELS } from "@/lib/audit";
 import { hasBranchAccess } from "@/lib/rbac/guard";
 import { Alert, Card, CardHeader, EmptyState, PageHeader, inputClass, buttonClass } from "@/components/ui/primitives";
@@ -29,6 +29,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         orderBy: { createdAt: "desc" },
         take: 8,
         include: { user: { select: { name: true } } },
+      })
+    : [];
+
+  const expiring = actor.permissions.has("contracts.view")
+    ? await prisma.contract.findMany({
+        where: {
+          status: "ACTIVE",
+          endDate: { gte: dateOnly(todayInRiyadh()), lte: dateOnly(addDays(todayInRiyadh(), s.expiringWithinDays)) },
+          ...(branchId ? { branchId } : actor.allBranches ? {} : { branchId: { in: [...actor.branchIds] } }),
+        },
+        orderBy: { endDate: "asc" },
+        take: 8,
+        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } }, renewedBy: { select: { id: true, status: true } } },
       })
     : [];
 
@@ -92,8 +105,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="العقود التي ستنتهي قريبًا" />
-          <EmptyState title="لا توجد بيانات" description="يُفعَّل هذا الجدول مع وحدة العقود (المرحلة الثالثة)." />
+          <CardHeader title="العقود التي ستنتهي قريبًا" action={<Link href="/contracts?expiring=30" className="text-sm text-brand-700 hover:underline">الكل</Link>} />
+          {expiring.length === 0 ? (
+            <EmptyState title="لا توجد عقود تنتهي خلال 30 يومًا" />
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {expiring.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
+                  <span>
+                    <Link href={`/contracts/${c.id}`} className="font-medium text-brand-700 hover:underline">{c.tenant.name}</Link>
+                    <span className="block text-xs text-gray-400">{c.branch.nameAr} · <span dir="ltr">{c.contractNo}</span></span>
+                  </span>
+                  <span className="text-end">
+                    <span className="tabular block text-gray-700">{formatDate(c.endDate)}</span>
+                    <span className="text-xs text-gray-400">{c.renewedBy && c.renewedBy.status !== "CANCELLED" ? "يوجد تجديد" : "بدون تجديد"}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
         <Card>
           <CardHeader title="آخر عمليات التحصيل" />

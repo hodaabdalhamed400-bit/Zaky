@@ -50,7 +50,7 @@ try {
   await page.waitForSelector("text=نسبة الإشغال");
   check("لوحة التحكم تظهر بعد تغيير كلمة المرور", true);
   check("حالة فارغة واضحة بدون أرقام وهمية", await page.isVisible("text=لا توجد وحدات مسجلة بعد"));
-  check("الأقسام غير المنفذة معطلة وموسومة بالمرحلة", (await page.locator("[aria-disabled=true]").count()) >= 4);
+  check("الأقسام غير المنفذة معطلة وموسومة بالمرحلة", (await page.locator("[aria-disabled=true]").count()) >= 2);
   await page.screenshot({ path: `${OUT}/02-dashboard-desktop.png`, fullPage: true });
 
   // إنشاء مدير فرع مقيد بفرع واحد

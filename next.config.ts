@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@node-rs/argon2"],
   experimental: {
-    serverActions: { bodySizeLimit: "2mb" },
+    serverActions: { bodySizeLimit: "11mb" }, // رفع مستندات حتى 10 ميجابايت
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

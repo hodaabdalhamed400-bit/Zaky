@@ -8,7 +8,7 @@ import type { Actor, RequestMeta } from "@/lib/auth/actor";
 import { assertBranchAccess, branchWhere, hasBranchAccess, requirePermission } from "@/lib/rbac/guard";
 import { dateOnly, todayInRiyadh } from "@/lib/dates";
 import { decimalString, optionalDecimalString, optionalText, parseInput } from "@/lib/validation";
-import { unitHasCurrentOrFutureBookings, unitOccupancyToday } from "./occupancy.service";
+import { IN_FORCE_STATUSES, unitHasCurrentOrFutureBookings, unitOccupancyToday } from "./occupancy.service";
 
 export const UNIT_STATUS_LABELS: Record<UnitStatus, string> = {
   AVAILABLE: "متاحة",
@@ -72,7 +72,7 @@ export const UNITS_PAGE_SIZE = 30;
 function occupiedNow(today: string): Prisma.ContractUnitListRelationFilter {
   return {
     some: {
-      contract: { status: "ACTIVE" },
+      contract: { status: { in: [...IN_FORCE_STATUSES] } },
       startDate: { lte: dateOnly(today) },
       endDate: { gte: dateOnly(today) },
     },

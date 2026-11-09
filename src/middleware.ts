@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * فحص أولي سريع فقط: وجود كوكي الجلسة. التحقق الحقيقي من الجلسة والصلاحيات
  * يتم على الخادم في كل صفحة وإجراء (requirePageActor / الخدمات).
  */
-const PUBLIC = ["/login", "/api/health"];
+const PUBLIC = ["/login", "/api/health", "/api/cron"]; // /api/cron محمي بسر خاص
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

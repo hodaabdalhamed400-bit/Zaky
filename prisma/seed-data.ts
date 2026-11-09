@@ -56,6 +56,7 @@ export const DEFAULT_SETTINGS = [
   { key: "contract.number_format", value: "ZK-{BRANCH}-{YEAR}-{SEQ4}", description: "ترقيم العقود، مثال ZK-IZD-2026-0001 (معتمد)" },
   { key: "contract.deposits_enabled", value: false, description: "لا يوجد تأمين في عقود ذكي (معتمد)" },
   { key: "contract.early_exit_refund", value: false, description: "عند الخروج المبكر لا يُسترد باقي قيمة العقد (معتمد)" },
+  { key: "contract.renewal_draft_days", value: 30, description: "إنشاء مسودة التجديد تلقائيًا قبل انتهاء العقد بهذا العدد من الأيام (معتمد)" },
   { key: "contract.renewal_pricing", value: "NEGOTIATED", description: "سعر التجديد حسب الاتفاق مع مسؤول الفرع (معتمد)" },
   { key: "finance.currency", value: "SAR", description: "العملة" },
   { key: "system.timezone", value: "Asia/Riyadh", description: "المنطقة الزمنية" },

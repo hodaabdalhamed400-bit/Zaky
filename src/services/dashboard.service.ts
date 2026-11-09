@@ -3,7 +3,7 @@ import type { Db } from "@/lib/db";
 import type { Actor } from "@/lib/auth/actor";
 import { requirePermission, assertBranchAccess } from "@/lib/rbac/guard";
 import { dateOnly, todayInRiyadh, addDays } from "@/lib/dates";
-import { computeOccupancy } from "./occupancy.service";
+import { computeOccupancy, IN_FORCE_STATUSES } from "./occupancy.service";
 
 /**
  * مؤشرات لوحة التحكم — تُحسب من قاعدة البيانات مباشرة ومقيدة بفروع المستخدم.
@@ -61,7 +61,7 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
         status: "AVAILABLE",
         unitType: { leaseMode: "LEASE" },
         ...scoped,
-        NOT: { contractUnits: { some: { contract: { status: "ACTIVE" }, startDate: { lte: dateOnly(today) }, endDate: { gte: dateOnly(today) } } } },
+        NOT: { contractUnits: { some: { contract: { status: { in: [...IN_FORCE_STATUSES] } }, startDate: { lte: dateOnly(today) }, endDate: { gte: dateOnly(today) } } } },
       },
     }),
     db.contract.count({ where: { status: "ACTIVE", ...scoped } }),

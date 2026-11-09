@@ -10,6 +10,7 @@ import { AUDIT_ACTION_LABELS } from "@/lib/audit";
 import { PRICING_CYCLE_LABELS, effectiveUnitStatus, getUnit } from "@/services/units.service";
 import { Alert, Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui/primitives";
 import { ArchiveUnitForm } from "../unit-form";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { archiveUnitAction } from "../actions";
 
 export const metadata: Metadata = { title: "بيانات الوحدة" };
@@ -66,10 +67,7 @@ export default async function UnitPage({ params, searchParams }: { params: Promi
               <div className="p-5"><ArchiveUnitForm action={archiveUnitAction.bind(null, unit.id, !unit.archivedAt)} archived={!!unit.archivedAt} /></div>
             </Card>
           )}
-          <Card>
-            <CardHeader title="الصور والمرفقات" />
-            <p className="p-5 text-sm text-gray-500">رفع الصور والمرفقات يُفعَّل في المرحلة الثالثة مع التخزين الآمن للملفات.</p>
-          </Card>
+          <DocumentsPanel actor={actor} owner={{ unitId: unit.id }} path={`/units/${unit.id}`} categories={["UNIT_PHOTO", "OTHER"]} title="الصور والمرفقات" canUpload={!unit.archivedAt && canManage} />
         </div>
       </div>
 

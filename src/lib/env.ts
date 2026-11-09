@@ -13,6 +13,10 @@ const schema = z.object({
     .transform((v) => (v === undefined ? undefined : v === "true")),
   // عدد الوكلاء العكسيين الموثوقين لقراءة X-Forwarded-For (Render = 1)
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+  // مجلد التخزين الخاص للمستندات (خارج public/ — لا يُخدم مباشرة أبدًا). في Render: قرص دائم.
+  STORAGE_DIR: z.string().min(1).default("./storage"),
+  // سر لمهمة الصيانة اليومية (POST /api/cron/daily). بدونه تُعطَّل نقطة الاستدعاء.
+  CRON_SECRET: z.string().min(24).optional(),
 });
 
 let cached: z.infer<typeof schema> | null = null;

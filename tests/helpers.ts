@@ -83,6 +83,7 @@ export async function makeContract(opts: {
       startDate: dateOnly(opts.start),
       endDate: dateOnly(opts.end),
       billingCycle: "MONTHLY",
+      durationMonths: 12,
       rentAmount: opts.total ?? "12000.00",
       totalAmount: opts.total ?? "12000.00",
     },
