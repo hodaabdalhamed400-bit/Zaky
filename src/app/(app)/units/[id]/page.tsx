@@ -39,6 +39,11 @@ export default async function UnitPage({ params, searchParams }: { params: Promi
         actions={canManage && !unit.archivedAt ? <LinkButton href={`/units/${unit.id}/edit`}>تعديل</LinkButton> : undefined}
       />
       {saved && <div className="mb-4"><Alert kind="success">تم حفظ بيانات الوحدة.</Alert></div>}
+      {unit.unitType.leaseMode === "BOOKING" && (
+        <div className="mb-4">
+          <Alert kind="info">هذه الوحدة تُدار بحجوزات منفصلة بالساعة أو اليوم وليس بعقود، ولا تدخل في نسب إشغال العقود. وحدة الحجوزات لم تُبنَ بعد.</Alert>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

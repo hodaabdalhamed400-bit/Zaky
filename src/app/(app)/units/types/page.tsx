@@ -24,7 +24,10 @@ export default async function UnitTypesPage() {
               {types.map((t) => (
                 <tr key={t.id}>
                   <Td className="font-medium">{t.nameAr}{t.isSystem && <span className="ms-1.5"><Badge>أساسي</Badge></span>}</Td>
-                  <Td>{t.occupancyMode === "SHARED" ? "مشتركة (بالمقاعد)" : "حصرية"}</Td>
+                  <Td>
+                    {t.occupancyMode === "SHARED" ? "مشتركة (بالمقاعد)" : "حصرية"}
+                    <span className="block text-xs text-gray-400">{t.leaseMode === "BOOKING" ? "حجوزات بالساعة/اليوم" : "بعقود"}</span>
+                  </Td>
                   <Td className="tabular">{t._count.units}</Td>
                   <Td>{t.isActive ? <Badge color="green">مفعل</Badge> : <Badge>معطل</Badge>}</Td>
                   <Td><ToggleTypeForm action={toggleUnitTypeAction.bind(null, t.id, !t.isActive)} active={t.isActive} /></Td>

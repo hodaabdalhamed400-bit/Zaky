@@ -43,6 +43,11 @@ enum OccupancyMode {
   SHARED // وحدة مشتركة بمقاعد متعددة (يحكمها عدد المقاعد = السعة)
 }
 
+enum LeaseMode {
+  LEASE // تُؤجر بعقود (مكاتب، مساحات)
+  BOOKING // حجوزات منفصلة بالساعة/اليوم بدون عقود (قاعات الاجتماعات) — قرار معتمد
+}
+
 enum TenantType {
   INDIVIDUAL // فرد
   COMPANY // منشأة
@@ -298,6 +303,7 @@ model UnitType {
   key           String        @unique
   nameAr        String        @map("name_ar")
   occupancyMode OccupancyMode @default(EXCLUSIVE) @map("occupancy_mode")
+  leaseMode     LeaseMode     @default(LEASE) @map("lease_mode")
   isSystem      Boolean       @default(false) @map("is_system")
   isActive      Boolean       @default(true) @map("is_active")
   units         Unit[]

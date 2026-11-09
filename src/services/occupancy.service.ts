@@ -5,8 +5,9 @@ import { dateOnly, todayInRiyadh } from "@/lib/dates";
 /**
  * حساب الإشغال — تعريفات معتمدة وموحدة لكل النظام (لوحة التحكم، الفروع، التقارير):
  *
- * المخزون القابل للتأجير = الوحدات غير المؤرشفة وحالتها ليست "غير نشطة"
- *   (وحدات الصيانة تبقى ضمن المخزون لأنها طاقة معطلة مؤقتًا).
+ * المخزون القابل للتأجير = الوحدات غير المؤرشفة وحالتها ليست "غير نشطة"، ونوعها يُؤجر بعقود
+ *   (وحدات الصيانة تبقى ضمن المخزون لأنها طاقة معطلة مؤقتًا؛ قاعات الاجتماعات خارجه لأنها
+ *   تُدار بحجوزات منفصلة بالساعة/اليوم — قرار معتمد).
  * الوحدة "مشغولة" في تاريخ معين = مرتبطة بعقد حالته "نشط" يغطي هذا التاريخ.
  *
  * ثلاث نسب، ويُذكر أساس النسبة دائمًا عند عرضها:
@@ -83,6 +84,7 @@ export async function computeOccupancy(db: Db, branchIds: string[] | null, onDat
     WITH inv AS (
       SELECT u.id, u.branch_id, u.capacity, u.area_sqm, u.occupancy_mode
       FROM units u
+      JOIN unit_types ut ON ut.id = u.unit_type_id AND ut.lease_mode = 'LEASE'
       WHERE u.archived_at IS NULL AND u.status <> 'INACTIVE' AND ${cond}
     ),
     occ AS (

@@ -199,6 +199,27 @@ describe("إدارة الوحدات", () => {
   });
 });
 
+describe("قرارات معتمدة: الفروع والحجوزات والعقود", () => {
+  it("بيانات الفروع والإعدادات وطريقة تأجير قاعات الاجتماعات", async () => {
+    expect(await branchByCode("MRK")).toMatchObject({ city: "الرياض" });
+    expect((await branchByCode("SWD")).notes).toContain("القصر مول");
+    expect((await branchByCode("IMU")).notes).toContain("بهو الجامعة");
+    expect(await prisma.unitType.findUniqueOrThrow({ where: { key: "MEETING_ROOM" } })).toMatchObject({ leaseMode: "BOOKING" });
+    expect(await prisma.unitType.findUniqueOrThrow({ where: { key: "PRIVATE_OFFICE" } })).toMatchObject({ leaseMode: "LEASE" });
+    const s = Object.fromEntries((await prisma.systemSetting.findMany()).map((x) => [x.key, x.value]));
+    expect(s["contract.number_format"]).toBe("ZK-{BRANCH}-{YEAR}-{SEQ4}");
+    expect(s["contract.deposits_enabled"]).toBe(false);
+    expect(s["contract.early_exit_refund"]).toBe(false);
+    expect(s["contract.renewal_pricing"]).toBe("NEGOTIATED");
+  });
+
+  it("نوع مخصص بالحجوزات", async () => {
+    const { actor } = await makeActor("SUPER_ADMIN");
+    const t = await createUnitType(prisma, actor, { nameAr: `بودكاست ${rnd()}`, occupancyMode: "EXCLUSIVE", leaseMode: "BOOKING" });
+    expect(t.leaseMode).toBe("BOOKING");
+  });
+});
+
 describe("حساب الإشغال (وحدات / مقاعد / مساحة)", () => {
   it("يطبق التعريفات المعتمدة بدقة", async () => {
     const { actor } = await makeActor("SUPER_ADMIN");
@@ -213,6 +234,7 @@ describe("حساب الإشغال (وحدات / مقاعد / مساحة)", () =>
     const archived = await mk({ code: "X1", areaSqm: "50", capacity: "5" });
     await setUnitArchived(prisma, actor, archived.id, true);
     const future = await mk({ code: "F1", areaSqm: "10", capacity: "1" }); // عقد مستقبلي لا يُحتسب
+    await mk({ code: "M1", unitTypeId: await typeId("MEETING_ROOM"), areaSqm: "25", capacity: "8" }); // حجوزات: خارج إشغال العقود
 
     const t = await makeTenant();
     const active = await makeContract({ branchId: b.id, tenantId: t.id, start: addDays(today, -30), end: addDays(today, 30) });

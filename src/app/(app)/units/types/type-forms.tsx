@@ -19,6 +19,12 @@ export function TypeForm({ action }: { action: (prev: FormState, fd: FormData) =
           <option value="SHARED">مشتركة (بالمقاعد)</option>
         </select>
       </Field>
+      <Field label="طريقة التأجير" htmlFor="type-lease" required hint="الحجوزات لا تدخل في العقود ولا في نسب إشغال العقود">
+        <select id="type-lease" name="leaseMode" className={inputClass} defaultValue="LEASE">
+          <option value="LEASE">بعقود</option>
+          <option value="BOOKING">حجوزات بالساعة/اليوم</option>
+        </select>
+      </Field>
       <SubmitButton className="w-full">إضافة النوع</SubmitButton>
     </form>
   );

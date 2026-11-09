@@ -59,6 +59,7 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
       where: {
         archivedAt: null,
         status: "AVAILABLE",
+        unitType: { leaseMode: "LEASE" },
         ...scoped,
         NOT: { contractUnits: { some: { contract: { status: "ACTIVE" }, startDate: { lte: dateOnly(today) }, endDate: { gte: dateOnly(today) } } } },
       },

@@ -61,7 +61,7 @@ export async function archiveUnitAction(id: string, archived: boolean, _prev: Fo
 export async function createUnitTypeAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const actor = await requireActionActor();
   try {
-    await createUnitType(prisma, actor, { nameAr: String(fd.get("nameAr") ?? ""), occupancyMode: String(fd.get("occupancyMode") ?? "") }, await getRequestMeta());
+    await createUnitType(prisma, actor, { nameAr: String(fd.get("nameAr") ?? ""), occupancyMode: String(fd.get("occupancyMode") ?? ""), leaseMode: String(fd.get("leaseMode") ?? "LEASE") }, await getRequestMeta());
   } catch (e) {
     return { error: toSafeMessage(e) };
   }

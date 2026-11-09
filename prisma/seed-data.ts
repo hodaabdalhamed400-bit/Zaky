@@ -11,11 +11,13 @@ type BranchSeed = {
   managerName: string | null;
   managerActing: boolean;
   status: "ACTIVE" | "PREPARING";
+  notes?: string;
 };
 
 /**
  * الفروع كما اعتمدتها الإدارة (نوفمبر 2026).
- * - المدينة: "الرياض" لأحياء الرياض المعروفة، و"تبوك" لفرع تبوك؛ فرع "المركز" غير محدد بانتظار التأكيد.
+ * - المدينة: جميع الفروع في الرياض عدا فرع تبوك (مؤكد من الإدارة).
+ * - "القصر مول" هو فرع السويدي، و"بهو الجامعة" هو فرع جامعة الإمام (مؤكد).
  * - العنوان ورابط الخريطة تُستكمل من شاشة الفروع (المرحلة الثانية).
  * ملاحظة: الزرع لا يعدّل فرعًا موجودًا (update: {}) حتى لا يمسح تعديلات الإدارة لاحقًا.
  */
@@ -23,10 +25,10 @@ export const INITIAL_BRANCHES: BranchSeed[] = [
   // فروع عاملة
   { code: "IZD", nameAr: "الازدهار", city: "الرياض", managerName: "أسماء", managerActing: false, status: "ACTIVE" },
   { code: "NFL", nameAr: "النفل", city: "الرياض", managerName: "حنان", managerActing: false, status: "ACTIVE" },
-  { code: "IMU", nameAr: "جامعة الإمام", city: "الرياض", managerName: "حنان", managerActing: true, status: "ACTIVE" },
-  { code: "MRK", nameAr: "المركز", city: null, managerName: "حنان", managerActing: true, status: "ACTIVE" },
+  { code: "IMU", nameAr: "جامعة الإمام", city: "الرياض", managerName: "حنان", managerActing: true, status: "ACTIVE", notes: "يُعرف سابقًا باسم: بهو الجامعة" },
+  { code: "MRK", nameAr: "المركز", city: "الرياض", managerName: "حنان", managerActing: true, status: "ACTIVE" },
   { code: "RWD", nameAr: "الروضة", city: "الرياض", managerName: "أحمد", managerActing: true, status: "ACTIVE" },
-  { code: "SWD", nameAr: "السويدي", city: "الرياض", managerName: "هاجر", managerActing: false, status: "ACTIVE" },
+  { code: "SWD", nameAr: "السويدي", city: "الرياض", managerName: "هاجر", managerActing: false, status: "ACTIVE", notes: "يُعرف سابقًا باسم: القصر مول" },
   { code: "TBK", nameAr: "تبوك", city: "تبوك", managerName: "عبد الرحمن", managerActing: false, status: "ACTIVE" },
   // قيد التجهيز (الافتتاح خلال شهر تقريبًا) — بدون مدير بعد
   { code: "GRN", nameAr: "غرناطة مول", city: "الرياض", managerName: null, managerActing: false, status: "PREPARING" },
@@ -38,7 +40,8 @@ export const INITIAL_BRANCHES: BranchSeed[] = [
 export const UNIT_TYPES = [
   { key: "PRIVATE_OFFICE", nameAr: "مكتب خاص", occupancyMode: "EXCLUSIVE" as const },
   { key: "SHARED_OFFICE", nameAr: "مكتب مشترك", occupancyMode: "SHARED" as const },
-  { key: "MEETING_ROOM", nameAr: "قاعة اجتماعات", occupancyMode: "EXCLUSIVE" as const },
+  // قاعات الاجتماعات: حجوزات منفصلة بالساعة/اليوم بدون عقود (قرار معتمد)
+  { key: "MEETING_ROOM", nameAr: "قاعة اجتماعات", occupancyMode: "EXCLUSIVE" as const, leaseMode: "BOOKING" as const },
   { key: "ADMIN_SPACE", nameAr: "مساحة إدارية", occupancyMode: "EXCLUSIVE" as const },
 ];
 
@@ -50,6 +53,10 @@ export const DEFAULT_SETTINGS = [
   { key: "finance.installment_due_rule", value: "SAME_DAY_AS_CONTRACT_START", description: "القسط يستحق في نفس يوم بداية العقد من كل شهر (معتمد)" },
   { key: "finance.allocation_mode", value: "MANUAL", description: "توزيع الدفعة على الأقساط يختاره الموظف (معتمد)" },
   { key: "company.phone", value: COMPANY_PHONE, description: "رقم التواصل الموحد للشركة والفروع" },
+  { key: "contract.number_format", value: "ZK-{BRANCH}-{YEAR}-{SEQ4}", description: "ترقيم العقود، مثال ZK-IZD-2026-0001 (معتمد)" },
+  { key: "contract.deposits_enabled", value: false, description: "لا يوجد تأمين في عقود ذكي (معتمد)" },
+  { key: "contract.early_exit_refund", value: false, description: "عند الخروج المبكر لا يُسترد باقي قيمة العقد (معتمد)" },
+  { key: "contract.renewal_pricing", value: "NEGOTIATED", description: "سعر التجديد حسب الاتفاق مع مسؤول الفرع (معتمد)" },
   { key: "finance.currency", value: "SAR", description: "العملة" },
   { key: "system.timezone", value: "Asia/Riyadh", description: "المنطقة الزمنية" },
 ];

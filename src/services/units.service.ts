@@ -279,6 +279,7 @@ export async function unitFormOptions(db: Db, actor: Actor) {
 const unitTypeSchema = z.object({
   nameAr: z.string().trim().min(2, "اسم النوع قصير جدًا").max(60),
   occupancyMode: z.enum(["EXCLUSIVE", "SHARED"], { message: "اختر طريقة الإشغال" }),
+  leaseMode: z.enum(["LEASE", "BOOKING"], { message: "اختر طريقة التأجير" }).default("LEASE"),
 });
 
 export async function createUnitType(db: Db, actor: Actor, raw: unknown, meta: RequestMeta = {}) {
