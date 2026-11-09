@@ -69,7 +69,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <StatCard
           label="نسبة الإشغال"
           value={s.occupancyPct === null ? "—" : `${s.occupancyPct}%`}
-          hint="حسب عدد الوحدات"
+          hint={`حسب الوحدات${s.seatsOccupancyPct !== null ? ` · المقاعد ${s.seatsOccupancyPct}%` : ""}`}
           icon="reports"
         />
         <StatCard label="العقود النشطة" value={String(s.activeContracts)} icon="contracts" />
@@ -84,7 +84,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <EmptyState
             icon="units"
             title="لا توجد وحدات مسجلة بعد"
-            description="ستظهر مؤشرات الإشغال والعقود والتحصيل بعد إضافة المكاتب والوحدات (المرحلة الثانية) ثم العقود والدفعات. لا يعرض النظام أي أرقام تجريبية."
+            description="ستظهر مؤشرات الإشغال بعد إضافة المكاتب والوحدات، ثم العقود والتحصيل بعد تفعيلها. لا يعرض النظام أي أرقام تجريبية."
+            action={actor.permissions.has("units.manage") ? <Link href="/units/new" className={buttonClass("primary")}>إضافة وحدة</Link> : undefined}
           />
         </Card>
       )}

@@ -2,18 +2,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { getActor, getRequestMeta } from "@/lib/auth/server";
+import { getRequestMeta, requireActionActor, type FormState } from "@/lib/auth/server";
 import { toSafeMessage } from "@/lib/errors";
 import { createUser, resetUserPassword, updateUser } from "@/services/users.service";
 
-export type FormState = { error?: string; success?: string };
-
-async function actionActor() {
-  const actor = await getActor();
-  if (!actor) redirect("/login");
-  if (actor.mustChangePassword) redirect("/account?first=1");
-  return actor;
-}
+export type { FormState };
 
 function readCommon(fd: FormData) {
   return {
@@ -25,7 +18,7 @@ function readCommon(fd: FormData) {
 }
 
 export async function createUserAction(_prev: FormState, fd: FormData): Promise<FormState> {
-  const actor = await actionActor();
+  const actor = await requireActionActor();
   let id: string;
   try {
     const user = await createUser(
@@ -43,7 +36,7 @@ export async function createUserAction(_prev: FormState, fd: FormData): Promise<
 }
 
 export async function updateUserAction(id: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const actor = await actionActor();
+  const actor = await requireActionActor();
   try {
     await updateUser(prisma, actor, id, { ...readCommon(fd), isActive: fd.get("isActive") === "on" }, await getRequestMeta());
   } catch (e) {
@@ -55,7 +48,7 @@ export async function updateUserAction(id: string, _prev: FormState, fd: FormDat
 }
 
 export async function resetPasswordAction(id: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const actor = await actionActor();
+  const actor = await requireActionActor();
   try {
     await resetUserPassword(prisma, actor, id, String(fd.get("password") ?? ""), await getRequestMeta());
   } catch (e) {

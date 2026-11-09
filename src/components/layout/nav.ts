@@ -16,7 +16,7 @@ export const NAV: { title?: string; items: NavItem[] }[] = [
     title: "العقارات",
     items: [
       { href: "/branches", label: "الفروع", icon: "branches", perm: "branches.view" },
-      { href: "/units", label: "المكاتب والوحدات", icon: "units", perm: "units.view", phase: 2 },
+      { href: "/units", label: "المكاتب والوحدات", icon: "units", perm: "units.view" },
     ],
   },
   {

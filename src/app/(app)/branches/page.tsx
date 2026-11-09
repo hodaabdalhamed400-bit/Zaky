@@ -1,34 +1,38 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
-import { branchWhere } from "@/lib/rbac/guard";
-import { Alert, Badge, Card, EmptyState, PageHeader, Table, Td, Th } from "@/components/ui/primitives";
+import { BRANCH_STATUS_COLOR as STATUS_COLOR, BRANCH_STATUS_LABELS, listBranches } from "@/services/branches.service";
+import { Badge, Card, EmptyState, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui/primitives";
+import { OccupancyBar, OccupancyBreakdown } from "@/components/ui/occupancy";
 
 export const metadata: Metadata = { title: "الفروع" };
 
-const STATUS = {
-  ACTIVE: { label: "عامل", color: "green" },
-  PREPARING: { label: "قيد التجهيز", color: "amber" },
-  INACTIVE: { label: "موقوف", color: "gray" },
-} as const;
-
 export default async function BranchesPage() {
   const actor = await requirePageActor("branches.view");
-  const branches = await prisma.branch.findMany({
-    where: branchWhere(actor, "id"),
-    // العاملة أولًا ثم قيد التجهيز ثم الموقوفة
-    orderBy: [{ status: "asc" }, { nameAr: "asc" }],
-    include: { _count: { select: { units: { where: { archivedAt: null } } } } },
-  });
+  const { branches, total } = await listBranches(prisma, actor);
+  const canCreate = actor.permissions.has("branches.manage") && actor.allBranches;
 
   return (
     <>
-      <PageHeader title="الفروع" description="الفروع المصرح لك بالاطلاع عليها." />
-      <div className="mb-4">
-        <Alert kind="info">
-          عرض للقراءة فقط في المرحلة الأولى. إضافة الفروع وتعديل بياناتها (العنوان، رابط الخريطة، المدير) تُفعَّل في المرحلة الثانية.
-        </Alert>
-      </div>
+      <PageHeader
+        title="الفروع"
+        description="الفروع المصرح لك بها مع نسب الإشغال اليوم."
+        actions={
+          <>
+            {actor.permissions.has("branches.manage") && <LinkButton href="/units/types" variant="secondary">أنواع الوحدات</LinkButton>}
+            {canCreate && <LinkButton href="/branches/new" icon="plus">فرع جديد</LinkButton>}
+          </>
+        }
+      />
+
+      {branches.length > 0 && (
+        <Card className="mb-6 p-5">
+          <p className="mb-3 text-sm font-semibold text-gray-900">الإشغال الإجمالي للفروع المعروضة</p>
+          <OccupancyBreakdown o={total} />
+        </Card>
+      )}
+
       <Card>
         {branches.length === 0 ? (
           <EmptyState title="لا توجد فروع متاحة لك" description="تواصل مع مسؤول النظام لمنحك صلاحية على الفروع." />
@@ -37,20 +41,20 @@ export default async function BranchesPage() {
             <thead>
               <tr>
                 <Th>الفرع</Th>
-                <Th>الرمز</Th>
-                <Th>المدينة</Th>
                 <Th>المدير</Th>
-                <Th>رقم التواصل</Th>
-                <Th>عدد الوحدات</Th>
+                <Th>الوحدات</Th>
+                <Th>الإشغال (وحدات)</Th>
+                <Th>الإشغال (مقاعد)</Th>
                 <Th>الحالة</Th>
               </tr>
             </thead>
             <tbody>
               {branches.map((b) => (
-                <tr key={b.id}>
-                  <Td className="font-medium">{b.nameAr}</Td>
-                  <Td><span dir="ltr" className="font-mono text-xs">{b.code}</span></Td>
-                  <Td>{b.city ?? <span className="text-gray-400">غير محدد</span>}</Td>
+                <tr key={b.id} className="hover:bg-gray-50">
+                  <Td>
+                    <Link href={`/branches/${b.id}`} className="font-medium text-brand-700 hover:underline">{b.nameAr}</Link>
+                    <span className="block text-xs text-gray-400">{b.city ?? "مدينة غير محددة"} · <span dir="ltr" className="font-mono">{b.code}</span></span>
+                  </Td>
                   <Td>
                     {b.managerName ? (
                       <>
@@ -61,9 +65,13 @@ export default async function BranchesPage() {
                       <span className="text-gray-400">لم يُحدد بعد</span>
                     )}
                   </Td>
-                  <Td>{b.phone ? <a href={`tel:${b.phone}`} dir="ltr" className="tabular text-brand-700 hover:underline">{b.phone}</a> : "—"}</Td>
-                  <Td className="tabular">{b._count.units}</Td>
-                  <Td><Badge color={STATUS[b.status].color}>{STATUS[b.status].label}</Badge></Td>
+                  <Td className="tabular">
+                    {b.occupancy.units}
+                    <span className="block text-xs text-gray-400">{b.occupancy.occupiedUnits} مؤجرة</span>
+                  </Td>
+                  <Td><OccupancyBar pct={b.occupancy.unitsPct} /></Td>
+                  <Td><OccupancyBar pct={b.occupancy.seatsPct} /></Td>
+                  <Td><Badge color={STATUS_COLOR[b.status]}>{BRANCH_STATUS_LABELS[b.status]}</Badge></Td>
                 </tr>
               ))}
             </tbody>

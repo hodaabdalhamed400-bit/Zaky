@@ -3,12 +3,13 @@ import type { Db } from "@/lib/db";
 import type { Actor } from "@/lib/auth/actor";
 import { requirePermission, assertBranchAccess } from "@/lib/rbac/guard";
 import { dateOnly, todayInRiyadh, addDays } from "@/lib/dates";
+import { computeOccupancy } from "./occupancy.service";
 
 /**
  * مؤشرات لوحة التحكم — تُحسب من قاعدة البيانات مباشرة ومقيدة بفروع المستخدم.
  * التعريفات (موثقة في docs/BUSINESS_RULES.md):
- * - الوحدة "مؤجرة" إذا كان لها سطر في contract_units ضمن عقد نشط يغطي تاريخ اليوم.
- * - نسبة الإشغال هنا = حسب عدد الوحدات (وحدات مؤجرة ÷ وحدات قابلة للتأجير).
+ * - الإشغال: نفس تعريفات occupancy.service.ts (الوحدات / المقاعد / المساحة).
+ * - المتاحة = حالتها "متاحة" وليس عليها عقد نشط اليوم.
  * - المستحق = الأقساط التي حلّ تاريخها (حتى اليوم) ولم تُسدد بالكامل.
  * - المتأخر = الأقساط التي تجاوزت تاريخ استحقاقها ولم تُسدد بالكامل.
  * - المحصّل = الدفعات المعتمدة فقط خلال الشهر الحالي (بتوقيت الرياض).
@@ -20,6 +21,8 @@ export type DashboardStats = {
   rentedUnits: number;
   availableUnits: number;
   occupancyPct: number | null;
+  seatsOccupancyPct: number | null;
+  areaOccupancyPct: number | null;
   activeContracts: number;
   expiringContracts: number;
   dueAmount: string;
@@ -48,19 +51,18 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
   const branchWhere = branchIds === null ? {} : { id: { in: branchIds } };
   const scoped = branchIds === null ? {} : { branchId: { in: branchIds } };
 
-  const [branches, preparingBranches, units, rented, available, activeContracts, expiring, money] = await Promise.all([
+  const [branches, preparingBranches, occ, available, activeContracts, expiring, money] = await Promise.all([
     db.branch.count({ where: { status: "ACTIVE", ...branchWhere } }),
     db.branch.count({ where: { status: "PREPARING", ...branchWhere } }),
-    db.unit.count({ where: { archivedAt: null, status: { not: "INACTIVE" }, ...scoped } }),
-    db.$queryRaw<{ n: bigint }[]>`
-      SELECT COUNT(DISTINCT cu.unit_id) AS n
-      FROM contract_units cu
-      JOIN contracts c ON c.id = cu.contract_id
-      JOIN units u ON u.id = cu.unit_id
-      WHERE c.status = 'ACTIVE' AND u.archived_at IS NULL
-        AND ${dateOnly(today)}::date BETWEEN cu.start_date AND cu.end_date
-        AND ${branchCond("cu.branch_id")}`,
-    db.unit.count({ where: { archivedAt: null, status: "AVAILABLE", ...scoped } }),
+    computeOccupancy(db, branchIds, today),
+    db.unit.count({
+      where: {
+        archivedAt: null,
+        status: "AVAILABLE",
+        ...scoped,
+        NOT: { contractUnits: { some: { contract: { status: "ACTIVE" }, startDate: { lte: dateOnly(today) }, endDate: { gte: dateOnly(today) } } } },
+      },
+    }),
     db.contract.count({ where: { status: "ACTIVE", ...scoped } }),
     db.contract.count({
       where: {
@@ -85,15 +87,16 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
             AND ${branchCond("p.branch_id")}) AS collected`,
   ]);
 
-  const rentedUnits = Number(rented[0]?.n ?? 0);
   const m = money[0];
   return {
     branches,
     preparingBranches,
-    units,
-    rentedUnits,
+    units: occ.total.units,
+    rentedUnits: occ.total.occupiedUnits,
     availableUnits: available,
-    occupancyPct: units > 0 ? Math.round((rentedUnits / units) * 1000) / 10 : null,
+    occupancyPct: occ.total.unitsPct,
+    seatsOccupancyPct: occ.total.seatsPct,
+    areaOccupancyPct: occ.total.unitsWithoutArea === 0 ? occ.total.areaPct : null,
     activeContracts,
     expiringContracts: expiring,
     dueAmount: new Prisma.Decimal(m?.due ?? 0).toFixed(2),

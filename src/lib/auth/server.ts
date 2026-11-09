@@ -54,3 +54,13 @@ export async function requirePageActor(perm?: PermissionKey, opts: { allowPasswo
   if (perm && !actor.permissions.has(perm)) redirect("/forbidden");
   return actor;
 }
+
+/** لإجراءات الخادم (Server Actions): يتطلب جلسة صالحة ولا يسمح بالعمل قبل تغيير كلمة المرور المؤقتة. */
+export async function requireActionActor(): Promise<Actor> {
+  const actor = await getActor();
+  if (!actor) redirect("/login");
+  if (actor.mustChangePassword) redirect("/account?first=1");
+  return actor;
+}
+
+export type FormState = { error?: string; success?: string };

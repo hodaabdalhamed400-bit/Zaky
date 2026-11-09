@@ -18,7 +18,8 @@
     "admin:create": "tsx scripts/create-admin.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node tests/e2e/smoke.mjs"
+    "test:e2e": "node tests/e2e/smoke.mjs",
+    "test:e2e:phase2": "node tests/e2e/phase2.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",
