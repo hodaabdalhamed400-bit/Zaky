@@ -7,7 +7,7 @@ import { Badge, Card, CardHeader } from "@/components/ui/primitives";
 import { DeleteDocButton, UploadForm } from "./upload-form";
 import { deleteDocumentAction, uploadDocumentAction } from "./actions";
 
-type Owner = { tenantId: string } | { contractId: string } | { unitId: string };
+type Owner = { tenantId: string } | { contractId: string } | { unitId: string } | { paymentId: string };
 
 export async function DocumentsPanel({
   actor,

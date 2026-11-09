@@ -45,6 +45,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       })
     : [];
 
+  const latestPayments = actor.permissions.has("payments.view")
+    ? await prisma.payment.findMany({
+        where: { status: "APPROVED", ...(branchId ? { branchId } : actor.allBranches ? {} : { branchId: { in: [...actor.branchIds] } }) },
+        orderBy: { approvedAt: "desc" },
+        take: 8,
+        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } } },
+      })
+    : [];
+
   const noBranches = !actor.allBranches && actor.branchIds.length === 0;
 
   return (
@@ -126,8 +135,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           )}
         </Card>
         <Card>
-          <CardHeader title="آخر عمليات التحصيل" />
-          <EmptyState title="لا توجد بيانات" description="يُفعَّل هذا الجدول مع وحدة التحصيل (المرحلة الرابعة)." />
+          <CardHeader title="آخر عمليات التحصيل" action={actor.permissions.has("payments.view") ? <Link href="/finance/payments" className="text-sm text-brand-700 hover:underline">الكل</Link> : undefined} />
+          {latestPayments.length === 0 ? (
+            <EmptyState title="لا توجد دفعات معتمدة بعد" />
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {latestPayments.map((pm) => (
+                <li key={pm.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
+                  <span>
+                    <Link href={`/finance/payments/${pm.id}`} className="font-medium text-brand-700 hover:underline">{pm.tenant.name}</Link>
+                    <span className="block text-xs text-gray-400">{pm.branch.nameAr} · <span dir="ltr">{pm.receiptNo}</span></span>
+                  </span>
+                  <span className="tabular font-semibold text-emerald-700">{formatSAR(pm.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
         {actor.permissions.has("audit.view") && (
           <Card className="lg:col-span-2">

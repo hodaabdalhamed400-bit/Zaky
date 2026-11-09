@@ -12,6 +12,9 @@ import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader, Table, Td, Th }
 import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { OpButton, ReasonOp, TerminateForm } from "../op-forms";
 import { contractOpAction } from "../actions";
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS } from "@/services/payments.service";
+import { AdjustmentForm } from "../../finance/payment-form";
+import { adjustmentAction } from "../../finance/actions";
 
 export const metadata: Metadata = { title: "تفاصيل العقد" };
 
@@ -51,7 +54,13 @@ export default async function ContractPage({ params, searchParams }: { params: P
   const showMoney = p.has("payments.view");
   const remaining = sum(c.schedules.filter((s) => s.status === "PENDING" || s.status === "PARTIAL").map((s) => s.amountDue.minus(s.amountPaid).minus(s.amountAdjusted)));
 
+  const payments = showMoney ? await prisma.payment.findMany({ where: { contractId: id }, orderBy: { createdAt: "desc" } }) : [];
+  const openInst = c.schedules
+    .filter((s) => s.status === "PENDING" || s.status === "PARTIAL")
+    .map((s) => ({ id: s.id, seqNo: s.seqNo, dueDate: s.dueDate.toISOString().slice(0, 10), remaining: s.amountDue.minus(s.amountPaid).minus(s.amountAdjusted).toFixed(2) }));
+
   const actions: React.ReactNode[] = [];
+  if (p.has("payments.record") && openInst.length > 0) actions.push(<LinkButton key="pay" href={`/finance/payments/new?contractId=${id}`} icon="finance">تسجيل دفعة</LinkButton>);
   if (c.status === "DRAFT" && canDraft) {
     actions.push(<LinkButton key="e" href={`/contracts/${id}/edit`} variant="secondary">تعديل المسودة</LinkButton>);
     actions.push(<OpButton key="s" action={op("submit")} label="إرسال للاعتماد" confirm="إرسال العقد للاعتماد؟ ستُحجز الوحدات." />);
@@ -143,14 +152,45 @@ export default async function ContractPage({ params, searchParams }: { params: P
                           <Td className="tabular whitespace-nowrap">{formatSAR(s.amountDue)}</Td>
                           <Td className="tabular whitespace-nowrap text-xs text-gray-500">{formatSAR(s.vatAmount)}</Td>
                           <Td className="tabular whitespace-nowrap">{formatSAR(s.amountPaid)}</Td>
-                          <Td>{late ? <Badge color="red">متأخر</Badge> : <Badge color={st.color}>{st.label}</Badge>}</Td>
+                          <Td>
+                            <span className="flex flex-wrap gap-1">
+                              {(!late || s.status === "PARTIAL") && <Badge color={st.color}>{st.label}</Badge>}
+                              {late && <Badge color="red">متأخر</Badge>}
+                            </span>
+                          </Td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </Table>
               )}
-              <p className="border-t border-gray-100 px-5 py-2 text-xs text-gray-400">تسجيل الدفعات والإيصالات يُفعَّل في المرحلة الرابعة.</p>
+            </Card>
+          )}
+
+          {showMoney && payments.length > 0 && (
+            <Card>
+              <CardHeader title="الدفعات على هذا العقد" />
+              <Table>
+                <thead><tr><Th>الإيصال</Th><Th>المبلغ</Th><Th>الوسيلة</Th><Th>تاريخ الدفع</Th><Th>الحالة</Th></tr></thead>
+                <tbody>
+                  {payments.map((pm) => (
+                    <tr key={pm.id} className="hover:bg-gray-50">
+                      <Td><Link href={`/finance/payments/${pm.id}`} dir="ltr" className="font-mono text-xs text-brand-700 hover:underline">{pm.receiptNo ?? "بانتظار المراجعة"}</Link></Td>
+                      <Td className="tabular whitespace-nowrap">{formatSAR(pm.amount)}</Td>
+                      <Td>{PAYMENT_METHOD_LABELS[pm.method]}</Td>
+                      <Td className="tabular whitespace-nowrap">{formatDate(pm.paidOn)}</Td>
+                      <Td><Badge color={PAYMENT_STATUS_COLOR[pm.status]}>{PAYMENT_STATUS_LABELS[pm.status]}</Badge></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card>
+          )}
+
+          {p.has("finance.adjust") && openInst.length > 0 && (
+            <Card>
+              <CardHeader title="تسوية / خصم على قسط" />
+              <div className="p-5"><AdjustmentForm action={adjustmentAction.bind(null, id)} installments={openInst} /></div>
             </Card>
           )}
         </div>

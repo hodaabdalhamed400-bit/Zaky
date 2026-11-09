@@ -87,4 +87,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "contract.renewal_unlinked": "فك ارتباط تجديد ملغى",
   "contract.expire": "انتهاء عقد",
   "contract.renewed": "انتقال عقد إلى مجدد",
+  "payment.record": "تسجيل دفعة",
+  "payment.approve": "اعتماد دفعة وإصدار إيصال",
+  "payment.reject": "رفض دفعة",
+  "payment.reverse": "عكس دفعة",
+  "adjustment.create": "تسوية على قسط",
 };

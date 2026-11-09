@@ -49,6 +49,7 @@ const uploadSchema = z.object({
     z.object({ tenantId: z.string().uuid() }),
     z.object({ contractId: z.string().uuid() }),
     z.object({ unitId: z.string().uuid() }),
+    z.object({ paymentId: z.string().uuid() }),
   ]),
 });
 
@@ -120,7 +121,7 @@ export async function uploadDocument(
 }
 
 /** قائمة مستندات كيان: الحساسة لا تُعرض لمن لا يملك صلاحيتها (يظهر عددها فقط). */
-export async function listDocuments(db: Db, actor: Actor, owner: { tenantId?: string; contractId?: string; unitId?: string }) {
+export async function listDocuments(db: Db, actor: Actor, owner: { tenantId?: string; contractId?: string; unitId?: string; paymentId?: string }) {
   if (!actor.permissions.has("documents.view")) return { documents: [], hiddenSensitive: 0, allowed: false };
   const all = await db.document.findMany({
     where: { ...owner, deletedAt: null },

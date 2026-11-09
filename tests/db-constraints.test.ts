@@ -95,7 +95,7 @@ describe("سلامة السجلات المالية", () => {
     await expect(prisma.payment.delete({ where: { id: p.id } })).rejects.toThrow(/ZAKI_IMMUTABLE/);
     await expect(prisma.payment.update({ where: { id: p.id }, data: { amount: "1.00" } })).rejects.toThrow(/ZAKI_IMMUTABLE/);
     // العكس عبر حالة REVERSED هو المسار الوحيد المسموح
-    await expect(prisma.payment.update({ where: { id: p.id }, data: { status: "REVERSED" } })).resolves.toBeTruthy();
+    await expect(prisma.payment.update({ where: { id: p.id }, data: { status: "REVERSED", reversedAt: new Date(), reversalReason: "خطأ إدخال" } })).resolves.toBeTruthy();
   });
 
   it("لا يمكن اعتماد دفعة بدون رقم إيصال", async () => {

@@ -550,6 +550,12 @@ model Payment {
   approvedById   String?       @map("approved_by_id") @db.Uuid
   approvedAt     DateTime?     @map("approved_at") @db.Timestamptz(3)
   rejectedReason String?       @map("rejected_reason")
+  rejectedById   String?       @map("rejected_by_id") @db.Uuid
+  rejectedAt     DateTime?     @map("rejected_at") @db.Timestamptz(3)
+  // العكس (تصحيح دفعة معتمدة): يبقى السجل كما هو وتُستبعد من المحصّل
+  reversedById   String?       @map("reversed_by_id") @db.Uuid
+  reversedAt     DateTime?     @map("reversed_at") @db.Timestamptz(3)
+  reversalReason String?       @map("reversal_reason")
   reversalOfId   String?       @unique @map("reversal_of_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
