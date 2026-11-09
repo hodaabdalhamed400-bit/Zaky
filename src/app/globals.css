@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/*
+ * ألوان مؤقتة محايدة — تُستبدل بهوية شركة ذكي المعتمدة عند توفيرها
+ * (تعديل هذه القيم فقط يكفي لتغيير هوية النظام بالكامل).
+ */
+@theme {
+  --font-sans: var(--font-arabic), "Segoe UI", Tahoma, system-ui, sans-serif;
+  --color-brand-50: #eef7f6;
+  --color-brand-100: #d5ecea;
+  --color-brand-200: #aed9d5;
+  --color-brand-500: #1f8a82;
+  --color-brand-600: #187069;
+  --color-brand-700: #145a55;
+  --color-brand-900: #0c3633;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f6f7f9;
+  color: #111827;
+}
+
+/* أرقام بعرض ثابت في الجداول والمبالغ */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}

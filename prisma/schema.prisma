@@ -1,0 +1,714 @@
+// ZAKI Smart ERP — مخطط قاعدة البيانات
+// ملاحظات عامة:
+// - جميع المبالغ النقدية Decimal(14,2) بالريال السعودي، ولا يُستخدم floating-point للأموال.
+// - تواريخ العقود والاستحقاقات من نوع DATE (بدون وقت) وتُفسَّر بتوقيت Asia/Riyadh.
+// - الطوابع الزمنية timestamptz (UTC في التخزين).
+// - قيود إضافية لا يدعمها Prisma مباشرة (EXCLUDE / CHECK / Triggers / Partial unique)
+//   موجودة في ملف الترحيل SQL: prisma/migrations/*_constraints/migration.sql
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────────── التعدادات ─────────────────────────────
+
+enum PricingCycle {
+  HOUR
+  DAY
+  MONTH
+  YEAR
+}
+
+enum UnitStatus {
+  AVAILABLE // متاحة
+  RESERVED // محجوزة
+  RENTED // مؤجرة
+  MAINTENANCE // صيانة
+  INACTIVE // غير نشطة
+}
+
+enum OccupancyMode {
+  EXCLUSIVE // وحدة تؤجر لعقد واحد في الفترة (مكتب خاص...)
+  SHARED // وحدة مشتركة بمقاعد متعددة (يحكمها عدد المقاعد = السعة)
+}
+
+enum TenantType {
+  INDIVIDUAL // فرد
+  COMPANY // منشأة
+}
+
+enum TenantStatus {
+  PROSPECT // محتمل
+  ACTIVE // نشط
+  FORMER // سابق
+}
+
+enum ContractStatus {
+  DRAFT // مسودة
+  PENDING_APPROVAL // بانتظار الاعتماد
+  ACTIVE // نشط
+  EXPIRED // منتهي
+  CANCELLED // ملغى (قبل السريان)
+  TERMINATED // منهى مبكرًا
+  RENEWED // مجدد (حل محله عقد لاحق)
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+  CUSTOM
+}
+
+enum ScheduleStatus {
+  PENDING // لم يُسدد
+  PARTIAL // مسدد جزئيًا
+  PAID // مسدد بالكامل
+  WAIVED // معفى بتسوية معتمدة
+  CANCELLED // ملغى (عقد ملغى/منهى)
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER // تحويل بنكي
+  CARD // شبكة / مدى
+  CASH // نقد
+  CHEQUE // شيك
+  OTHER // أخرى
+}
+
+enum PaymentStatus {
+  PENDING_REVIEW // بانتظار المراجعة
+  APPROVED // معتمد
+  REJECTED // مرفوض
+  REVERSED // معكوس بقيد تصحيح
+}
+
+enum DepositStatus {
+  HELD
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FORFEITED
+}
+
+enum RefundStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum AdjustmentType {
+  DISCOUNT // خصم
+  WRITE_OFF // إعفاء/شطب
+  CORRECTION // تصحيح
+  LATE_FEE // رسوم تأخير (إن اعتُمدت)
+}
+
+enum DocumentCategory {
+  CONTRACT_SIGNED
+  CONTRACT_DRAFT
+  ID_DOCUMENT
+  COMMERCIAL_REGISTER
+  VAT_CERTIFICATE
+  PAYMENT_PROOF
+  UNIT_PHOTO
+  OTHER
+}
+
+enum NotificationType {
+  CONTRACT_EXPIRING
+  PAYMENT_DUE
+  PAYMENT_OVERDUE
+  CONTRACT_PENDING_APPROVAL
+  DOCUMENT_MISSING
+  PAYMENT_PENDING_REVIEW
+  SYSTEM
+}
+
+// ───────────────────────────── المستخدمون والصلاحيات ─────────────────────────────
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  key         String           @unique // SUPER_ADMIN, GENERAL_MANAGER, ...
+  nameAr      String           @map("name_ar")
+  description String?
+  isSystem    Boolean          @default(false) @map("is_system")
+  // الدور يرى جميع الفروع (لا يحتاج user_branch_access)
+  allBranches Boolean          @default(false) @map("all_branches")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id      String           @id @default(uuid()) @db.Uuid
+  key     String           @unique // مثال: contracts.approve
+  nameAr  String           @map("name_ar")
+  groupAr String           @map("group_ar")
+  roles   RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique // يُخزَّن بأحرف صغيرة
+  name               String
+  phone              String?
+  passwordHash       String    @map("password_hash")
+  roleId             String    @map("role_id") @db.Uuid
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  // MFA (TOTP) — الحقول جاهزة، التفعيل في مرحلة التجهيز للإنتاج
+  mfaEnabled         Boolean   @default(false) @map("mfa_enabled")
+  mfaSecretEnc       String?   @map("mfa_secret_enc")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
+  passwordChangedAt  DateTime  @default(now()) @map("password_changed_at") @db.Timestamptz(3)
+  createdById        String?   @map("created_by_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  role          Role               @relation(fields: [roleId], references: [id])
+  createdBy     User?              @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers  User[]             @relation("UserCreatedBy")
+  branchAccess  UserBranchAccess[]
+  sessions      Session[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+model UserBranchAccess {
+  userId    String   @map("user_id") @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@id([userId, branchId])
+  @@index([branchId])
+  @@map("user_branch_access")
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  // يُخزَّن SHA-256 للرمز فقط؛ الرمز الأصلي في كوكي httpOnly لدى المستخدم
+  tokenHash  String    @unique @map("token_hash")
+  userId     String    @map("user_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String
+  ip        String?
+  success   Boolean
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@map("login_attempts")
+}
+
+// ───────────────────────────── الفروع والوحدات ─────────────────────────────
+
+model Branch {
+  id            String    @id @default(uuid()) @db.Uuid
+  code          String    @unique
+  nameAr        String    @unique @map("name_ar")
+  city          String?
+  address       String?
+  mapUrl        String?   @map("map_url")
+  managerName   String?   @map("manager_name")
+  contactPerson String?   @map("contact_person")
+  phone         String?
+  notes         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  floors        Floor[]
+  units         Unit[]
+  tenants       Tenant[]
+  contracts     Contract[]
+  payments      Payment[]
+  userAccess    UserBranchAccess[]
+  contractUnits ContractUnit[]
+
+  @@map("branches")
+}
+
+model Floor {
+  id        String   @id @default(uuid()) @db.Uuid
+  branchId  String   @map("branch_id") @db.Uuid
+  name      String
+  level     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  units     Unit[]
+
+  @@unique([branchId, name])
+  @@map("floors")
+}
+
+model UnitType {
+  id            String        @id @default(uuid()) @db.Uuid
+  key           String        @unique
+  nameAr        String        @map("name_ar")
+  occupancyMode OccupancyMode @default(EXCLUSIVE) @map("occupancy_mode")
+  isSystem      Boolean       @default(false) @map("is_system")
+  isActive      Boolean       @default(true) @map("is_active")
+  units         Unit[]
+
+  @@map("unit_types")
+}
+
+model Unit {
+  id            String        @id @default(uuid()) @db.Uuid
+  branchId      String        @map("branch_id") @db.Uuid
+  floorId       String?       @map("floor_id") @db.Uuid
+  unitTypeId    String        @map("unit_type_id") @db.Uuid
+  code          String // رقم المكتب/الوحدة — فريد داخل الفرع
+  occupancyMode OccupancyMode @default(EXCLUSIVE) @map("occupancy_mode")
+  areaSqm       Decimal?      @map("area_sqm") @db.Decimal(10, 2)
+  capacity      Int           @default(1) // السعة/عدد المقاعد
+  basePrice     Decimal       @map("base_price") @db.Decimal(14, 2)
+  pricingCycle  PricingCycle  @default(MONTH) @map("pricing_cycle")
+  description   String?
+  status        UnitStatus    @default(AVAILABLE)
+  archivedAt    DateTime?     @map("archived_at") @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  floor         Floor?         @relation(fields: [floorId], references: [id], onDelete: SetNull)
+  unitType      UnitType       @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+  contractUnits ContractUnit[]
+  documents     Document[]
+
+  @@unique([branchId, code])
+  @@index([branchId, status])
+  @@map("units")
+}
+
+// ───────────────────────────── المستأجرون ─────────────────────────────
+
+model Tenant {
+  id                String       @id @default(uuid()) @db.Uuid
+  type              TenantType
+  name              String
+  contactPersonName String?      @map("contact_person_name")
+  mobile            String?
+  email             String?
+  crNumber          String?      @map("cr_number") // السجل التجاري
+  nationalId        String?      @map("national_id") // حساس: يظهر فقط لـ tenants.view_sensitive
+  vatNumber         String?      @map("vat_number")
+  nationalAddress   String?      @map("national_address")
+  primaryBranchId   String?      @map("primary_branch_id") @db.Uuid
+  status            TenantStatus @default(PROSPECT)
+  notes             String?
+  createdById       String?      @map("created_by_id") @db.Uuid
+  updatedById       String?      @map("updated_by_id") @db.Uuid
+  archivedAt        DateTime?    @map("archived_at") @db.Timestamptz(3)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  primaryBranch Branch?             @relation(fields: [primaryBranchId], references: [id], onDelete: SetNull)
+  contacts      TenantContact[]
+  interactions  TenantInteraction[]
+  contracts     Contract[]
+  payments      Payment[]
+  deposits      Deposit[]
+  refunds       Refund[]
+  documents     Document[]
+
+  @@index([name])
+  @@index([mobile])
+  @@index([primaryBranchId])
+  @@map("tenants")
+}
+
+model TenantContact {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  title     String?
+  mobile    String?
+  email     String?
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_contacts")
+}
+
+// سجل التواصل والملاحظات
+model TenantInteraction {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  authorId  String?  @map("author_id") @db.Uuid
+  channel   String? // اتصال، زيارة، بريد، واتساب...
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_interactions")
+}
+
+// ───────────────────────────── العقود ─────────────────────────────
+
+model Contract {
+  id                 String         @id @default(uuid()) @db.Uuid
+  contractNo         String         @unique @map("contract_no")
+  tenantId           String         @map("tenant_id") @db.Uuid
+  branchId           String         @map("branch_id") @db.Uuid
+  status             ContractStatus @default(DRAFT)
+  startDate          DateTime       @map("start_date") @db.Date
+  endDate            DateTime       @map("end_date") @db.Date
+  billingCycle       BillingCycle   @map("billing_cycle")
+  rentAmount         Decimal        @map("rent_amount") @db.Decimal(14, 2) // إجمالي الإيجار قبل الخصم والضريبة
+  discountAmount     Decimal        @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  vatRate            Decimal        @default(0) @map("vat_rate") @db.Decimal(5, 4) // 0.1500 = 15%
+  vatAmount          Decimal        @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  totalAmount        Decimal        @map("total_amount") @db.Decimal(14, 2)
+  depositAmount      Decimal        @default(0) @map("deposit_amount") @db.Decimal(14, 2)
+  terms              String?
+  notes              String?
+  previousContractId String?        @unique @map("previous_contract_id") @db.Uuid
+  currentVersion     Int            @default(1) @map("current_version")
+  submittedAt        DateTime?      @map("submitted_at") @db.Timestamptz(3)
+  approvedById       String?        @map("approved_by_id") @db.Uuid
+  approvedAt         DateTime?      @map("approved_at") @db.Timestamptz(3)
+  endedAt            DateTime?      @map("ended_at") @db.Date
+  endReason          String?        @map("end_reason")
+  createdById        String?        @map("created_by_id") @db.Uuid
+  archivedAt         DateTime?      @map("archived_at") @db.Timestamptz(3)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branch           Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  previousContract Contract?         @relation("ContractRenewal", fields: [previousContractId], references: [id], onDelete: Restrict)
+  renewedBy        Contract?         @relation("ContractRenewal")
+  units            ContractUnit[]
+  versions         ContractVersion[]
+  schedules        PaymentSchedule[]
+  payments         Payment[]
+  deposits         Deposit[]
+  refunds          Refund[]
+  adjustments      Adjustment[]
+  documents        Document[]
+
+  @@index([tenantId])
+  @@index([branchId, status])
+  @@index([status, endDate])
+  @@map("contracts")
+}
+
+model ContractUnit {
+  id              String        @id @default(uuid()) @db.Uuid
+  contractId      String        @map("contract_id") @db.Uuid
+  unitId          String        @map("unit_id") @db.Uuid
+  branchId        String        @map("branch_id") @db.Uuid
+  seats           Int           @default(1) // للوحدات المشتركة
+  price           Decimal       @db.Decimal(14, 2) // سعر هذه الوحدة ضمن العقد لكل دورة
+  startDate       DateTime      @map("start_date") @db.Date
+  endDate         DateTime      @map("end_date") @db.Date
+  // true فقط عندما يكون العقد في حالة تحجز الوحدة (بانتظار الاعتماد/نشط)
+  // قيد EXCLUDE في SQL يمنع التداخل للوحدات الحصرية عندما يكون true
+  blocksOccupancy Boolean       @default(false) @map("blocks_occupancy")
+  occupancyMode   OccupancyMode @default(EXCLUSIVE) @map("occupancy_mode")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  unit     Unit     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  branch   Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@unique([contractId, unitId])
+  @@index([unitId, startDate, endDate])
+  @@map("contract_units")
+}
+
+// لقطة كاملة للعقد عند كل تعديل/اعتماد — لا تُعدَّل ولا تُحذف
+model ContractVersion {
+  id           String   @id @default(uuid()) @db.Uuid
+  contractId   String   @map("contract_id") @db.Uuid
+  versionNo    Int      @map("version_no")
+  snapshot     Json
+  changeReason String?  @map("change_reason")
+  createdById  String?  @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+
+  @@unique([contractId, versionNo])
+  @@map("contract_versions")
+}
+
+// ───────────────────────────── المالية ─────────────────────────────
+
+model PaymentSchedule {
+  id             String         @id @default(uuid()) @db.Uuid
+  contractId     String         @map("contract_id") @db.Uuid
+  seqNo          Int            @map("seq_no")
+  periodStart    DateTime       @map("period_start") @db.Date
+  periodEnd      DateTime       @map("period_end") @db.Date
+  dueDate        DateTime       @map("due_date") @db.Date
+  netAmount      Decimal        @map("net_amount") @db.Decimal(14, 2)
+  vatAmount      Decimal        @default(0) @map("vat_amount") @db.Decimal(14, 2)
+  amountDue      Decimal        @map("amount_due") @db.Decimal(14, 2) // = net + vat
+  // يُحدَّث داخل نفس المعاملة مع payment_allocations/adjustments
+  amountPaid     Decimal        @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  amountAdjusted Decimal        @default(0) @map("amount_adjusted") @db.Decimal(14, 2)
+  status         ScheduleStatus @default(PENDING)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  contract    Contract            @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  allocations PaymentAllocation[]
+  adjustments Adjustment[]
+
+  @@unique([contractId, seqNo])
+  @@index([dueDate, status])
+  @@map("payment_schedules")
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  receiptNo      String?       @unique @map("receipt_no") // يصدر عند الاعتماد
+  tenantId       String        @map("tenant_id") @db.Uuid
+  contractId     String?       @map("contract_id") @db.Uuid
+  branchId       String        @map("branch_id") @db.Uuid
+  amount         Decimal       @db.Decimal(14, 2)
+  method         PaymentMethod
+  referenceNo    String?       @map("reference_no")
+  paidOn         DateTime      @map("paid_on") @db.Date
+  status         PaymentStatus @default(PENDING_REVIEW)
+  // مفتاح يمنع إرسال نفس النموذج مرتين (نقرة مزدوجة/إعادة إرسال)
+  idempotencyKey String        @unique @map("idempotency_key")
+  notes          String?
+  recordedById   String?       @map("recorded_by_id") @db.Uuid
+  approvedById   String?       @map("approved_by_id") @db.Uuid
+  approvedAt     DateTime?     @map("approved_at") @db.Timestamptz(3)
+  rejectedReason String?       @map("rejected_reason")
+  reversalOfId   String?       @unique @map("reversal_of_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contract    Contract?           @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  branch      Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  reversalOf  Payment?            @relation("PaymentReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy  Payment?            @relation("PaymentReversal")
+  allocations PaymentAllocation[]
+  documents   Document[]
+
+  @@index([branchId, paidOn])
+  @@index([tenantId])
+  @@index([status])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id         String          @id @default(uuid()) @db.Uuid
+  paymentId  String          @map("payment_id") @db.Uuid
+  scheduleId String          @map("schedule_id") @db.Uuid
+  amount     Decimal         @db.Decimal(14, 2)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  payment    Payment         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  schedule   PaymentSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, scheduleId])
+  @@index([scheduleId])
+  @@map("payment_allocations")
+}
+
+// مبالغ التأمين — منفصلة تمامًا عن الإيرادات
+model Deposit {
+  id          String         @id @default(uuid()) @db.Uuid
+  contractId  String         @map("contract_id") @db.Uuid
+  tenantId    String         @map("tenant_id") @db.Uuid
+  amount      Decimal        @db.Decimal(14, 2)
+  receivedOn  DateTime?      @map("received_on") @db.Date
+  method      PaymentMethod?
+  referenceNo String?        @map("reference_no")
+  status      DepositStatus  @default(HELD)
+  notes       String?
+  createdById String?        @map("created_by_id") @db.Uuid
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  refunds  Refund[]
+
+  @@index([contractId])
+  @@map("deposits")
+}
+
+model Refund {
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @map("tenant_id") @db.Uuid
+  contractId   String?        @map("contract_id") @db.Uuid
+  depositId    String?        @map("deposit_id") @db.Uuid
+  amount       Decimal        @db.Decimal(14, 2)
+  reason       String
+  method       PaymentMethod?
+  referenceNo  String?        @map("reference_no")
+  status       RefundStatus   @default(PENDING_APPROVAL)
+  refundedOn   DateTime?      @map("refunded_on") @db.Date
+  createdById  String?        @map("created_by_id") @db.Uuid
+  approvedById String?        @map("approved_by_id") @db.Uuid
+  approvedAt   DateTime?      @map("approved_at") @db.Timestamptz(3)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  deposit  Deposit?  @relation(fields: [depositId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("refunds")
+}
+
+// التسويات والخصومات على الاستحقاقات
+model Adjustment {
+  id           String         @id @default(uuid()) @db.Uuid
+  contractId   String         @map("contract_id") @db.Uuid
+  scheduleId   String?        @map("schedule_id") @db.Uuid
+  type         AdjustmentType
+  // موجب = يخفض المستحق (خصم/إعفاء)، سالب = يزيده (تصحيح/رسوم)
+  amount       Decimal        @db.Decimal(14, 2)
+  reason       String
+  createdById  String?        @map("created_by_id") @db.Uuid
+  approvedById String?        @map("approved_by_id") @db.Uuid
+  approvedAt   DateTime?      @map("approved_at") @db.Timestamptz(3)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  contract Contract         @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  schedule PaymentSchedule? @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@map("adjustments")
+}
+
+// عدادات أرقام العقود والإيصالات (تُزاد داخل المعاملة: UPDATE ... RETURNING)
+model NumberSequence {
+  key       String @id // مثال: CONTRACT-2026 أو RECEIPT-2026
+  lastValue Int    @default(0) @map("last_value")
+
+  @@map("number_sequences")
+}
+
+// ───────────────────────────── المستندات والإشعارات والتدقيق ─────────────────────────────
+
+model Document {
+  id           String           @id @default(uuid()) @db.Uuid
+  category     DocumentCategory
+  fileName     String           @map("file_name")
+  mimeType     String           @map("mime_type")
+  sizeBytes    Int              @map("size_bytes")
+  storageKey   String           @unique @map("storage_key") // مسار خاص في التخزين — لا يُعرض مباشرة
+  sha256       String
+  isSensitive  Boolean          @default(false) @map("is_sensitive")
+  tenantId     String?          @map("tenant_id") @db.Uuid
+  contractId   String?          @map("contract_id") @db.Uuid
+  paymentId    String?          @map("payment_id") @db.Uuid
+  unitId       String?          @map("unit_id") @db.Uuid
+  uploadedById String?          @map("uploaded_by_id") @db.Uuid
+  deletedAt    DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([contractId])
+  @@map("documents")
+}
+
+model Notification {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  type       NotificationType
+  title      String
+  body       String?
+  link       String?
+  entityType String?          @map("entity_type")
+  entityId   String?          @map("entity_id")
+  // يمنع تكرار نفس التنبيه لنفس المستخدم (مثال: CONTRACT_EXPIRING:<id>:30)
+  dedupeKey  String?          @map("dedupe_key")
+  readAt     DateTime?        @map("read_at") @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// سجل تدقيق — إضافة فقط (Trigger يمنع التعديل والحذف)
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  userId     String?  @map("user_id") @db.Uuid
+  action     String // مثال: user.create, contract.approve, auth.login_failed
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  branchId   String?  @map("branch_id") @db.Uuid
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  description String?
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("system_settings")
+}
