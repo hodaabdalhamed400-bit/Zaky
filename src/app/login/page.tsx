@@ -12,7 +12,8 @@ export default async function LoginPage() {
       <div className="flex items-center justify-center px-4 py-12 sm:px-8">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <div className="mb-4 grid size-12 place-items-center rounded-xl bg-brand-700 text-xl font-bold text-white">ذ</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/zaki-logo.svg" alt="ذكي لحاضنات ومسرعات الأعمال" width={240} height={92} className="mb-8 h-20 w-auto" />
             <h1 className="text-2xl font-bold text-gray-900">تسجيل الدخول</h1>
             <p className="mt-1 text-sm text-gray-500">ZAKI Smart ERP — نظام إدارة الفروع والعقود والتحصيل</p>
           </div>
@@ -23,10 +24,13 @@ export default async function LoginPage() {
         </div>
       </div>
       <div className="relative hidden overflow-hidden bg-brand-900 lg:block">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(30,173,192,0.28),transparent_55%)]" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/zaki-mark-white.svg" alt="" aria-hidden="true" className="absolute -end-16 top-16 h-80 w-auto opacity-10" />
         <div className="relative flex h-full flex-col justify-end p-12 text-white">
           <p className="text-3xl font-bold leading-snug">إدارة مركزية لجميع فروع ذكي</p>
-          <p className="mt-3 max-w-md text-brand-100/80">
+          <div className="mt-5 h-1 w-16 rounded-full bg-accent-500" />
+          <p className="mt-4 max-w-md text-brand-100/80">
             الفروع والمكاتب والمستأجرون والعقود والتحصيل في مكان واحد، مع صلاحيات دقيقة لكل مستخدم.
           </p>
         </div>

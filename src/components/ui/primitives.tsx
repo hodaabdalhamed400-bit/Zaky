@@ -69,7 +69,7 @@ const BADGE = {
   red: "bg-red-50 text-red-700 ring-red-600/20",
   amber: "bg-amber-50 text-amber-800 ring-amber-600/20",
   blue: "bg-sky-50 text-sky-700 ring-sky-600/20",
-  brand: "bg-brand-50 text-brand-700 ring-brand-600/20",
+  brand: "bg-accent-50 text-accent-700 ring-accent-600/20",
 };
 export function Badge({ children, color = "gray" }: { children: React.ReactNode; color?: keyof typeof BADGE }) {
   return (
@@ -123,7 +123,7 @@ export function Td({ children, className }: { children?: React.ReactNode; classN
 }
 
 export const inputClass =
-  "block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:bg-gray-100";
+  "block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/30 disabled:bg-gray-100";
 
 export function Field({
   label,

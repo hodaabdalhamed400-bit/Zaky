@@ -74,8 +74,8 @@ const VIEW_BASICS: PermissionKey[] = [
 ];
 
 /**
- * الصلاحيات الافتراضية لكل دور — مقترح أولي يحتاج تأكيد الإدارة
- * (راجع docs/BUSINESS_RULES_QUESTIONS.md).
+ * الصلاحيات الافتراضية لكل دور — اعتمدتها الإدارة (نوفمبر 2026)،
+ * مع منح مدير الفرع اعتماد العقود والتحصيل. راجع docs/BUSINESS_RULES.md.
  */
 export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
   SUPER_ADMIN: {
@@ -110,7 +110,8 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
   },
   BRANCH_MANAGER: {
     nameAr: "مدير الفرع",
-    description: "إدارة الوحدات والمستأجرين والعقود في فروعه فقط",
+    // معتمد من الإدارة: مسؤول الفرع هو من يعتمد العقود والتحصيل في فرعه
+    description: "إدارة الوحدات والمستأجرين والعقود واعتماد العقود والتحصيل في فروعه فقط",
     allBranches: false,
     permissions: [
       ...VIEW_BASICS,
@@ -119,8 +120,10 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
       "tenants.view_sensitive",
       "contracts.create",
       "contracts.edit",
+      "contracts.approve",
       "payments.view",
       "payments.record",
+      "payments.approve",
       "documents.upload",
       "documents.view_sensitive",
       "reports.view",

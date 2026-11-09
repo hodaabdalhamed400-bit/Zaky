@@ -32,7 +32,7 @@ export async function validateSession(db: Db, token: string | null | undefined, 
       user: {
         include: {
           role: { include: { permissions: { include: { permission: true } } } },
-          branchAccess: { where: { branch: { isActive: true } }, select: { branchId: true } },
+          branchAccess: { where: { branch: { status: { not: "INACTIVE" } } }, select: { branchId: true } },
         },
       },
     },

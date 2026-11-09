@@ -15,6 +15,7 @@ import { dateOnly, todayInRiyadh, addDays } from "@/lib/dates";
  */
 export type DashboardStats = {
   branches: number;
+  preparingBranches: number;
   units: number;
   rentedUnits: number;
   availableUnits: number;
@@ -47,8 +48,9 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
   const branchWhere = branchIds === null ? {} : { id: { in: branchIds } };
   const scoped = branchIds === null ? {} : { branchId: { in: branchIds } };
 
-  const [branches, units, rented, available, activeContracts, expiring, money] = await Promise.all([
-    db.branch.count({ where: { isActive: true, ...branchWhere } }),
+  const [branches, preparingBranches, units, rented, available, activeContracts, expiring, money] = await Promise.all([
+    db.branch.count({ where: { status: "ACTIVE", ...branchWhere } }),
+    db.branch.count({ where: { status: "PREPARING", ...branchWhere } }),
     db.unit.count({ where: { archivedAt: null, status: { not: "INACTIVE" }, ...scoped } }),
     db.$queryRaw<{ n: bigint }[]>`
       SELECT COUNT(DISTINCT cu.unit_id) AS n
@@ -87,6 +89,7 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
   const m = money[0];
   return {
     branches,
+    preparingBranches,
     units,
     rentedUnits,
     availableUnits: available,

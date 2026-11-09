@@ -43,7 +43,7 @@ prisma/
   schema.prisma                 مخطط قاعدة البيانات الكامل (كل المراحل)
   migrations/…_init             الجداول
   migrations/…_constraints      EXCLUDE / CHECK / Triggers / فهارس جزئية
-  seed-data.ts, seed.ts         الصلاحيات، الأدوار، الفروع السبعة، أنواع الوحدات، الإعدادات (بدون مستخدمين)
+  seed-data.ts, seed.ts         الصلاحيات، الأدوار، الفروع الـ11، أنواع الوحدات، الإعدادات (بدون مستخدمين)
 scripts/create-admin.ts         إنشاء مسؤول النظام الأول من سطر الأوامر
 src/
   middleware.ts

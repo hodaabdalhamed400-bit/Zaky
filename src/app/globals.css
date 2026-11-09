@@ -1,18 +1,29 @@
 @import "tailwindcss";
 
 /*
- * ألوان مؤقتة محايدة — تُستبدل بهوية شركة ذكي المعتمدة عند توفيرها
- * (تعديل هذه القيم فقط يكفي لتغيير هوية النظام بالكامل).
+ * هوية شركة ذكي المعتمدة (docs/brand-identity.pdf):
+ *   الكحلي  #132E4B  — اللون الأساسي (brand-900)
+ *   السماوي #1EADC0  — اللون المساند (accent-500)
+ * تعديل هذه القيم فقط يغيّر هوية النظام بالكامل.
  */
 @theme {
   --font-sans: var(--font-arabic), "Segoe UI", Tahoma, system-ui, sans-serif;
-  --color-brand-50: #eef7f6;
-  --color-brand-100: #d5ecea;
-  --color-brand-200: #aed9d5;
-  --color-brand-500: #1f8a82;
-  --color-brand-600: #187069;
-  --color-brand-700: #145a55;
-  --color-brand-900: #0c3633;
+  /* درجات الكحلي */
+  --color-brand-50: #eef3f8;
+  --color-brand-100: #d6e1ec;
+  --color-brand-200: #a9bdd2;
+  --color-brand-500: #2f5680;
+  --color-brand-600: #22446a;
+  --color-brand-700: #1a3a5c;
+  --color-brand-800: #163352;
+  --color-brand-900: #132e4b;
+  /* درجات السماوي */
+  --color-accent-50: #e8f7f9;
+  --color-accent-100: #c9eef3;
+  --color-accent-300: #6fcfdc;
+  --color-accent-500: #1eadc0;
+  --color-accent-600: #1891a1;
+  --color-accent-700: #137482;
 }
 
 :root {
@@ -30,6 +41,6 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brand-500);
+  outline: 2px solid var(--color-accent-500);
   outline-offset: 2px;
 }

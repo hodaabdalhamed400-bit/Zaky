@@ -18,6 +18,11 @@ describe("الصلاحيات حسب الدور", () => {
     expect(can(ro, "tenants.view_sensitive")).toBe(false);
     expect(can(acc, "payments.approve")).toBe(true);
     expect(can(acc, "users.view")).toBe(false);
+    // قرار معتمد: مدير الفرع يعتمد العقود والتحصيل في فرعه
+    const { actor: bm } = await makeActor("BRANCH_MANAGER", { branchCodes: ["GRN"] });
+    expect(can(bm, "contracts.approve")).toBe(true);
+    expect(can(bm, "payments.approve")).toBe(true);
+    expect(can(bm, "users.manage")).toBe(false);
   });
 
   it("مدير الفرع لا يصل إلى فرع آخر", async () => {
@@ -29,6 +34,16 @@ describe("الصلاحيات حسب الدور", () => {
     await expect(getDashboardStats(prisma, actor, { branchId: tbk.id })).rejects.toThrow(/الفرع/);
     const visible = await prisma.branch.findMany({ where: branchWhere(actor, "id") });
     expect(visible.map((b) => b.code)).toEqual(["GRN"]);
+  });
+
+  it("الفرع قيد التجهيز متاح لموظفيه، والفرع الموقوف يُسحب من صلاحياتهم دون حذف بياناته", async () => {
+    const b = await prisma.branch.create({ data: { code: `S${Date.now() % 100000}`, nameAr: `فرع حالة ${Date.now()}`, status: "PREPARING" } });
+    const { user, token } = await makeActor("BRANCH_MANAGER");
+    await prisma.userBranchAccess.create({ data: { userId: user.id, branchId: b.id } });
+    expect((await validateSession(prisma, token))?.branchIds).toEqual([b.id]);
+    await prisma.branch.update({ where: { id: b.id }, data: { status: "INACTIVE" } });
+    expect((await validateSession(prisma, token))?.branchIds).toEqual([]);
+    expect(await prisma.userBranchAccess.count({ where: { branchId: b.id } })).toBe(1);
   });
 
   it("مستخدم بلا صلاحية users.view لا يستطيع عرض المستخدمين", async () => {

@@ -38,3 +38,48 @@ export function addDays(ymd: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+function daysInMonth(year: number, month0: number): number {
+  return new Date(Date.UTC(year, month0 + 1, 0)).getUTCDate();
+}
+
+/**
+ * يضيف أشهرًا مع الحفاظ على يوم البداية، وإن لم يوجد في الشهر الهدف يُستخدم آخر يوم فيه
+ * (مثال: 31 يناير + شهر = 28/29 فبراير، ثم 31 مارس).
+ */
+export function addMonthsKeepDay(startYmd: string, months: number): string {
+  const [y, m, d] = startYmd.split("-").map(Number) as [number, number, number];
+  dateOnly(startYmd);
+  const total = m - 1 + months;
+  const year = y + Math.floor(total / 12);
+  const month0 = ((total % 12) + 12) % 12;
+  const day = Math.min(d, daysInMonth(year, month0));
+  return `${year}-${String(month0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/**
+ * تواريخ استحقاق الأقساط — قرار معتمد: القسط يستحق في نفس يوم بداية العقد
+ * (عقد يبدأ يوم 12 ⇐ الاستحقاق يوم 12 من كل دورة). الفترة الأولى تبدأ يوم بداية العقد.
+ * @param cycleMonths 1 شهري، 3 ربع سنوي، 6 نصف سنوي، 12 سنوي
+ */
+export function installmentPeriods(startYmd: string, endYmd: string, cycleMonths: number) {
+  if (!Number.isInteger(cycleMonths) || cycleMonths < 1) throw new Error("دورة الدفع غير صحيحة");
+  if (endYmd < startYmd) throw new Error("تاريخ النهاية قبل البداية");
+  const periods: { seqNo: number; periodStart: string; periodEnd: string; dueDate: string }[] = [];
+  for (let i = 0; ; i++) {
+    const periodStart = addMonthsKeepDay(startYmd, i * cycleMonths);
+    if (periodStart > endYmd) break;
+    const nextStart = addMonthsKeepDay(startYmd, (i + 1) * cycleMonths);
+    const periodEnd = addDays(nextStart, -1) < endYmd ? addDays(nextStart, -1) : endYmd;
+    periods.push({ seqNo: i + 1, periodStart, periodEnd, dueDate: periodStart });
+  }
+  return periods;
+}
+
+/**
+ * قرار معتمد: لا توجد مهلة سماح. القسط غير المسدد بالكامل يصبح متأخرًا
+ * بمجرد انتهاء يوم استحقاقه (بتوقيت الرياض)، أي من اليوم التالي.
+ */
+export function isOverdue(dueYmd: string, todayYmd = todayInRiyadh()): boolean {
+  return todayYmd > dueYmd;
+}

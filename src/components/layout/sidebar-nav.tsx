@@ -14,7 +14,7 @@ function NavLinks({ sections, onNavigate }: { sections: Section[]; onNavigate?: 
     <nav aria-label="القائمة الرئيسية" className="space-y-5">
       {sections.map((s, i) => (
         <div key={i}>
-          {s.title && <p className="mb-1.5 px-3 text-xs font-semibold text-brand-200/80">{s.title}</p>}
+          {s.title && <p className="mb-1.5 px-3 text-xs font-semibold text-accent-300/80">{s.title}</p>}
           <ul className="space-y-0.5">
             {s.items.map((item) => {
               const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -40,7 +40,9 @@ function NavLinks({ sections, onNavigate }: { sections: Section[]; onNavigate?: 
                     aria-current={active ? "page" : undefined}
                     className={cx(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                      active ? "bg-white/15 font-semibold text-white" : "text-brand-50/85 hover:bg-white/10 hover:text-white",
+                      active
+                        ? "bg-white/10 font-semibold text-white shadow-[inset_-3px_0_0_var(--color-accent-500)]"
+                        : "text-brand-50/85 hover:bg-white/10 hover:text-white",
                     )}
                   >
                     <Icon name={item.icon} className="size-4.5" />
@@ -62,20 +64,19 @@ export function SidebarNav({ sections, footer }: { sections: Section[]; footer: 
   useEffect(() => setOpen(false), [pathname]);
 
   const brand = (
-    <div className="flex items-center gap-2.5 px-3">
-      <div className="grid size-9 place-items-center rounded-lg bg-white/15 text-lg font-bold text-white">ذ</div>
-      <div>
-        <p className="text-sm font-bold text-white">ZAKI Smart ERP</p>
-        <p className="text-[11px] text-brand-100/70">شركة ذكي لحاضنات ومسرعات الأعمال</p>
-      </div>
+    <div className="px-3">
+      {/* eslint-disable-next-line @next/next/no-img-element -- SVG ثابت */}
+      <img src="/brand/zaki-logo-white.svg" alt="ذكي لحاضنات ومسرعات الأعمال" width={168} height={64} className="h-14 w-auto" />
+      <p className="mt-1.5 text-[11px] font-medium tracking-wide text-accent-300">ZAKI Smart ERP</p>
     </div>
   );
 
   return (
     <>
       {/* شريط علوي للجوال */}
-      <div className="sticky top-0 z-30 flex items-center justify-between bg-brand-900 px-4 py-3 lg:hidden">
-        {brand}
+      <div className="sticky top-0 z-30 flex items-center justify-between bg-brand-900 px-4 py-2.5 lg:hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/zaki-logo-white.svg" alt="ذكي لحاضنات ومسرعات الأعمال" width={126} height={48} className="h-10 w-auto" />
         <button
           type="button"
           onClick={() => setOpen(true)}

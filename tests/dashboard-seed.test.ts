@@ -12,7 +12,14 @@ describe("البيانات المرجعية", () => {
     const usersBefore = await prisma.user.count();
     await seedReferenceData(prisma);
     await seedReferenceData(prisma);
-    expect(await prisma.branch.count({ where: { code: { in: INITIAL_BRANCHES.map((b) => b.code) } } })).toBe(7);
+    expect(INITIAL_BRANCHES).toHaveLength(11);
+    expect(await prisma.branch.count({ where: { code: { in: INITIAL_BRANCHES.map((b) => b.code) } } })).toBe(11);
+    expect(await prisma.branch.count({ where: { code: { in: INITIAL_BRANCHES.map((b) => b.code) }, status: "ACTIVE" } })).toBe(7);
+    expect(await prisma.branch.count({ where: { code: { in: INITIAL_BRANCHES.map((b) => b.code) }, status: "PREPARING" } })).toBe(4);
+    const imu = await prisma.branch.findUniqueOrThrow({ where: { code: "IMU" } });
+    expect(imu).toMatchObject({ nameAr: "جامعة الإمام", managerName: "حنان", managerActing: true, phone: "0500510051" });
+    const grn = await prisma.branch.findUniqueOrThrow({ where: { code: "GRN" } });
+    expect(grn).toMatchObject({ status: "PREPARING", managerName: null });
     expect(await prisma.role.count()).toBe(ROLE_KEYS.length);
     expect(await prisma.permission.count()).toBe(ALL_PERMISSIONS.length);
     expect(await prisma.user.count()).toBe(usersBefore);

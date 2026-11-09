@@ -19,7 +19,7 @@ export default async function RolesPage() {
       <PageHeader title="الأدوار والصلاحيات" description="مصفوفة الصلاحيات الحالية لكل دور. يتم التحقق منها على الخادم في كل عملية." />
       <div className="mb-4">
         <Alert kind="info">
-          هذه الصلاحيات مقترح أولي بانتظار اعتماد الإدارة. تعديل المصفوفة يتم حاليًا من ملف التعريف{" "}
+          توزيع الصلاحيات معتمد من الإدارة (مدير الفرع يعتمد العقود والتحصيل في فرعه). تعديل المصفوفة يتم حاليًا من ملف التعريف{" "}
           <code dir="ltr" className="rounded bg-white/60 px-1">src/lib/rbac/permissions.ts</code> ثم تشغيل{" "}
           <code dir="ltr" className="rounded bg-white/60 px-1">npm run db:seed</code>.
         </Alert>

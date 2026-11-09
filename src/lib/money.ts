@@ -27,3 +27,16 @@ export function formatSAR(v: Prisma.Decimal.Value | null | undefined): string {
   // Intl يقبل النص الرقمي بدقة كاملة في Node 20+
   return `${sarFmt.format(d.toFixed(2) as unknown as number)} ر.س`;
 }
+
+/**
+ * فصل الضريبة من مبلغ شامل لها (الإيجارات في ذكي شاملة الضريبة — قرار معتمد).
+ * net = round(gross / (1 + rate), 2) و vat = gross − net، فيبقى net + vat = gross بالضبط.
+ */
+export function splitVatInclusive(gross: Prisma.Decimal.Value, rate: Prisma.Decimal.Value) {
+  const g = money(gross);
+  const r = new Prisma.Decimal(rate);
+  if (g.isNegative()) throw new Error("المبلغ لا يمكن أن يكون سالبًا");
+  if (r.isNegative() || r.gte(1)) throw new Error("نسبة الضريبة غير صحيحة");
+  const net = g.div(r.plus(1)).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+  return { gross: g, net, vat: g.minus(net) };
+}

@@ -24,6 +24,12 @@ enum PricingCycle {
   YEAR
 }
 
+enum BranchStatus {
+  ACTIVE // عامل
+  PREPARING // قيد التجهيز (لم يُفتتح بعد)
+  INACTIVE // موقوف — تبقى بياناته التاريخية
+}
+
 enum UnitStatus {
   AVAILABLE // متاحة
   RESERVED // محجوزة
@@ -245,20 +251,22 @@ model LoginAttempt {
 // ───────────────────────────── الفروع والوحدات ─────────────────────────────
 
 model Branch {
-  id            String    @id @default(uuid()) @db.Uuid
-  code          String    @unique
-  nameAr        String    @unique @map("name_ar")
+  id            String       @id @default(uuid()) @db.Uuid
+  code          String       @unique
+  nameAr        String       @unique @map("name_ar")
   city          String?
   address       String?
-  mapUrl        String?   @map("map_url")
-  managerName   String?   @map("manager_name")
-  contactPerson String?   @map("contact_person")
+  mapUrl        String?      @map("map_url")
+  managerName   String?      @map("manager_name")
+  // المدير مكلف مؤقتًا (بالإنابة)
+  managerActing Boolean      @default(false) @map("manager_acting")
+  contactPerson String?      @map("contact_person")
   phone         String?
   notes         String?
-  isActive      Boolean   @default(true) @map("is_active")
-  archivedAt    DateTime? @map("archived_at") @db.Timestamptz(3)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  status        BranchStatus @default(ACTIVE)
+  archivedAt    DateTime?    @map("archived_at") @db.Timestamptz(3)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   floors        Floor[]
   units         Unit[]
@@ -268,6 +276,7 @@ model Branch {
   userAccess    UserBranchAccess[]
   contractUnits ContractUnit[]
 
+  @@index([status])
   @@map("branches")
 }
 

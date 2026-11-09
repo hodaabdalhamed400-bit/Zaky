@@ -251,7 +251,7 @@ export async function listAssignableOptions(db: Db, actor: Actor) {
       include: { permissions: { include: { permission: true } } },
     }),
     db.branch.findMany({
-      where: actor.allBranches ? { isActive: true } : { isActive: true, id: { in: [...actor.branchIds] } },
+      where: { status: { not: "INACTIVE" }, ...(actor.allBranches ? {} : { id: { in: [...actor.branchIds] } }) },
       orderBy: { code: "asc" },
       select: { id: true, nameAr: true, code: true },
     }),

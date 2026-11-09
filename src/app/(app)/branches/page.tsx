@@ -6,11 +6,18 @@ import { Alert, Badge, Card, EmptyState, PageHeader, Table, Td, Th } from "@/com
 
 export const metadata: Metadata = { title: "الفروع" };
 
+const STATUS = {
+  ACTIVE: { label: "عامل", color: "green" },
+  PREPARING: { label: "قيد التجهيز", color: "amber" },
+  INACTIVE: { label: "موقوف", color: "gray" },
+} as const;
+
 export default async function BranchesPage() {
   const actor = await requirePageActor("branches.view");
   const branches = await prisma.branch.findMany({
     where: branchWhere(actor, "id"),
-    orderBy: { code: "asc" },
+    // العاملة أولًا ثم قيد التجهيز ثم الموقوفة
+    orderBy: [{ status: "asc" }, { nameAr: "asc" }],
     include: { _count: { select: { units: { where: { archivedAt: null } } } } },
   });
 
@@ -19,7 +26,7 @@ export default async function BranchesPage() {
       <PageHeader title="الفروع" description="الفروع المصرح لك بالاطلاع عليها." />
       <div className="mb-4">
         <Alert kind="info">
-          عرض للقراءة فقط في المرحلة الأولى. إضافة الفروع وتعديل بياناتها (المدينة، العنوان، المدير، رقم التواصل) تُفعَّل في المرحلة الثانية.
+          عرض للقراءة فقط في المرحلة الأولى. إضافة الفروع وتعديل بياناتها (العنوان، رابط الخريطة، المدير) تُفعَّل في المرحلة الثانية.
         </Alert>
       </div>
       <Card>
@@ -29,10 +36,11 @@ export default async function BranchesPage() {
           <Table>
             <thead>
               <tr>
-                <Th>الرمز</Th>
                 <Th>الفرع</Th>
+                <Th>الرمز</Th>
                 <Th>المدينة</Th>
                 <Th>المدير</Th>
+                <Th>رقم التواصل</Th>
                 <Th>عدد الوحدات</Th>
                 <Th>الحالة</Th>
               </tr>
@@ -40,12 +48,22 @@ export default async function BranchesPage() {
             <tbody>
               {branches.map((b) => (
                 <tr key={b.id}>
-                  <Td><span dir="ltr" className="font-mono text-xs">{b.code}</span></Td>
                   <Td className="font-medium">{b.nameAr}</Td>
+                  <Td><span dir="ltr" className="font-mono text-xs">{b.code}</span></Td>
                   <Td>{b.city ?? <span className="text-gray-400">غير محدد</span>}</Td>
-                  <Td>{b.managerName ?? <span className="text-gray-400">غير محدد</span>}</Td>
+                  <Td>
+                    {b.managerName ? (
+                      <>
+                        {b.managerName}
+                        {b.managerActing && <span className="ms-1.5"><Badge color="blue">مؤقت</Badge></span>}
+                      </>
+                    ) : (
+                      <span className="text-gray-400">لم يُحدد بعد</span>
+                    )}
+                  </Td>
+                  <Td>{b.phone ? <a href={`tel:${b.phone}`} dir="ltr" className="tabular text-brand-700 hover:underline">{b.phone}</a> : "—"}</Td>
                   <Td className="tabular">{b._count.units}</Td>
-                  <Td>{b.isActive ? <Badge color="green">نشط</Badge> : <Badge>موقوف</Badge>}</Td>
+                  <Td><Badge color={STATUS[b.status].color}>{STATUS[b.status].label}</Badge></Td>
                 </tr>
               ))}
             </tbody>

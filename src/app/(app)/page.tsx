@@ -17,7 +17,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const { branch } = await searchParams;
 
   const branches = await prisma.branch.findMany({
-    where: { isActive: true, ...(actor.allBranches ? {} : { id: { in: [...actor.branchIds] } }) },
+    where: { status: { not: "INACTIVE" }, ...(actor.allBranches ? {} : { id: { in: [...actor.branchIds] } }) },
     orderBy: { code: "asc" },
     select: { id: true, nameAr: true },
   });
@@ -62,7 +62,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="الفروع النشطة" value={String(s.branches)} icon="branches" />
+        <StatCard label="الفروع العاملة" value={String(s.branches)} hint={s.preparingBranches ? `+ ${s.preparingBranches} قيد التجهيز` : undefined} icon="branches" />
         <StatCard label="إجمالي الوحدات" value={String(s.units)} icon="units" />
         <StatCard label="الوحدات المؤجرة" value={String(s.rentedUnits)} icon="units" tone="good" />
         <StatCard label="الوحدات المتاحة" value={String(s.availableUnits)} icon="units" />
