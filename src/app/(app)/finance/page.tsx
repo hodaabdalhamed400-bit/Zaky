@@ -91,7 +91,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         </ul>
       </details>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className="stagger mt-6 grid gap-6">
         <Card>
           <CardHeader title="حسب الفرع" />
           <Table>
@@ -124,7 +124,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
               ))}
             </tbody>
           </Table>
-          <p className="border-t border-gray-100 px-5 py-2 text-xs text-gray-400">النسبة تقريبية: المحصّل في الشهر قد يخص أقساط أشهر أخرى. الرسوم البيانية في المرحلة الخامسة.</p>
+          <p className="border-t border-gray-100 px-5 py-2 text-xs text-gray-400">النسبة تقريبية: المحصّل في الشهر قد يخص أقساط أشهر أخرى.</p>
         </Card>
       </div>
     </>
