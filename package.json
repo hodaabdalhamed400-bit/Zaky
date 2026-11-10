@@ -27,7 +27,8 @@
     "test:e2e:phase6": "node tests/e2e/phase6.mjs",
     "backup": "bash scripts/backup.sh",
     "restore": "bash scripts/restore.sh",
-    "backup:verify": "tsx scripts/verify-restore.ts"
+    "backup:verify": "tsx scripts/verify-restore.ts",
+    "admin:reset-password": "tsx scripts/reset-password.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",
