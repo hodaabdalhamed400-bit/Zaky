@@ -65,7 +65,7 @@ describe("تفعيل التحقق الثنائي", () => {
     const { actor: b } = await makeActor("ACCOUNTANT", { branchCodes: ["IZD"] });
     const ta = await beginEnrollment(prisma, a);
     await beginEnrollment(prisma, b);
-    await expect(confirmEnrollment(prisma, b, totpAt(ta.secret, currentStep()), {}, ta.ticket)).rejects.toThrow(/غير صحيح/);
+    await expect(confirmEnrollment(prisma, b, totpAt(ta.secret, currentStep()), {}, ta.ticket)).rejects.toThrow(/بحساب آخر في نفس المتصفح/);
     await expect(confirmEnrollment(prisma, a, totpAt(ta.secret, currentStep() - 4), {}, ta.ticket)).rejects.toThrow(/متأخر بنحو 120 ثانية/);
   });
 });

@@ -66,13 +66,17 @@ export async function beginEnrollment(db: Db, actor: Actor) {
 
 function secretFromTicket(actorId: string, ticket: string | undefined): string | null {
   if (!ticket) return null;
+  let t: { u: string; s: string; t: number };
   try {
-    const t = JSON.parse(open(ticket)) as { u: string; s: string; t: number };
-    if (t.u !== actorId || Date.now() - t.t > TICKET_MINUTES * 60_000) return null;
-    return t.s;
+    t = JSON.parse(open(ticket));
   } catch {
     return null;
   }
+  // الجلسة في المتصفح تتغير لكل التبويبات عند الدخول بحساب آخر
+  if (t.u !== actorId)
+    throw new AppError("OTHER_ACCOUNT", "تم تسجيل الدخول بحساب آخر في نفس المتصفح بعد بدء التفعيل. سجّل الخروج، وادخل بالحساب المطلوب وحده، ثم ابدأ التفعيل من جديد.");
+  if (Date.now() - t.t > TICKET_MINUTES * 60_000) return null;
+  return t.s;
 }
 
 /** تشخيص: هل الرمز صحيح لكن وقت الجوال مختلف؟ يُرجع الفرق بالثواني (للتأكيد فقط، لا يُقبل للدخول). */
