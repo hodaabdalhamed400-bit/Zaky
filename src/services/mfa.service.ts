@@ -8,7 +8,7 @@ import type { Actor, RequestMeta } from "@/lib/auth/actor";
 import { generateSessionToken, hashToken } from "@/lib/auth/tokens";
 import { createSession, revokeAllUserSessions } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/rbac/guard";
-import { generateSecret, normalizeDigits, otpauthUri, verifyTotp } from "@/lib/totp";
+import { currentStep, generateSecret, normalizeDigits, otpauthUri, STEP_SECONDS, totpAt, verifyTotp } from "@/lib/totp";
 import { open, seal } from "@/lib/secret-box";
 
 /** إعدادات الفرض: الأدوار الإدارية تتطلب التحقق الثنائي (المواصفات: "دعم المصادقة متعددة العوامل للإدارة"). */
@@ -46,7 +46,13 @@ function newRecoveryCodes() {
 
 // ───── التفعيل ─────
 
-/** يبدأ التفعيل: سر جديد يُخزَّن مشفرًا وغير مفعّل حتى يُؤكد برمز صحيح. */
+const TICKET_MINUTES = 30;
+
+/**
+ * يبدأ التفعيل: سر جديد غير مفعّل حتى يُؤكد برمز صحيح.
+ * يُعاد معه "تذكرة" مشفرة (السر + المستخدم + الوقت) تُرسل مع التأكيد، فيُتحقق من نفس السر
+ * المعروض في الصفحة حتى لو بُدئ التفعيل مرة أخرى في تبويب آخر.
+ */
 export async function beginEnrollment(db: Db, actor: Actor) {
   const u = await db.user.findUniqueOrThrow({ where: { id: actor.id } });
   if (u.mfaEnabled) throw new AppError("STATE", "التحقق الثنائي مفعّل بالفعل");
@@ -54,18 +60,45 @@ export async function beginEnrollment(db: Db, actor: Actor) {
   await db.user.update({ where: { id: actor.id }, data: { mfaSecretEnc: seal(secret), mfaLastStep: null } });
   const uri = otpauthUri(secret, u.email);
   const qrSvg = await QRCode.toString(uri, { type: "svg", errorCorrectionLevel: "M", margin: 1 });
-  return { secret, uri, qrSvg };
+  const ticket = seal(JSON.stringify({ u: actor.id, s: secret, t: Date.now() }));
+  return { secret, uri, qrSvg, ticket };
 }
 
-export async function confirmEnrollment(db: Db, actor: Actor, code: string, meta: RequestMeta = {}) {
+function secretFromTicket(actorId: string, ticket: string | undefined): string | null {
+  if (!ticket) return null;
+  try {
+    const t = JSON.parse(open(ticket)) as { u: string; s: string; t: number };
+    if (t.u !== actorId || Date.now() - t.t > TICKET_MINUTES * 60_000) return null;
+    return t.s;
+  } catch {
+    return null;
+  }
+}
+
+/** تشخيص: هل الرمز صحيح لكن وقت الجوال مختلف؟ يُرجع الفرق بالثواني (للتأكيد فقط، لا يُقبل للدخول). */
+function clockSkew(secret: string, code: string): number | null {
+  const c = normalizeDigits(code).replace(/\s/g, "");
+  if (!/^\d{6}$/.test(c)) return null;
+  const cur = currentStep();
+  for (let d = 2; d <= 20; d++) for (const k of [cur - d, cur + d]) if (totpAt(secret, k) === c) return (k - cur) * STEP_SECONDS;
+  return null;
+}
+
+export async function confirmEnrollment(db: Db, actor: Actor, code: string, meta: RequestMeta = {}, ticket?: string) {
   const u = await db.user.findUniqueOrThrow({ where: { id: actor.id } });
   if (u.mfaEnabled) throw new AppError("STATE", "التحقق الثنائي مفعّل بالفعل");
-  if (!u.mfaSecretEnc) throw new AppError("STATE", "ابدأ التفعيل أولًا");
-  const step = verifyTotp(open(u.mfaSecretEnc), code, null);
-  if (step === null) throw new AppError("BAD_CODE", "الرمز غير صحيح. تأكد من ضبط وقت الجوال وأعد المحاولة.");
+  const secret = secretFromTicket(actor.id, ticket) ?? (u.mfaSecretEnc ? open(u.mfaSecretEnc) : null);
+  if (!secret) throw new AppError("STATE", "انتهت مهلة التفعيل. حدّث الصفحة وابدأ من جديد.");
+  const step = verifyTotp(secret, code, null);
+  if (step === null) {
+    const skew = clockSkew(secret, code);
+    if (skew !== null)
+      throw new AppError("CLOCK", `الرمز صحيح لكن وقت الجوال ${skew > 0 ? "متقدم" : "متأخر"} بنحو ${Math.abs(skew)} ثانية. فعّل "ضبط الوقت تلقائيًا" في الجوال ثم أعد المحاولة.`);
+    throw new AppError("BAD_CODE", "الرمز غير صحيح. احذف أي حساب قديم باسم ZAKI Smart ERP من التطبيق، وامسح الرمز الظاهر الآن، ثم أدخل الرقم الحالي.");
+  }
   const codes = newRecoveryCodes();
   await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: actor.id }, data: { mfaEnabled: true, mfaLastStep: step, mfaRecoveryHashes: codes.map(hashCode) } });
+    await tx.user.update({ where: { id: actor.id }, data: { mfaEnabled: true, mfaSecretEnc: seal(secret), mfaLastStep: step, mfaRecoveryHashes: codes.map(hashCode) } });
     // جلسات أخرى قديمة تُنهى؛ الجلسة الحالية تبقى
     await revokeAllUserSessions(tx, actor.id, actor.sessionId ?? undefined);
     await writeAudit(tx, { actorId: actor.id, action: "auth.mfa_enabled", entityType: "user", entityId: actor.id, meta });

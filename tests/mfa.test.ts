@@ -48,6 +48,28 @@ async function enrolled(role: "SUPER_ADMIN" | "ACCOUNTANT" = "ACCOUNTANT") {
   return { actor, user, secret, recoveryCodes };
 }
 
+describe("تفعيل التحقق الثنائي", () => {
+  it("التأكيد يستخدم المفتاح المعروض حتى لو بُدئ التفعيل مرة أخرى في تبويب آخر", async () => {
+    const { actor } = await makeActor("ACCOUNTANT", { branchCodes: ["IZD"] });
+    const first = await beginEnrollment(prisma, actor);
+    await beginEnrollment(prisma, actor); // تبويب آخر غيّر المفتاح المحفوظ
+    await expect(confirmEnrollment(prisma, actor, totpAt(first.secret, currentStep()))).rejects.toThrow(/غير صحيح/);
+    const r = await confirmEnrollment(prisma, actor, totpAt(first.secret, currentStep()), {}, first.ticket);
+    expect(r.recoveryCodes).toHaveLength(8);
+    const u = await prisma.user.findUniqueOrThrow({ where: { id: actor.id } });
+    expect(open(u.mfaSecretEnc!)).toBe(first.secret);
+  });
+
+  it("تذكرة مستخدم آخر لا تُقبل، ويُشخَّص فرق وقت الجوال", async () => {
+    const { actor: a } = await makeActor("ACCOUNTANT", { branchCodes: ["IZD"] });
+    const { actor: b } = await makeActor("ACCOUNTANT", { branchCodes: ["IZD"] });
+    const ta = await beginEnrollment(prisma, a);
+    await beginEnrollment(prisma, b);
+    await expect(confirmEnrollment(prisma, b, totpAt(ta.secret, currentStep()), {}, ta.ticket)).rejects.toThrow(/غير صحيح/);
+    await expect(confirmEnrollment(prisma, a, totpAt(ta.secret, currentStep() - 4), {}, ta.ticket)).rejects.toThrow(/متأخر بنحو 120 ثانية/);
+  });
+});
+
 describe("الدخول بالتحقق الثنائي", () => {
   it("كلمة المرور وحدها لا تنشئ جلسة؛ الرمز الصحيح يكمل الدخول ولا يُعاد استخدامه", async () => {
     const { user, secret } = await enrolled();

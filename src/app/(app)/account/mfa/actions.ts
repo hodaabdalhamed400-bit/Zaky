@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { toSafeMessage } from "@/lib/errors";
 import { beginEnrollment, confirmEnrollment } from "@/services/mfa.service";
 
-export type EnrollState = { qrSvg?: string; secret?: string; codes?: string[]; error?: string };
+export type EnrollState = { qrSvg?: string; secret?: string; ticket?: string; codes?: string[]; error?: string };
 
 async function actor() {
   const a = await getActor();
@@ -19,9 +19,9 @@ export async function enrollAction(prev: EnrollState, fd: FormData): Promise<Enr
   try {
     if (fd.get("step") === "start") {
       const r = await beginEnrollment(prisma, a);
-      return { qrSvg: r.qrSvg, secret: r.secret };
+      return { qrSvg: r.qrSvg, secret: r.secret, ticket: r.ticket };
     }
-    const r = await confirmEnrollment(prisma, a, String(fd.get("code") ?? ""), await getRequestMeta());
+    const r = await confirmEnrollment(prisma, a, String(fd.get("code") ?? ""), await getRequestMeta(), String(fd.get("ticket") ?? "") || prev.ticket);
     return { codes: r.recoveryCodes };
   } catch (e) {
     return { ...prev, error: toSafeMessage(e) };

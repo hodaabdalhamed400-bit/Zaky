@@ -37,6 +37,7 @@ export function Enroll() {
       {/* SVG مولّد على الخادم من مكتبة QR — لا يحتوي مدخلات مستخدم */}
       <div className="w-48 rounded-lg border border-gray-200 bg-white p-2" aria-label="رمز QR للتفعيل" dangerouslySetInnerHTML={{ __html: state.qrSvg }} />
       <p className="text-xs text-gray-500">لا يمكن المسح؟ أدخل هذا المفتاح يدويًا: <code dir="ltr" className="select-all break-all rounded bg-gray-100 px-1" data-testid="mfa-secret">{state.secret}</code></p>
+      <input type="hidden" name="ticket" value={state.ticket ?? ""} />
       <Field label="الرمز من التطبيق" htmlFor="code" required>
         <input id="code" name="code" required dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={6} className={inputClass + " max-w-40 text-center tracking-[0.3em]"} />
       </Field>
