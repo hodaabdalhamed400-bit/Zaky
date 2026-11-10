@@ -6,15 +6,18 @@ import { branchWhere } from "@/lib/rbac/guard";
 import { formatDate } from "@/lib/dates";
 import { formatSAR, sum } from "@/lib/money";
 import { overdueReport } from "@/services/finance.service";
-import { Badge, Card, EmptyState, PageHeader, Table, Td, Th, buttonClass, inputClass } from "@/components/ui/primitives";
+import { UPCOMING_DAYS, toWhatsAppNumber, upcomingInstallments } from "@/services/reminders.service";
+import { WhatsAppButton } from "@/components/ui/whatsapp-button";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, Table, Td, Th, buttonClass, inputClass } from "@/components/ui/primitives";
 
 export const metadata: Metadata = { title: "المتأخرات" };
 
 export default async function OverduePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requirePageActor("payments.view");
   const sp = await searchParams;
-  const [rows, branches] = await Promise.all([
+  const [rows, upcoming, branches] = await Promise.all([
     overdueReport(prisma, actor, sp),
+    upcomingInstallments(prisma, actor, { branchId: sp.branchId || undefined }),
     prisma.branch.findMany({ where: branchWhere(actor, "id"), orderBy: { nameAr: "asc" }, select: { id: true, nameAr: true } }),
   ]);
   const total = sum(rows.map((r) => r.overdue));
@@ -47,12 +50,46 @@ export default async function OverduePage({ searchParams }: { searchParams: Prom
                   <Td className="tabular whitespace-nowrap font-semibold text-red-700">{formatSAR(r.overdue)}<span className="block text-xs font-normal text-gray-400">{r.installments} قسط</span></Td>
                   <Td className="tabular whitespace-nowrap">{formatDate(r.oldestDue)}</Td>
                   <Td><Badge color={r.daysLate > 60 ? "red" : r.daysLate > 30 ? "amber" : "gray"}>{r.daysLate} يوم</Badge></Td>
-                  <Td>{actor.permissions.has("payments.record") && <Link href={`/finance/payments/new?contractId=${r.contractId}`} className="text-xs text-brand-700 hover:underline">تسجيل دفعة</Link>}</Td>
+                  <Td>
+                    <span className="flex flex-wrap items-center justify-end gap-2">
+                      {toWhatsAppNumber(r.mobile) && <WhatsAppButton contractId={r.contractId} />}
+                      {actor.permissions.has("payments.record") && <Link href={`/finance/payments/new?contractId=${r.contractId}`} className="text-xs text-brand-700 hover:underline">تسجيل دفعة</Link>}
+                    </span>
+                  </Td>
                 </tr>
               ))}
             </tbody>
           </Table>
         )}
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader title={`أقساط تستحق خلال ${UPCOMING_DAYS} أيام`} />
+        {upcoming.length === 0 ? (
+          <EmptyState icon="calendar" title="لا توجد أقساط مستحقة خلال الأيام القادمة" />
+        ) : (
+          <Table>
+            <thead><tr><Th>المستأجر</Th><Th>العقد</Th><Th>الفرع</Th><Th>القسط</Th><Th>المتبقي</Th><Th>الاستحقاق</Th><Th /></tr></thead>
+            <tbody>
+              {upcoming.map((u) => (
+                <tr key={u.id}>
+                  <Td><Link href={`/tenants/${u.contract.tenant.id}`} className="font-medium text-brand-700 hover:underline">{u.contract.tenant.name}</Link>{u.contract.tenant.mobile && <a href={`tel:${u.contract.tenant.mobile}`} dir="ltr" className="tabular block text-xs text-gray-500">{u.contract.tenant.mobile}</a>}</Td>
+                  <Td><Link href={`/contracts/${u.contract.id}`} dir="ltr" className="font-mono text-xs text-brand-700 hover:underline">{u.contract.contractNo}</Link></Td>
+                  <Td>{u.contract.branch.nameAr}</Td>
+                  <Td className="tabular">رقم {u.seqNo}</Td>
+                  <Td className="tabular whitespace-nowrap font-semibold">{formatSAR(u.remaining)}</Td>
+                  <Td className="tabular whitespace-nowrap">{formatDate(u.dueDate)}<span className="block text-xs text-gray-400">{u.daysLeft === 0 ? "اليوم" : u.daysLeft === 1 ? "غدًا" : `بعد ${u.daysLeft} أيام`}</span></Td>
+                  <Td>
+                    {toWhatsAppNumber(u.contract.tenant.mobile) ? <WhatsAppButton contractId={u.contract.id} /> : <span className="text-xs text-gray-400">لا يوجد جوال</span>}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+        <p className="border-t border-gray-100 px-5 py-2.5 text-xs text-gray-500">
+          زر «تذكير واتساب» مجاني: يفتح واتساب على جهازك برسالة جاهزة فيها المبلغ وتاريخ الاستحقاق، وتضغط «إرسال» بنفسك. كل تذكير يُسجَّل في سجل التدقيق.
+        </p>
       </Card>
     </>
   );

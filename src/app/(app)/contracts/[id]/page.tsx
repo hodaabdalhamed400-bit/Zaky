@@ -10,6 +10,8 @@ import { BILLING_CYCLE_LABELS } from "@/lib/contract-pricing";
 import { CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABELS, getContract } from "@/services/contracts.service";
 import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui/primitives";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
+import { WhatsAppButton } from "@/components/ui/whatsapp-button";
+import { toWhatsAppNumber } from "@/services/reminders.service";
 import { OpButton, ReasonOp, TerminateForm } from "../op-forms";
 import { contractOpAction } from "../actions";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS } from "@/services/payments.service";
@@ -61,6 +63,7 @@ export default async function ContractPage({ params, searchParams }: { params: P
 
   const actions: React.ReactNode[] = [];
   if (p.has("payments.record") && openInst.length > 0) actions.push(<LinkButton key="pay" href={`/finance/payments/new?contractId=${id}`} icon="finance">تسجيل دفعة</LinkButton>);
+  if (showMoney && openInst.length > 0 && toWhatsAppNumber(c.tenant.mobile)) actions.push(<WhatsAppButton key="wa" contractId={id} size="md" />);
   if (c.status === "DRAFT" && canDraft) {
     actions.push(<LinkButton key="e" href={`/contracts/${id}/edit`} variant="secondary">تعديل المسودة</LinkButton>);
     actions.push(<OpButton key="s" action={op("submit")} label="إرسال للاعتماد" confirm="إرسال العقد للاعتماد؟ ستُحجز الوحدات." />);

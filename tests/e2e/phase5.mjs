@@ -70,6 +70,18 @@ try {
   await page.locator('section[aria-label="المستحقات مقابل المحصّل"] path.recharts-rectangle').first().hover();
   check("تلميح عربي عند المرور على الأعمدة", await page.locator(".recharts-tooltip-wrapper >> text=المحصّل في الشهر").isVisible());
 
+  // ── تذكير واتساب المجاني ──
+  await page.goto(BASE + "/finance/overdue");
+  const wa = page.locator("a:has-text('تذكير واتساب')").first();
+  check("زر تذكير واتساب ظاهر للمتأخرين", (await wa.count()) > 0 && (await wa.getAttribute("target")) === "_blank");
+  if ((await wa.count()) > 0) {
+    const r = await page.request.get(BASE + (await wa.getAttribute("href")), { maxRedirects: 0 });
+    const loc = r.headers()["location"] ?? "";
+    check("التذكير يحوّل إلى واتساب برسالة جاهزة", r.status() === 303 && /^https:\/\/wa\.me\/966\d{9}\?text=/.test(loc) && decodeURIComponent(loc).includes("متأخر"), `${r.status()} ${loc.slice(0, 60)}`);
+  }
+  await page.goto(BASE + "/audit");
+  check("التذكير مسجّل في سجل التدقيق", await page.isVisible("text=تذكير دفع عبر واتساب"));
+
   // ── الإشعارات ──
   const bellLabel = await page.locator('main a[href="/notifications"]').getAttribute("aria-label");
   check("جرس الإشعارات يعرض عدد غير المقروء بعد المهمة اليومية", /غير مقروء/.test(bellLabel ?? ""), bellLabel);
