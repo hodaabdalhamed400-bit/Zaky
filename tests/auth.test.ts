@@ -29,7 +29,7 @@ describe("تسجيل الدخول", () => {
     const user = await makeUser("READ_ONLY", { branchCodes: ["GRN"] });
     const res = await login(prisma, { email: user.email.toUpperCase(), password: STRONG }, { ip: "10.0.0.1" });
     expect(res.ok).toBe(true);
-    if (!res.ok) return;
+    if (res.ok !== true) return;
     const s = await prisma.session.findUnique({ where: { tokenHash: hashToken(res.token) } });
     expect(s?.userId).toBe(user.id);
     expect(await prisma.session.count({ where: { tokenHash: res.token } })).toBe(0);

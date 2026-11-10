@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS = [
   { key: "finance.overpayment_allowed", value: false, description: "لا يوجد دفع زائد: الدفعة توزع بالكامل على أقساط مستحقة (معتمد)" },
   { key: "finance.late_fees_enabled", value: false, description: "لا توجد رسوم تأخير (معتمد)" },
   { key: "finance.receipt_number_format", value: "RC-{BRANCH}-{YEAR}-{SEQ5}", description: "ترقيم الإيصالات: تسلسل مستقل لكل فرع (معتمد)" },
+  { key: "security.mfa_required_roles", value: ["SUPER_ADMIN", "GENERAL_MANAGER"], description: "أدوار يُفرض عليها التحقق الثنائي (عند تفعيل الفرض MFA_ENFORCE)" },
   { key: "company.phone", value: COMPANY_PHONE, description: "رقم التواصل الموحد للشركة والفروع" },
   { key: "contract.number_format", value: "ZK-{BRANCH}-{YEAR}-{SEQ4}", description: "ترقيم العقود، مثال ZK-IZD-2026-0001 (معتمد)" },
   { key: "contract.deposits_enabled", value: false, description: "لا يوجد تأمين في عقود ذكي (معتمد)" },

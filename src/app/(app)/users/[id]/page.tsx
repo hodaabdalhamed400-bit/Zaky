@@ -7,7 +7,8 @@ import { NotFoundError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/dates";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui/primitives";
 import { ResetPasswordForm, UserForm } from "../user-form";
-import { resetPasswordAction, updateUserAction } from "../actions";
+import { resetMfaAction, resetPasswordAction, updateUserAction } from "../actions";
+import { SmallActionForm } from "../../tenants/forms";
 
 export const metadata: Metadata = { title: "بيانات المستخدم" };
 
@@ -70,6 +71,15 @@ export default async function UserPage({ params, searchParams }: { params: Promi
               <div className="flex justify-between gap-2"><dt className="text-gray-500">التحقق الثنائي</dt><dd>{user.mfaEnabled ? "مفعّل" : "غير مفعّل"}</dd></div>
             </dl>
           </Card>
+          {editable && !isSelf && user.mfaEnabled && (
+            <Card>
+              <CardHeader title="التحقق الثنائي" />
+              <div className="space-y-3 p-5">
+                <p className="text-sm text-gray-500">استخدمها فقط إذا فقد المستخدم جواله، بعد التحقق من هويته.</p>
+                <SmallActionForm action={resetMfaAction.bind(null, user.id)} label="إعادة تعيين التحقق الثنائي" confirm="إعادة تعيين التحقق الثنائي لهذا المستخدم؟ ستُنهى جلساته." danger />
+              </div>
+            </Card>
+          )}
           {editable && !isSelf && (
             <Card>
               <CardHeader title="إعادة تعيين كلمة المرور" />

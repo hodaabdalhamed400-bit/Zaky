@@ -198,6 +198,10 @@ model User {
   // MFA (TOTP) — الحقول جاهزة، التفعيل في مرحلة التجهيز للإنتاج
   mfaEnabled         Boolean   @default(false) @map("mfa_enabled")
   mfaSecretEnc       String?   @map("mfa_secret_enc")
+  // آخر خطوة زمنية استُخدمت (يمنع إعادة استخدام نفس الرمز)
+  mfaLastStep        Int?      @map("mfa_last_step")
+  // رموز الاسترداد (SHA-256 فقط، تُستهلك مرة واحدة)
+  mfaRecoveryHashes  String[]  @default([]) @map("mfa_recovery_hashes")
   failedLoginCount   Int       @default(0) @map("failed_login_count")
   lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(3)
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
@@ -211,6 +215,7 @@ model User {
   createdUsers  User[]             @relation("UserCreatedBy")
   branchAccess  UserBranchAccess[]
   sessions      Session[]
+  mfaChallenges MfaChallenge[]
   notifications Notification[]
   auditLogs     AuditLog[]
 
@@ -245,6 +250,22 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// مرحلة الدخول الثانية: بعد كلمة المرور الصحيحة وقبل إنشاء الجلسة
+model MfaChallenge {
+  id         String    @id @default(uuid()) @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  userId     String    @map("user_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  ip         String?
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_challenges")
 }
 
 model LoginAttempt {

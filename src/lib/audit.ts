@@ -93,4 +93,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "payment.reverse": "عكس دفعة",
   "adjustment.create": "تسوية على قسط",
   "report.export": "تصدير تقرير",
+  "auth.mfa_enabled": "تفعيل التحقق الثنائي",
+  "auth.mfa_failed": "رمز تحقق ثنائي خاطئ",
+  "auth.login_recovery_code": "دخول برمز استرداد",
+  "user.mfa_reset": "إعادة تعيين التحقق الثنائي",
 };

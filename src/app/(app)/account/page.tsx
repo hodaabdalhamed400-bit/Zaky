@@ -16,6 +16,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <Alert kind="warning">لديك كلمة مرور مؤقتة. يجب تغييرها قبل استخدام النظام.</Alert>
         </div>
       )}
+      <p className="mb-4 text-sm"><a href="/account/mfa" className="text-brand-700 hover:underline">إعدادات التحقق الثنائي ←</a></p>
       <Card className="max-w-xl">
         <CardHeader title="تغيير كلمة المرور" />
         <div className="p-5">

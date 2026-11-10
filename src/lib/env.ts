@@ -17,6 +17,13 @@ const schema = z.object({
   STORAGE_DIR: z.string().min(1).default("./storage"),
   // سر لمهمة الصيانة اليومية (POST /api/cron/daily). بدونه تُعطَّل نقطة الاستدعاء.
   CRON_SECRET: z.string().min(24).optional(),
+  // مفتاح تشفير أسرار التحقق الثنائي (32 حرفًا على الأقل). إلزامي في الإنتاج.
+  MFA_ENCRYPTION_KEY: z.string().min(32).optional(),
+  // فرض التحقق الثنائي على الأدوار المحددة في الإعدادات (افتراضيًا: مفعل في الإنتاج)
+  MFA_ENFORCE: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === "true")),
 });
 
 let cached: z.infer<typeof schema> | null = null;

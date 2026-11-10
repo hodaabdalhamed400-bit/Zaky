@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getRequestMeta, requireActionActor, type FormState } from "@/lib/auth/server";
 import { toSafeMessage } from "@/lib/errors";
 import { createUser, resetUserPassword, updateUser } from "@/services/users.service";
+import { resetUserMfa } from "@/services/mfa.service";
 
 export type { FormState };
 
@@ -55,4 +56,15 @@ export async function resetPasswordAction(id: string, _prev: FormState, fd: Form
     return { error: toSafeMessage(e) };
   }
   return { success: "تم تعيين كلمة مرور مؤقتة وإنهاء جلسات المستخدم. سيُطلب منه تغييرها عند الدخول." };
+}
+
+export async function resetMfaAction(id: string, _prev: FormState, _fd: FormData): Promise<FormState> {
+  const actor = await requireActionActor();
+  try {
+    await resetUserMfa(prisma, actor, id, await getRequestMeta());
+  } catch (e) {
+    return { error: toSafeMessage(e) };
+  }
+  revalidatePath(`/users/${id}`);
+  return { success: "تمت إعادة تعيين التحقق الثنائي وإنهاء جلسات المستخدم. سيُطلب منه التفعيل من جديد." };
 }

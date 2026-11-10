@@ -23,13 +23,18 @@
     "job:daily": "tsx scripts/daily.ts",
     "test:e2e:phase3": "node tests/e2e/phase3.mjs",
     "test:e2e:phase4": "node tests/e2e/phase4.mjs",
-    "test:e2e:phase5": "node tests/e2e/phase5.mjs"
+    "test:e2e:phase5": "node tests/e2e/phase5.mjs",
+    "test:e2e:phase6": "node tests/e2e/phase6.mjs",
+    "backup": "bash scripts/backup.sh",
+    "restore": "bash scripts/restore.sh",
+    "backup:verify": "tsx scripts/verify-restore.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",
     "@prisma/client": "6.19.3",
     "exceljs": "^4.4.0",
     "next": "15.5.29",
+    "qrcode": "^1.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "recharts": "^2.15.4",
@@ -39,6 +44,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "4.1.13",
     "@types/node": "22.18.6",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
     "dotenv": "17.2.2",
@@ -47,5 +53,16 @@
     "tsx": "4.20.5",
     "typescript": "5.9.2",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.32"
+    },
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.1"
+    }
   }
 }

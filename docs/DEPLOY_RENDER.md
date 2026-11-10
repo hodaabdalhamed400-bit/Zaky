@@ -9,7 +9,7 @@
 1. في Render: **New → Blueprint** واختر هذا المستودع؛ سيقرأ `render.yaml` وينشئ الخدمة وقاعدة PostgreSQL 16.
    (`autoDeploy: false` — النشر يدوي حتى تستقر المراحل.)
 2. أثناء النشر يُشغَّل `preDeployCommand`: الترحيلات (`prisma migrate deploy`) ثم مزامنة البيانات المرجعية (`db:seed`، آمن للتكرار، لا ينشئ مستخدمين).
-3. إنشاء مسؤول النظام الأول من **Render Shell** للخدمة:
+3. إنشاء مسؤول النظام الأول من **Render Shell** للخدمة. بعد أول دخول سيُطلب منه تغيير كلمة المرور، ثم تفعيل التحقق الثنائي بتطبيق مصادقة على الجوال، ويحفظ رموز الاسترداد الثمانية في مكان آمن:
    ```bash
    npm run admin:create -- --email it@your-domain.sa --name "اسم المسؤول"
    # ستُطلب كلمة المرور بشكل مخفي، ويجب تغييرها عند أول دخول
@@ -40,6 +40,8 @@
 | `TRUSTED_PROXY_HOPS=1` | لقراءة IP العميل الحقيقي خلف موازن Render. |
 | `STORAGE_DIR` | `/var/data/storage` على القرص الدائم. |
 | `CRON_SECRET` | يُولَّد تلقائيًا، ويحمي نقطة المهمة اليومية. |
+| `MFA_ENCRYPTION_KEY` | يُولَّد تلقائيًا ويشفّر أسرار التحقق الثنائي. **لا تغيّره بعد التشغيل**، فتغييره يتطلب إعادة تفعيل التحقق الثنائي لكل المستخدمين. |
+| `MFA_ENFORCE` | غير مضبوط = التحقق الثنائي مفروض في الإنتاج على مسؤول النظام والإدارة العليا (الأدوار في الإعداد `security.mfa_required_roles`). |
 
 لا توجد أي أسرار داخل الكود. لا تضع `ZAKI_ADMIN_PASSWORD` كمتغير دائم في Render.
 
@@ -49,17 +51,37 @@
 - **إنتاج:** خدمة وقاعدة منفصلتان؛ لا تُنسخ بيانات الإنتاج إلى بيئة أخرى.
 
 ## النسخ الاحتياطي والاستعادة
-- خطط Render المدفوعة توفر نسخًا يومية واستعادة لنقطة زمنية (PITR) حسب الخطة.
-- **نسخة مستقلة إضافية** (موصى بها، خارج Render) — من جهاز إداري آمن:
-  ```bash
-  pg_dump "$EXTERNAL_DATABASE_URL" -Fc --no-owner -f zaki-$(date +%F).dump
-  # تشفير قبل التخزين:
-  gpg --symmetric --cipher-algo AES256 zaki-$(date +%F).dump
-  ```
-- **الاستعادة** (إلى قاعدة فارغة):
-  ```bash
-  createdb zaki_restore
-  psql zaki_restore -c "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-  pg_restore --no-owner -d zaki_restore zaki-YYYY-MM-DD.dump
-  ```
-- **اختبار الاستعادة دوريًا** إلزامي (مجدول في المرحلة السادسة؛ لم يُختبر بعد).
+
+### النسخ الآلية في Render
+- خطط Render المدفوعة توفر نسخًا يومية لقاعدة البيانات.
+- **القرص الدائم للمستندات له نسخ منفصل.**
+
+### نسخة مستقلة إضافية (موصى بها أسبوعيًا على الأقل، خارج Render)
+تُنفَّذ من جهاز إداري آمن أو من Render Shell:
+```bash
+DATABASE_URL="<External Database URL>" STORAGE_DIR=/var/data/storage BACKUP_DIR=./backups npm run backup
+# الناتج: zaki-db-<الوقت>.dump + zaki-storage-<الوقت>.tgz + ملف تحقق SHA-256
+gpg --symmetric --cipher-algo AES256 backups/zaki-db-*.dump   # شفّر قبل النقل والتخزين
+```
+
+### الاستعادة
+تتم دائمًا إلى قاعدة **فارغة**، والسكربت يرفض الكتابة فوق قاعدة بها بيانات:
+```bash
+createdb zaki_restore
+TARGET_DATABASE_URL="postgresql://.../zaki_restore" npm run restore -- backups/zaki-db-X.dump backups/zaki-storage-X.tgz ./storage-restored
+```
+السكربت يتحقق أولًا من بصمات SHA-256، ويرفض أي ملف نسخة معطوب.
+
+### اختبار الاستعادة (تمرين دوري، شهري مثلًا)
+```bash
+SOURCE_DATABASE_URL=... TARGET_DATABASE_URL=".../zaki_restore" RESTORED_STORAGE_DIR=./storage-restored/storage npm run backup:verify
+```
+**ما يتحقق منه:**
+- عدد السجلات في كل جدول.
+- المجاميع المالية وتسلسل أرقام العقود والإيصالات.
+- سجل الترحيلات.
+- وجود قيود قاعدة البيانات.
+- عمل حماية سجل التدقيق.
+- سلامة كل مستند ببصمته.
+
+**نتيجة آخر تمرين:** في بيئة التطوير، 362 سجلًا في 30 جدولًا، وجميعها متطابقة. انظر `docs/TESTING.md`.

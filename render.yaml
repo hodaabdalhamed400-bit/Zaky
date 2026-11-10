@@ -36,6 +36,9 @@ services:
         value: /var/data/storage
       - key: CRON_SECRET
         generateValue: true
+      # مفتاح تشفير أسرار التحقق الثنائي — لا تغيّره بعد التشغيل (يُبطل التحقق الثنائي لكل المستخدمين)
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true
 
   # المهمة اليومية: انتهاء العقود + مسودات التجديد التلقائية (00:15 بتوقيت الرياض = 21:15 UTC)
   - type: cron

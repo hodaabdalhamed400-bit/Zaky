@@ -6,9 +6,13 @@ import { prisma } from "@/lib/db";
 import { cookieSecure, env } from "@/lib/env";
 import type { PermissionKey } from "@/lib/rbac/permissions";
 import { validateSession } from "./session";
+import { mustEnrollMfa } from "@/services/mfa.service";
 import type { Actor, RequestMeta } from "./actor";
 
-export const SESSION_COOKIE = "zaki_session";
+import { mfaCookieName, sessionCookieName } from "./cookie-names";
+
+const SESSION_COOKIE = () => sessionCookieName(cookieSecure());
+const MFA_COOKIE = () => mfaCookieName(cookieSecure());
 
 export async function getRequestMeta(): Promise<RequestMeta> {
   const h = await headers();
@@ -24,7 +28,7 @@ export async function getRequestMeta(): Promise<RequestMeta> {
 }
 
 export async function setSessionCookie(token: string) {
-  (await cookies()).set(SESSION_COOKIE, token, {
+  (await cookies()).set(SESSION_COOKIE(), token, {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite: "lax",
@@ -33,13 +37,24 @@ export async function setSessionCookie(token: string) {
   });
 }
 
+/** كوكي مؤقتة (5 دقائق) لمرحلة رمز التحقق الثنائي فقط — لا تمنح أي صلاحية. */
+export async function setMfaCookie(token: string) {
+  (await cookies()).set(MFA_COOKIE(), token, { httpOnly: true, secure: cookieSecure(), sameSite: "lax", path: "/", maxAge: 5 * 60 });
+}
+export async function getMfaCookie() {
+  return (await cookies()).get(MFA_COOKIE())?.value;
+}
+export async function clearMfaCookie() {
+  (await cookies()).delete(MFA_COOKIE());
+}
+
 export async function clearSessionCookie() {
-  (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).delete(SESSION_COOKIE());
 }
 
 /** المستخدم الحالي (أو null) — مخزن مؤقتًا لكل طلب. */
 export const getActor = cache(async (): Promise<Actor | null> => {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE())?.value;
   return validateSession(prisma, token);
 });
 
@@ -47,10 +62,11 @@ export const getActor = cache(async (): Promise<Actor | null> => {
  * للصفحات: يتطلب تسجيل الدخول (وصلاحية اختيارية)، وإلا يعيد التوجيه.
  * يفرض تغيير كلمة المرور المؤقتة قبل استخدام النظام.
  */
-export async function requirePageActor(perm?: PermissionKey, opts: { allowPasswordChange?: boolean } = {}): Promise<Actor> {
+export async function requirePageActor(perm?: PermissionKey, opts: { allowPasswordChange?: boolean; allowMfaSetup?: boolean } = {}): Promise<Actor> {
   const actor = await getActor();
   if (!actor) redirect("/login");
   if (actor.mustChangePassword && !opts.allowPasswordChange) redirect("/account?first=1");
+  if (!opts.allowPasswordChange && !opts.allowMfaSetup && (await mustEnrollMfa(prisma, actor))) redirect("/account/mfa?required=1");
   if (perm && !actor.permissions.has(perm)) redirect("/forbidden");
   return actor;
 }
@@ -60,6 +76,7 @@ export async function requireActionActor(): Promise<Actor> {
   const actor = await getActor();
   if (!actor) redirect("/login");
   if (actor.mustChangePassword) redirect("/account?first=1");
+  if (await mustEnrollMfa(prisma, actor)) redirect("/account/mfa?required=1");
   return actor;
 }
 

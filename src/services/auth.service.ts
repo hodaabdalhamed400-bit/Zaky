@@ -5,6 +5,7 @@ import { AppError } from "@/lib/errors";
 import type { Actor, RequestMeta } from "@/lib/auth/actor";
 import { hashPassword, validatePasswordPolicy, verifyAgainstDummy, verifyPassword } from "@/lib/auth/password";
 import { createSession, revokeAllUserSessions, revokeSession } from "@/lib/auth/session";
+import { createChallenge } from "./mfa.service";
 
 /** حدود محاولات الدخول (قابلة للتعديل لاحقًا من الإعدادات). */
 export const LOGIN_LIMITS = {
@@ -20,6 +21,7 @@ const loginSchema = z.object({
 
 export type LoginResult =
   | { ok: true; token: string; userId: string; mustChangePassword: boolean }
+  | { ok: "mfa"; challengeToken: string }
   | { ok: false; error: string };
 
 const GENERIC_FAIL = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
@@ -66,6 +68,9 @@ export async function login(db: Db, raw: { email: unknown; password: unknown }, 
     await db.loginAttempt.create({ data: { email, ip: meta.ip ?? null, success: false } });
     return { ok: false, error: "هذا الحساب معطل. تواصل مع مسؤول النظام." };
   }
+
+  // المرحلة الثانية: كلمة المرور صحيحة لكن الجلسة لا تُنشأ إلا بعد رمز التحقق الثنائي
+  if (user.mfaEnabled) return { ok: "mfa", challengeToken: await createChallenge(db, user.id, meta) };
 
   const { token } = await db.$transaction(async (tx) => {
     await tx.loginAttempt.create({ data: { email, ip: meta.ip ?? null, success: true } });
