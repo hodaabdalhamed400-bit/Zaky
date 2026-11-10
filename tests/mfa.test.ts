@@ -21,6 +21,8 @@ describe("TOTP", () => {
     const step = currentStep(now);
     expect(verifyTotp(secret, totpAt(secret, step - 1), null, now)).toBe(step - 1);
     expect(verifyTotp(secret, totpAt(secret, step - 2), null, now)).toBeNull();
+    expect(verifyTotp(secret, totpAt(secret, step - 2), null, now, 3)).toBe(step - 2);
+    expect(verifyTotp(secret, totpAt(secret, step - 4), null, now, 3)).toBeNull();
     expect(verifyTotp(secret, totpAt(secret, step), step, now)).toBeNull();
     expect(verifyTotp(secret, "12345", null, now)).toBeNull();
     // أرقام لوحة المفاتيح العربية
@@ -66,7 +68,10 @@ describe("تفعيل التحقق الثنائي", () => {
     const ta = await beginEnrollment(prisma, a);
     await beginEnrollment(prisma, b);
     await expect(confirmEnrollment(prisma, b, totpAt(ta.secret, currentStep()), {}, ta.ticket)).rejects.toThrow(/بحساب آخر في نفس المتصفح/);
-    await expect(confirmEnrollment(prisma, a, totpAt(ta.secret, currentStep() - 4), {}, ta.ticket)).rejects.toThrow(/متأخر بنحو 120 ثانية/);
+    await expect(confirmEnrollment(prisma, a, totpAt(ta.secret, currentStep() - 6), {}, ta.ticket)).rejects.toThrow(/متأخر بنحو 180 ثانية/);
+    // دقيقة تأخير (مثل حالة الاستخدام الفعلية) مقبولة عند التفعيل
+    const r = await confirmEnrollment(prisma, a, totpAt(ta.secret, currentStep() - 2), {}, ta.ticket);
+    expect(r.recoveryCodes).toHaveLength(8);
   });
 });
 

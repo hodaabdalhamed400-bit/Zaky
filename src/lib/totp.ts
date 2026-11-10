@@ -58,15 +58,17 @@ export function totpAt(secret: string, step: number): string {
 }
 
 /**
- * يتحقق من الرمز ضمن نافذة ±1 خطوة (لفروق الساعة)، ويرفض أي خطوة سبق استخدامها
+ * يتحقق من الرمز ضمن نافذة ±window خطوة (30 ثانية لكل خطوة) لفروق الساعة وبطء الإدخال، ويرفض أي خطوة سبق استخدامها
  * (lastStep) — فلا يمكن إعادة استخدام رمز التُقط.
  * يُرجع الخطوة المطابقة أو null.
  */
-export function verifyTotp(secret: string, code: string, lastStep: number | null, now = Date.now()): number | null {
+export function verifyTotp(secret: string, code: string, lastStep: number | null, now = Date.now(), window = 1): number | null {
   const c = normalizeDigits(code).replace(/\s/g, "");
   if (!/^\d{6}$/.test(c)) return null;
   const cur = currentStep(now);
-  for (const step of [cur - 1, cur, cur + 1]) {
+  const steps = [cur];
+  for (let d = 1; d <= window; d++) steps.push(cur - d, cur + d);
+  for (const step of steps) {
     if (lastStep !== null && step <= lastStep) continue;
     const expected = Buffer.from(totpAt(secret, step));
     if (timingSafeEqual(expected, Buffer.from(c))) return step;

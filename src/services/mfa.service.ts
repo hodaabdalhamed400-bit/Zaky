@@ -47,6 +47,9 @@ function newRecoveryCodes() {
 // ───── التفعيل ─────
 
 const TICKET_MINUTES = 30;
+/** نافذة السماح: التفعيل ±4 خطوات (دقيقتان)، والدخول ±3 خطوات (90 ثانية) — مع منع إعادة الاستخدام دائمًا */
+export const ENROLL_WINDOW = 4;
+export const LOGIN_WINDOW = 3;
 
 /**
  * يبدأ التفعيل: سر جديد غير مفعّل حتى يُؤكد برمز صحيح.
@@ -84,7 +87,7 @@ function clockSkew(secret: string, code: string): number | null {
   const c = normalizeDigits(code).replace(/\s/g, "");
   if (!/^\d{6}$/.test(c)) return null;
   const cur = currentStep();
-  for (let d = 2; d <= 20; d++) for (const k of [cur - d, cur + d]) if (totpAt(secret, k) === c) return (k - cur) * STEP_SECONDS;
+  for (let d = ENROLL_WINDOW + 1; d <= 20; d++) for (const k of [cur - d, cur + d]) if (totpAt(secret, k) === c) return (k - cur) * STEP_SECONDS;
   return null;
 }
 
@@ -93,7 +96,7 @@ export async function confirmEnrollment(db: Db, actor: Actor, code: string, meta
   if (u.mfaEnabled) throw new AppError("STATE", "التحقق الثنائي مفعّل بالفعل");
   const secret = secretFromTicket(actor.id, ticket) ?? (u.mfaSecretEnc ? open(u.mfaSecretEnc) : null);
   if (!secret) throw new AppError("STATE", "انتهت مهلة التفعيل. حدّث الصفحة وابدأ من جديد.");
-  const step = verifyTotp(secret, code, null);
+  const step = verifyTotp(secret, code, null, Date.now(), ENROLL_WINDOW);
   if (step === null) {
     const skew = clockSkew(secret, code);
     if (skew !== null)
@@ -150,7 +153,7 @@ export async function verifyChallenge(db: Db, challengeToken: string | undefined
   let usedRecovery = false;
   let remaining = u.mfaRecoveryHashes;
   if (/^\d{6}$/.test(clean.replace(/\s/g, ""))) {
-    step = verifyTotp(open(u.mfaSecretEnc), clean, u.mfaLastStep);
+    step = verifyTotp(open(u.mfaSecretEnc), clean, u.mfaLastStep, Date.now(), LOGIN_WINDOW);
   } else {
     const h = hashCode(clean);
     const match = u.mfaRecoveryHashes.find((x) => x.length === h.length && timingSafeEqual(Buffer.from(x), Buffer.from(h)));
