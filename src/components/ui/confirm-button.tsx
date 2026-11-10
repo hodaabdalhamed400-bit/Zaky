@@ -1,5 +1,6 @@
 "use client";
 import { useFormStatus } from "react-dom";
+import { useFormPending } from "./action-form";
 import { buttonClass, type ButtonVariant } from "./primitives";
 
 /** زر إرسال يطلب تأكيدًا قبل تنفيذ إجراء حساس (أرشفة، حذف، إيقاف). */
@@ -14,7 +15,9 @@ export function ConfirmButton({
   variant?: ButtonVariant;
   className?: string;
 }) {
-  const { pending } = useFormStatus();
+  const status = useFormStatus();
+  const ctx = useFormPending();
+  const pending = ctx ?? status.pending;
   return (
     <button
       type="submit"

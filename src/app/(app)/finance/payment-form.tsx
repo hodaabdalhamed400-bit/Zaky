@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useMemo, useState } from "react";
 import { Alert, Field, buttonClass, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/auth/server";
@@ -27,7 +28,7 @@ export function PaymentForm({
   idempotencyKey: string;
   today: string;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("BANK_TRANSFER");
   const [alloc, setAlloc] = useState<Record<string, string>>({});
@@ -56,7 +57,7 @@ export function PaymentForm({
   };
 
   return (
-    <form action={formAction} className="space-y-6">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-6">
       {state.error && <Alert>{state.error}</Alert>}
       <input type="hidden" name="contractId" value={contractId} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
@@ -134,14 +135,14 @@ export function PaymentForm({
         <p className="text-xs text-gray-500">تُسجَّل الدفعة بانتظار المراجعة، ولا تُحتسب ولا يصدر لها إيصال قبل اعتمادها.</p>
         <SubmitButton>تسجيل الدفعة</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function AdjustmentForm({ action, installments }: { action: (p: FormState, fd: FormData) => Promise<FormState>; installments: { id: string; seqNo: number; dueDate: string; remaining: string }[] }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-3">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -166,6 +167,6 @@ export function AdjustmentForm({ action, installments }: { action: (p: FormState
         <input id="adj-r" name="reason" required minLength={5} maxLength={1000} className={inputClass} />
       </Field>
       <div className="flex justify-end"><SubmitButton variant="secondary">تسجيل التسوية</SubmitButton></div>
-    </form>
+    </ActionForm>
   );
 }

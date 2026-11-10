@@ -6,7 +6,7 @@ import { requirePageActor } from "@/lib/auth/server";
 import { AppError } from "@/lib/errors";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatSAR } from "@/lib/money";
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS, getPayment } from "@/services/payments.service";
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS, getPayment, payerName } from "@/services/payments.service";
 import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader, Table, Td, Th } from "@/components/ui/primitives";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { OpButton, ReasonOp } from "../../../contracts/op-forms";
@@ -37,7 +37,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
     <>
       <PageHeader
         title={p.receiptNo ? `الإيصال ${p.receiptNo}` : "دفعة بانتظار المراجعة"}
-        description={`${p.tenant.name} · ${p.branch.nameAr}`}
+        description={`${payerName(p)} · ${p.branch.nameAr}`}
         actions={p.receiptNo && p.status === "APPROVED" ? <LinkButton href={`/print/receipts/${id}`} variant="secondary">طباعة الإيصال</LinkButton> : undefined}
       />
       {done && DONE[done] && <div className="mb-4"><Alert kind="success">{DONE[done]}</Alert></div>}
@@ -55,7 +55,8 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
               <div><dt className="text-gray-500">رقم المرجع</dt><dd dir="ltr" className="mt-1 text-end font-mono">{p.referenceNo ?? "—"}</dd></div>
               <div><dt className="text-gray-500">تاريخ الدفع</dt><dd className="tabular mt-1">{formatDate(p.paidOn)}</dd></div>
               <div><dt className="text-gray-500">العقد</dt><dd className="mt-1">{p.contract && <Link href={`/contracts/${p.contract.id}`} dir="ltr" className="font-mono text-xs text-brand-700 hover:underline">{p.contract.contractNo}</Link>}</dd></div>
-              <div><dt className="text-gray-500">المستأجر</dt><dd className="mt-1"><Link href={`/tenants/${p.tenant.id}`} className="text-brand-700 hover:underline">{p.tenant.name}</Link></dd></div>
+              <div><dt className="text-gray-500">الدافع</dt><dd className="mt-1">{p.tenant ? <Link href={`/tenants/${p.tenant.id}`} className="text-brand-700 hover:underline">{p.tenant.name}</Link> : payerName(p)}</dd></div>
+              {p.booking && <div><dt className="text-gray-500">حجز قاعة</dt><dd className="mt-1"><Link href={`/bookings/${p.booking.id}`} dir="ltr" className="font-mono text-xs text-brand-700 hover:underline">{p.booking.bookingNo}</Link></dd></div>}
               {p.notes && <div className="sm:col-span-3"><dt className="text-gray-500">ملاحظات</dt><dd className="mt-1">{p.notes}</dd></div>}
               <div className="space-y-0.5 text-xs text-gray-400 sm:col-span-3">
                 <p>سجّلها: {who(p.recordedById, p.createdAt)}</p>
@@ -65,7 +66,13 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
               </div>
             </dl>
           </Card>
-          <Card>
+          {p.booking && (
+            <Card>
+              <CardHeader title="تفاصيل الحجز" />
+              <p className="p-5 text-sm text-gray-700">القاعة {p.booking.unit.code} · {formatDate(p.booking.bookingDate)} من {p.booking.startHour}:00 إلى {p.booking.endHour}:00 · {p.booking.paidHours} ساعة مدفوعة × {formatSAR(p.booking.hourlyPrice)}</p>
+            </Card>
+          )}
+          {p.allocations.length > 0 && <Card>
             <CardHeader title="التوزيع على الأقساط" />
             <Table>
               <thead><tr><Th>القسط</Th><Th>الاستحقاق</Th><Th>الفترة</Th><Th>قيمة القسط</Th><Th>المبلغ المخصص</Th></tr></thead>
@@ -81,7 +88,7 @@ export default async function PaymentPage({ params, searchParams }: { params: Pr
                 ))}
               </tbody>
             </Table>
-          </Card>
+          </Card>}
         </div>
         <div className="space-y-6">
           {(p.status === "PENDING_REVIEW" && can("payments.approve")) || (p.status === "APPROVED" && can("finance.adjust")) ? (

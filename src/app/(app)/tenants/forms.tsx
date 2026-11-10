@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useRef } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useRef } from "react";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -24,9 +25,9 @@ export function TenantForm({
   canSensitive: boolean;
   nationalIdHidden?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-6">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-6">
       {state.error && <Alert kind={state.duplicateSuspect ? "warning" : "error"}>{state.error}</Alert>}
       {state.duplicateSuspect && (
         <label className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
@@ -95,19 +96,19 @@ export function TenantForm({
         </div>
       </div>
       <div className="flex justify-end"><SubmitButton>حفظ</SubmitButton></div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function ContactForm({ action }: { action: (p: FormState, fd: FormData) => Promise<FormState> }) {
   const ref = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState(async (p: FormState, fd: FormData) => {
+  const [state, formAction, pending] = useActionForm(async (p: FormState, fd: FormData) => {
     const r = await action(p, fd);
     if (r.success) ref.current?.reset();
     return r;
   }, {});
   return (
-    <form ref={ref} action={formAction} className="space-y-3">
+    <ActionForm ref={ref} onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="الاسم" htmlFor="c-name" required><input id="c-name" name="name" required maxLength={120} className={inputClass} /></Field>
@@ -119,19 +120,19 @@ export function ContactForm({ action }: { action: (p: FormState, fd: FormData) =
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isPrimary" className="size-4 accent-brand-700" /> جهة الاتصال الأساسية</label>
         <SubmitButton variant="secondary" pendingText="…">إضافة</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function InteractionForm({ action }: { action: (p: FormState, fd: FormData) => Promise<FormState> }) {
   const ref = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState(async (p: FormState, fd: FormData) => {
+  const [state, formAction, pending] = useActionForm(async (p: FormState, fd: FormData) => {
     const r = await action(p, fd);
     if (r.success) ref.current?.reset();
     return r;
   }, {});
   return (
-    <form ref={ref} action={formAction} className="space-y-3">
+    <ActionForm ref={ref} onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       <div className="flex gap-2">
         <label htmlFor="i-channel" className="sr-only">الوسيلة</label>
@@ -146,26 +147,26 @@ export function InteractionForm({ action }: { action: (p: FormState, fd: FormDat
         <input id="i-body" name="body" required maxLength={3000} placeholder="ماذا تم؟" className={inputClass} />
         <SubmitButton variant="secondary" pendingText="…">تسجيل</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function SmallActionForm({ action, label, confirm, danger }: { action: (p: FormState, fd: FormData) => Promise<FormState>; label: string; confirm: string; danger?: boolean }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-2">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-2">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <ConfirmButton message={confirm} variant={danger ? "danger" : "secondary"}>{label}</ConfirmButton>
-    </form>
+    </ActionForm>
   );
 }
 
 export function RemoveContactButton({ action }: { action: (p: FormState, fd: FormData) => Promise<FormState> }) {
-  const [, formAction] = useActionState(action, {});
+  const [, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="inline">
+    <ActionForm onSubmit={formAction} pending={pending} className="inline">
       <button className="text-xs text-red-600 hover:underline" onClick={(e) => { if (!window.confirm("حذف جهة الاتصال؟")) e.preventDefault(); }}>حذف</button>
-    </form>
+    </ActionForm>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useState } from "react";
 import { Alert, Field, buttonClass, inputClass, type ButtonVariant } from "@/components/ui/primitives";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -8,22 +9,22 @@ import type { FormState } from "@/lib/auth/server";
 type A = (p: FormState, fd: FormData) => Promise<FormState>;
 
 export function OpButton({ action, label, confirm, variant = "primary" }: { action: A; label: string; confirm: string; variant?: ButtonVariant }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-2">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-2">
       {state.error && <Alert>{state.error}</Alert>}
       <ConfirmButton message={confirm} variant={variant} className="w-full">{label}</ConfirmButton>
-    </form>
+    </ActionForm>
   );
 }
 
 /** إجراء يتطلب سببًا مكتوبًا (إرجاع، إلغاء). */
 export function ReasonOp({ action, label, placeholder, variant = "secondary" }: { action: A; label: string; placeholder: string; variant?: ButtonVariant }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   if (!open) return <button type="button" onClick={() => setOpen(true)} className={buttonClass(variant, "w-full")}>{label}</button>;
   return (
-    <form action={formAction} className="space-y-2 rounded-lg border border-gray-200 p-3">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-2 rounded-lg border border-gray-200 p-3">
       {state.error && <Alert>{state.error}</Alert>}
       <label className="sr-only" htmlFor={`r-${label}`}>السبب</label>
       <textarea id={`r-${label}`} name="reason" required minLength={3} rows={2} placeholder={placeholder} className={inputClass} />
@@ -31,16 +32,16 @@ export function ReasonOp({ action, label, placeholder, variant = "secondary" }: 
         <SubmitButton variant={variant} className="flex-1">{label}</SubmitButton>
         <button type="button" onClick={() => setOpen(false)} className={buttonClass("ghost")}>تراجع</button>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function TerminateForm({ action, minDate, maxDate }: { action: A; minDate: string; maxDate: string }) {
   const [open, setOpen] = useState(false);
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   if (!open) return <button type="button" onClick={() => setOpen(true)} className={buttonClass("danger", "w-full")}>إنهاء مبكر</button>;
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-3">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-3">
       {state.error && <Alert>{state.error}</Alert>}
       <p className="text-xs text-gray-600">لا يُسترد أي مبلغ مدفوع عند الخروج المبكر. حدد مصير الأقساط القادمة حسب الاتفاق مع الشركة.</p>
       <Field label="تاريخ الخروج" htmlFor="exitDate" required>
@@ -58,6 +59,6 @@ export function TerminateForm({ action, minDate, maxDate }: { action: A; minDate
         <ConfirmButton message="تأكيد إنهاء العقد؟ لا يمكن التراجع." variant="danger" className="flex-1">تأكيد الإنهاء</ConfirmButton>
         <button type="button" onClick={() => setOpen(false)} className={buttonClass("ghost")}>تراجع</button>
       </div>
-    </form>
+    </ActionForm>
   );
 }

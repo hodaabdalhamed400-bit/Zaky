@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useState } from "react";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "./actions";
@@ -22,12 +23,12 @@ export function UserForm({
   initial?: { email: string; name: string; phone: string | null; roleId: string; branchIds: string[]; isActive: boolean };
   isSelf?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   const [roleId, setRoleId] = useState(initial?.roleId ?? "");
   const role = roles.find((r) => r.id === roleId);
 
   return (
-    <form action={formAction} className="space-y-5">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-5">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
 
@@ -115,14 +116,14 @@ export function UserForm({
       <div className="flex justify-end">
         <SubmitButton>{mode === "create" ? "إنشاء المستخدم" : "حفظ التعديلات"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function ResetPasswordForm({ action }: { action: (prev: FormState, fd: FormData) => Promise<FormState> }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-4">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <Field label="كلمة مرور مؤقتة جديدة" htmlFor="reset-password" hint="ستُنهى جميع جلسات المستخدم الحالية.">
@@ -131,6 +132,6 @@ export function ResetPasswordForm({ action }: { action: (prev: FormState, fd: Fo
       <div className="flex justify-end">
         <SubmitButton variant="secondary" pendingText="جارٍ التعيين…">إعادة تعيين كلمة المرور</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }

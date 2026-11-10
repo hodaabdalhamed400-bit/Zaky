@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useMemo, useState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useMemo, useState } from "react";
 import { Alert, Field, buttonClass, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/auth/server";
@@ -45,7 +46,7 @@ export function ContractForm({
   defaultTenantId?: string;
   lockBranch?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   const defTenant = tenants.find((t) => t.id === (initial?.tenantId ?? defaultTenantId));
   const [branchId, setBranchId] = useState(initial?.branchId ?? defTenant?.primaryBranchId ?? (branches.length === 1 ? branches[0]!.id : ""));
   const [lines, setLines] = useState<Line[]>(initial?.units ?? []);
@@ -85,7 +86,7 @@ export function ContractForm({
   const update = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
   return (
-    <form action={formAction} className="space-y-6">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-6">
       {state.error && <Alert>{state.error}</Alert>}
       <input type="hidden" name="units" value={JSON.stringify(lines)} />
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -213,20 +214,20 @@ export function ContractForm({
         <textarea id="notes" name="notes" rows={2} maxLength={3000} defaultValue={initial?.notes ?? ""} className={inputClass} />
       </Field>
       <div className="flex justify-end"><SubmitButton>حفظ كمسودة</SubmitButton></div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function TermsForm({ action, terms, notes }: { action: (p: FormState, fd: FormData) => Promise<FormState>; terms: string | null; notes: string | null }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-4">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
       <Alert kind="info">العقد معتمد: يمكن تعديل الشروط والملاحظات فقط، وتُحفظ نسخة جديدة. التعديل المالي يتطلب عقدًا جديدًا أو تجديدًا.</Alert>
       <Field label="الشروط الخاصة" htmlFor="terms"><textarea id="terms" name="terms" rows={6} maxLength={10000} defaultValue={terms ?? ""} className={inputClass} /></Field>
       <Field label="ملاحظات داخلية" htmlFor="notes"><textarea id="notes" name="notes" rows={2} maxLength={3000} defaultValue={notes ?? ""} className={inputClass} /></Field>
       <Field label="سبب التعديل" htmlFor="reason" required><input id="reason" name="reason" required minLength={3} maxLength={500} className={inputClass} /></Field>
       <div className="flex justify-end"><SubmitButton>حفظ نسخة جديدة</SubmitButton></div>
-    </form>
+    </ActionForm>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useState } from "react";
 import { Alert, Field, buttonClass, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -35,7 +36,7 @@ export function UnitForm({
   initial?: UnitInitial;
   defaultBranchId?: string;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   const [branchId, setBranchId] = useState(initial?.branchId ?? defaultBranchId ?? (branches.length === 1 ? branches[0]!.id : ""));
   const [typeId, setTypeId] = useState(initial?.unitTypeId ?? "");
   const floors = branches.find((b) => b.id === branchId)?.floors ?? [];
@@ -43,7 +44,7 @@ export function UnitForm({
   const selectableTypes = types.filter((t) => t.isActive || t.id === initial?.unitTypeId);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-6">
       {state.error && <Alert>{state.error}</Alert>}
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="الفرع" htmlFor="branchId" required>
@@ -109,14 +110,14 @@ export function UnitForm({
         )}
         <SubmitButton>{mode === "create" ? "حفظ الوحدة" : "حفظ التعديلات"}</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function ArchiveUnitForm({ action, archived }: { action: (prev: FormState, fd: FormData) => Promise<FormState>; archived: boolean }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-3">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <p className="text-sm text-gray-500">
@@ -127,6 +128,6 @@ export function ArchiveUnitForm({ action, archived }: { action: (prev: FormState
       <ConfirmButton message={archived ? "استعادة الوحدة؟" : "أرشفة هذه الوحدة؟"} variant={archived ? "secondary" : "danger"}>
         {archived ? "استعادة الوحدة" : "أرشفة الوحدة"}
       </ConfirmButton>
-    </form>
+    </ActionForm>
   );
 }

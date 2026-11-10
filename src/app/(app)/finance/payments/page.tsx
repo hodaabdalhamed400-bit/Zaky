@@ -5,7 +5,7 @@ import { requirePageActor } from "@/lib/auth/server";
 import { branchWhere } from "@/lib/rbac/guard";
 import { formatDate } from "@/lib/dates";
 import { formatSAR } from "@/lib/money";
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS, listPayments } from "@/services/payments.service";
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_COLOR, PAYMENT_STATUS_LABELS, listPayments, payerName } from "@/services/payments.service";
 import { Badge, Card, EmptyState, LinkButton, PageHeader, Table, Td, Th, buttonClass, inputClass } from "@/components/ui/primitives";
 
 export const metadata: Metadata = { title: "الدفعات" };
@@ -62,7 +62,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
               {payments.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
                   <Td><Link href={`/finance/payments/${p.id}`} className="font-mono text-xs font-medium text-brand-700 hover:underline" dir="ltr">{p.receiptNo ?? "—"}</Link><span className="block text-xs text-gray-400">{p.branch.nameAr}</span></Td>
-                  <Td>{p.tenant.name}<span dir="ltr" className="block font-mono text-xs text-gray-400">{p.contract?.contractNo}</span></Td>
+                  <Td>{payerName(p)}<span dir="ltr" className="block font-mono text-xs text-gray-400">{p.contract?.contractNo ?? p.booking?.bookingNo}</span></Td>
                   <Td className="tabular whitespace-nowrap font-medium">{formatSAR(p.amount)}</Td>
                   <Td>{PAYMENT_METHOD_LABELS[p.method]}{p.referenceNo && <span dir="ltr" className="block text-xs text-gray-400">{p.referenceNo}</span>}</Td>
                   <Td className="tabular whitespace-nowrap">{formatDate(p.paidOn)}</Td>

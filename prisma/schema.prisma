@@ -48,6 +48,17 @@ enum LeaseMode {
   BOOKING // حجوزات منفصلة بالساعة/اليوم بدون عقود (قاعات الاجتماعات) — قرار معتمد
 }
 
+enum BookingStatus {
+  CONFIRMED // مؤكد
+  CANCELLED // ملغى
+}
+
+enum BookingPaymentStatus {
+  FREE // ضمن الساعات المجانية بالكامل
+  UNPAID // عليه مبلغ لم يُسدد
+  PAID // سُدد (دفعة معتمدة)
+}
+
 enum TenantType {
   INDIVIDUAL // فرد
   COMPANY // منشأة
@@ -305,6 +316,7 @@ model Branch {
   tenants       Tenant[]
   contracts     Contract[]
   payments      Payment[]
+  bookings      RoomBooking[]
   userAccess    UserBranchAccess[]
   contractUnits ContractUnit[]
 
@@ -360,6 +372,7 @@ model Unit {
   unitType      UnitType       @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
   contractUnits ContractUnit[]
   documents     Document[]
+  bookings      RoomBooking[]
 
   @@unique([branchId, code])
   @@index([branchId, status])
@@ -396,6 +409,7 @@ model Tenant {
   deposits      Deposit[]
   refunds       Refund[]
   documents     Document[]
+  bookings      RoomBooking[]
 
   @@index([name])
   @@index([mobile])
@@ -556,7 +570,7 @@ model PaymentSchedule {
 model Payment {
   id             String        @id @default(uuid()) @db.Uuid
   receiptNo      String?       @unique @map("receipt_no") // يصدر عند الاعتماد
-  tenantId       String        @map("tenant_id") @db.Uuid
+  tenantId       String?       @map("tenant_id") @db.Uuid
   contractId     String?       @map("contract_id") @db.Uuid
   branchId       String        @map("branch_id") @db.Uuid
   amount         Decimal       @db.Decimal(14, 2)
@@ -577,21 +591,25 @@ model Payment {
   reversedById   String?       @map("reversed_by_id") @db.Uuid
   reversedAt     DateTime?     @map("reversed_at") @db.Timestamptz(3)
   reversalReason String?       @map("reversal_reason")
+  // دفعة حجز قاعة (بدل أقساط العقد)
+  bookingId      String?       @map("booking_id") @db.Uuid
   reversalOfId   String?       @unique @map("reversal_of_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant      Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contract    Contract?           @relation(fields: [contractId], references: [id], onDelete: Restrict)
   branch      Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
   reversalOf  Payment?            @relation("PaymentReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
   reversedBy  Payment?            @relation("PaymentReversal")
+  booking     RoomBooking?        @relation(fields: [bookingId], references: [id], onDelete: Restrict)
   allocations PaymentAllocation[]
   documents   Document[]
 
   @@index([branchId, paidOn])
   @@index([tenantId])
   @@index([status])
+  @@index([bookingId])
   @@map("payments")
 }
 
@@ -675,6 +693,46 @@ model Adjustment {
 
   @@index([contractId])
   @@map("adjustments")
+}
+
+// ───────────────────────────── حجوزات القاعات ─────────────────────────────
+
+// حجز قاعة اجتماعات بالساعة (قرار معتمد: يحجزه موظف الفرع، ساعتان مجانيتان يوميًا لكل مستأجر)
+model RoomBooking {
+  id            String               @id @default(uuid()) @db.Uuid
+  bookingNo     String               @unique @map("booking_no")
+  branchId      String               @map("branch_id") @db.Uuid
+  unitId        String               @map("unit_id") @db.Uuid
+  bookingDate   DateTime             @map("booking_date") @db.Date // تاريخ الرياض
+  startHour     Int                  @map("start_hour") // 8..21
+  endHour       Int                  @map("end_hour") // 9..22 (غير شامل)
+  hours         Int
+  tenantId      String?              @map("tenant_id") @db.Uuid
+  visitorName   String?              @map("visitor_name")
+  visitorMobile String?              @map("visitor_mobile")
+  freeHours     Int                  @default(0) @map("free_hours")
+  paidHours     Int                  @default(0) @map("paid_hours")
+  hourlyPrice   Decimal              @map("hourly_price") @db.Decimal(14, 2) // شامل الضريبة
+  chargeAmount  Decimal              @default(0) @map("charge_amount") @db.Decimal(14, 2)
+  status        BookingStatus        @default(CONFIRMED)
+  paymentStatus BookingPaymentStatus @map("payment_status")
+  notes         String?
+  createdById   String?              @map("created_by_id") @db.Uuid
+  cancelledById String?              @map("cancelled_by_id") @db.Uuid
+  cancelledAt   DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason  String?              @map("cancel_reason")
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  unit     Unit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@index([branchId, bookingDate])
+  @@index([tenantId, bookingDate])
+  @@index([unitId, bookingDate])
+  @@map("room_bookings")
 }
 
 // عدادات أرقام العقود والإيصالات (تُزاد داخل المعاملة: UPDATE ... RETURNING)

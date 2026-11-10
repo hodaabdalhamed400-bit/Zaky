@@ -28,7 +28,8 @@
     "backup": "bash scripts/backup.sh",
     "restore": "bash scripts/restore.sh",
     "backup:verify": "tsx scripts/verify-restore.ts",
-    "admin:reset-password": "tsx scripts/reset-password.ts"
+    "admin:reset-password": "tsx scripts/reset-password.ts",
+    "test:e2e:bookings": "node tests/e2e/bookings.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",

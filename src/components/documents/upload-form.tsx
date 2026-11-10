@@ -1,5 +1,6 @@
 "use client";
-import { useActionState, useRef } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
+import { useRef } from "react";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/auth/server";
@@ -14,13 +15,13 @@ export function UploadForm({
   canSensitive: boolean;
 }) {
   const ref = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState(async (prev: FormState, fd: FormData) => {
+  const [state, formAction, pending] = useActionForm(async (prev: FormState, fd: FormData) => {
     const r = await action(prev, fd);
     if (r.success) ref.current?.reset();
     return r;
   }, {});
   return (
-    <form ref={ref} action={formAction} className="space-y-3">
+    <ActionForm ref={ref} onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -41,18 +42,18 @@ export function UploadForm({
         </label>
       )}
       <SubmitButton variant="secondary" pendingText="جارٍ الرفع…">رفع المستند</SubmitButton>
-    </form>
+    </ActionForm>
   );
 }
 
 export function DeleteDocButton({ action }: { action: (prev: FormState, fd: FormData) => Promise<FormState> }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="inline">
+    <ActionForm onSubmit={formAction} pending={pending} className="inline">
       {state.error && <span role="alert" className="me-2 text-xs text-red-600">{state.error}</span>}
       <button type="submit" className="text-xs text-red-600 hover:underline" onClick={(e) => { if (!window.confirm("حذف المستند؟ يبقى محفوظًا في سجل التدقيق.")) e.preventDefault(); }}>
         حذف
       </button>
-    </form>
+    </ActionForm>
   );
 }

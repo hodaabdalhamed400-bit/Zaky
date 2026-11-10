@@ -33,6 +33,9 @@ export const PERMISSIONS = {
   "documents.upload": { nameAr: "رفع المستندات", groupAr: "المستندات" },
   "documents.view_sensitive": { nameAr: "عرض المستندات الحساسة", groupAr: "المستندات" },
 
+  "bookings.view": { nameAr: "عرض حجوزات القاعات", groupAr: "حجوزات القاعات" },
+  "bookings.manage": { nameAr: "إنشاء وإلغاء حجوزات القاعات", groupAr: "حجوزات القاعات" },
+
   "reports.view": { nameAr: "عرض التقارير", groupAr: "التقارير" },
   "reports.export": { nameAr: "تصدير التقارير", groupAr: "التقارير" },
 
@@ -71,6 +74,7 @@ const VIEW_BASICS: PermissionKey[] = [
   "tenants.view",
   "contracts.view",
   "documents.view",
+  "bookings.view",
 ];
 
 /**
@@ -121,6 +125,7 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
       "contracts.create",
       "contracts.edit",
       "contracts.approve",
+      "bookings.manage",
       "payments.view",
       "payments.record",
       "payments.approve",
@@ -134,13 +139,13 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
     nameAr: "موظف المبيعات",
     description: "العملاء المحتملون ومسودات العقود في فروعه",
     allBranches: false,
-    permissions: [...VIEW_BASICS, "tenants.manage", "contracts.create", "documents.upload"],
+    permissions: [...VIEW_BASICS, "tenants.manage", "contracts.create", "documents.upload", "bookings.manage"],
   },
   OPERATIONS_EMPLOYEE: {
     nameAr: "موظف التشغيل",
     description: "حالة الوحدات والتشغيل اليومي في فروعه",
     allBranches: false,
-    permissions: [...VIEW_BASICS, "units.manage", "documents.upload"],
+    permissions: [...VIEW_BASICS, "units.manage", "documents.upload", "bookings.manage"],
   },
   READ_ONLY: {
     nameAr: "اطلاع فقط",

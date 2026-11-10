@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
 import { getDashboardCharts, getDashboardStats } from "@/services/dashboard.service";
+import { payerName } from "@/services/payments.service";
 import { ContractsFlowChart, MoneyChart, OccupancyByBranchChart, OccupancyTrendChart } from "@/components/charts/charts";
 import { formatSAR } from "@/lib/money";
 import { addDays, dateOnly, formatDate, formatDateTime, todayInRiyadh } from "@/lib/dates";
@@ -52,7 +53,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         where: { status: "APPROVED", ...(branchId ? { branchId } : actor.allBranches ? {} : { branchId: { in: [...actor.branchIds] } }) },
         orderBy: { approvedAt: "desc" },
         take: 8,
-        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } } },
+        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } }, booking: { select: { visitorName: true } } },
       })
     : [];
 
@@ -162,7 +163,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               {latestPayments.map((pm) => (
                 <li key={pm.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
                   <span>
-                    <Link href={`/finance/payments/${pm.id}`} className="font-medium text-brand-700 hover:underline">{pm.tenant.name}</Link>
+                    <Link href={`/finance/payments/${pm.id}`} className="font-medium text-brand-700 hover:underline">{payerName(pm)}</Link>
                     <span className="block text-xs text-gray-400">{pm.branch.nameAr} · <span dir="ltr">{pm.receiptNo}</span></span>
                   </span>
                   <span className="tabular font-semibold text-emerald-700">{formatSAR(pm.amount)}</span>

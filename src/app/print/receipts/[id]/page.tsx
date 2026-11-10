@@ -5,7 +5,7 @@ import { requirePageActor } from "@/lib/auth/server";
 import { AppError } from "@/lib/errors";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatSAR } from "@/lib/money";
-import { PAYMENT_METHOD_LABELS, getPayment } from "@/services/payments.service";
+import { PAYMENT_METHOD_LABELS, getPayment, payerName } from "@/services/payments.service";
 import { PrintButton } from "../../contracts/[id]/print-button";
 
 export const metadata: Metadata = { title: "إيصال استلام" };
@@ -37,9 +37,9 @@ export default async function ReceiptPrint({ params }: { params: Promise<{ id: s
       {p.status === "REVERSED" && <p className="mt-3 rounded border border-red-300 bg-red-50 p-2 text-center font-bold text-red-700">ملغى بالعكس — {p.reversalReason}</p>}
       <table className="mt-5 w-full border-collapse">
         <tbody>
-          <tr><th className={cell + " w-36 bg-gray-50 text-start"}>استلمنا من</th><td className={cell}>{p.tenant.name}</td></tr>
+          <tr><th className={cell + " w-36 bg-gray-50 text-start"}>استلمنا من</th><td className={cell}>{payerName(p)}</td></tr>
           <tr><th className={cell + " bg-gray-50 text-start"}>مبلغ وقدره</th><td className={cell + " text-base font-bold"}>{formatSAR(p.amount)}</td></tr>
-          <tr><th className={cell + " bg-gray-50 text-start"}>وذلك عن</th><td className={cell}>أقساط العقد {p.contract?.contractNo}: {p.allocations.map((a) => `القسط ${a.schedule.seqNo} (${formatDate(a.schedule.dueDate)}): ${formatSAR(a.amount)}`).join("، ")}</td></tr>
+          <tr><th className={cell + " bg-gray-50 text-start"}>وذلك عن</th><td className={cell}>{p.booking ? `حجز القاعة ${p.booking.unit.code} (${p.booking.bookingNo}) بتاريخ ${formatDate(p.booking.bookingDate)} من ${p.booking.startHour}:00 إلى ${p.booking.endHour}:00 — ${p.booking.paidHours} ساعة` : `أقساط العقد ${p.contract?.contractNo}: ${p.allocations.map((a) => `القسط ${a.schedule.seqNo} (${formatDate(a.schedule.dueDate)}): ${formatSAR(a.amount)}`).join("، ")}`}</td></tr>
           <tr><th className={cell + " bg-gray-50 text-start"}>طريقة الدفع</th><td className={cell}>{PAYMENT_METHOD_LABELS[p.method]}{p.referenceNo ? ` — مرجع ${p.referenceNo}` : ""}</td></tr>
           <tr><th className={cell + " bg-gray-50 text-start"}>تاريخ الدفع</th><td className={cell}>{formatDate(p.paidOn)}</td></tr>
           <tr><th className={cell + " bg-gray-50 text-start"}>اعتمده</th><td className={cell}>{p.approvedById ? userNames[p.approvedById] : "—"} — {formatDateTime(p.approvedAt)}</td></tr>

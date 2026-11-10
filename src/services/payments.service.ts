@@ -193,6 +193,69 @@ export async function recordPayment(db: Db, actor: Actor, raw: unknown, meta: Re
   }
 }
 
+// ───── دفعة حجز قاعة ─────
+
+const bookingPaymentSchema = z
+  .object({
+    bookingId: z.string().uuid(),
+    method: z.enum(["BANK_TRANSFER", "CARD", "CASH", "CHEQUE", "OTHER"], { message: "اختر وسيلة الدفع" }),
+    referenceNo: optionalText(80),
+    paidOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "تاريخ الدفع غير صحيح"),
+    notes: optionalText(1000),
+    idempotencyKey: z.string().uuid("نموذج غير صالح، أعد تحميل الصفحة"),
+  })
+  .refine((d) => !["BANK_TRANSFER", "CHEQUE"].includes(d.method) || !!d.referenceNo, { message: "رقم المرجع مطلوب للتحويل البنكي والشيك", path: ["referenceNo"] });
+
+/** تسجيل دفعة حجز: المبلغ = رسوم الساعات الزائدة بالضبط (لا دفع زائد)، ودفعة واحدة فعالة لكل حجز. */
+export async function recordBookingPayment(db: Db, actor: Actor, raw: unknown, meta: RequestMeta = {}) {
+  requirePermission(actor, "payments.record");
+  const input = parseInput(bookingPaymentSchema, raw);
+  if (input.paidOn > todayInRiyadh()) throw new AppError("VALIDATION", "تاريخ الدفع لا يمكن أن يكون في المستقبل");
+  const b0 = await db.roomBooking.findUnique({ where: { id: input.bookingId }, select: { branchId: true } });
+  if (!b0) throw new NotFoundError("الحجز غير موجود");
+  assertBranchAccess(actor, b0.branchId);
+  try {
+    return await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM room_bookings WHERE id = ${input.bookingId}::uuid FOR UPDATE`;
+      const b = await tx.roomBooking.findUniqueOrThrow({ where: { id: input.bookingId } });
+      if (b.status !== "CONFIRMED") throw new AppError("STATE", "الحجز ملغى");
+      if (b.paymentStatus !== "UNPAID") throw new AppError("STATE", b.paymentStatus === "FREE" ? "الحجز مجاني بالكامل" : "الحجز مسدد بالفعل");
+      const open = await tx.payment.count({ where: { bookingId: b.id, status: { in: ["PENDING_REVIEW", "APPROVED"] } } });
+      if (open) throw new AppError("STATE", "توجد دفعة مسجلة لهذا الحجز بانتظار المراجعة");
+      const p = await tx.payment.create({
+        data: {
+          tenantId: b.tenantId,
+          bookingId: b.id,
+          branchId: b.branchId,
+          amount: b.chargeAmount,
+          method: input.method,
+          referenceNo: input.referenceNo,
+          paidOn: dateOnly(input.paidOn),
+          notes: input.notes,
+          idempotencyKey: input.idempotencyKey,
+          recordedById: actor.id,
+        },
+      });
+      await writeAudit(tx, { actorId: actor.id, action: "payment.record", entityType: "payment", entityId: p.id, branchId: p.branchId, after: { bookingNo: b.bookingNo, amount: b.chargeAmount.toFixed(2), method: p.method }, meta });
+      await notify(tx, {
+        type: "PAYMENT_PENDING_REVIEW",
+        title: `دفعة حجز بانتظار المراجعة: ${b.chargeAmount.toFixed(2)} ر.س`,
+        body: `الحجز ${b.bookingNo} — ${PAYMENT_METHOD_LABELS[p.method]}`,
+        link: `/finance/payments/${p.id}`,
+        entityType: "payment",
+        entityId: p.id,
+        dedupeKey: `PAYMENT_PENDING_REVIEW:${p.id}`,
+        branchId: p.branchId,
+        permission: "payments.approve",
+        excludeUserId: actor.id,
+      });
+      return p;
+    });
+  } catch (e) {
+    mapDbErrors(e);
+  }
+}
+
 // ───── المراجعة ─────
 
 async function loadPayment(db: Db | Tx, actor: Actor, id: string) {
@@ -220,6 +283,7 @@ export async function approvePayment(db: Db, actor: Actor, id: string, meta: Req
       const done = await tx.payment.updateMany({ where: { id, status: "PENDING_REVIEW" }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: new Date(), receiptNo } });
       if (done.count !== 1) throw new AppError("STATE", "تمت مراجعة الدفعة بالفعل");
       await recomputeSchedules(tx, ids);
+      if (p.bookingId) await tx.roomBooking.update({ where: { id: p.bookingId }, data: { paymentStatus: "PAID" } });
       await writeAudit(tx, { actorId: actor.id, action: "payment.approve", entityType: "payment", entityId: id, branchId: p.branchId, after: { receiptNo, amount: p.amount.toFixed(2) }, meta });
       await resolve(tx, ["PAYMENT_PENDING_REVIEW"], [id]);
       return tx.payment.findUniqueOrThrow({ where: { id } });
@@ -258,6 +322,7 @@ export async function reversePayment(db: Db, actor: Actor, id: string, reason: s
     const done = await tx.payment.updateMany({ where: { id, status: "APPROVED" }, data: { status: "REVERSED", reversedById: actor.id, reversedAt: new Date(), reversalReason: r } });
     if (done.count !== 1) throw new AppError("STATE", "تم تعديل الدفعة بالفعل");
     await recomputeSchedules(tx, ids);
+    if (p.bookingId) await tx.roomBooking.update({ where: { id: p.bookingId }, data: { paymentStatus: "UNPAID" } });
     await writeAudit(tx, { actorId: actor.id, action: "payment.reverse", entityType: "payment", entityId: id, branchId: p.branchId, before: { status: "APPROVED", receiptNo: p.receiptNo }, after: { status: "REVERSED", reason: r }, meta });
     return tx.payment.findUniqueOrThrow({ where: { id } });
   });
@@ -328,6 +393,8 @@ export async function listPayments(db: Db, actor: Actor, raw: unknown) {
         { referenceNo: { contains: f.q, mode: "insensitive" } },
         { tenant: { name: { contains: f.q, mode: "insensitive" } } },
         { contract: { contractNo: { contains: f.q, mode: "insensitive" } } },
+        { booking: { bookingNo: { contains: f.q, mode: "insensitive" } } },
+        { booking: { visitorName: { contains: f.q, mode: "insensitive" } } },
       ],
     });
   const where = { AND: and };
@@ -340,7 +407,7 @@ export async function listPayments(db: Db, actor: Actor, raw: unknown) {
       orderBy: [{ createdAt: "desc" }],
       skip: (page - 1) * PAYMENTS_PAGE_SIZE,
       take: PAYMENTS_PAGE_SIZE,
-      include: { tenant: { select: { id: true, name: true } }, branch: { select: { nameAr: true } }, contract: { select: { id: true, contractNo: true } } },
+      include: { tenant: { select: { id: true, name: true } }, branch: { select: { nameAr: true } }, contract: { select: { id: true, contractNo: true } }, booking: { select: { id: true, bookingNo: true, visitorName: true } } },
     }),
   ]);
   return { filters: f, page, total, sumAmount: (sum._sum.amount ?? new Prisma.Decimal(0)).toFixed(2), pages: Math.max(1, Math.ceil(total / PAYMENTS_PAGE_SIZE)), payments };
@@ -354,6 +421,7 @@ export async function getPayment(db: Db, actor: Actor, id: string) {
       tenant: { select: { id: true, name: true, vatNumber: true, crNumber: true } },
       branch: { select: { nameAr: true, code: true } },
       contract: { select: { id: true, contractNo: true } },
+      booking: { select: { id: true, bookingNo: true, visitorName: true, bookingDate: true, startHour: true, endHour: true, paidHours: true, hourlyPrice: true, unit: { select: { code: true } } } },
       allocations: { include: { schedule: { select: { seqNo: true, dueDate: true, periodStart: true, periodEnd: true, amountDue: true } } }, orderBy: { schedule: { seqNo: "asc" } } },
     },
   });
@@ -401,4 +469,9 @@ export async function contractsWithBalance(db: Db, actor: Actor) {
     select: { id: true, contractNo: true, tenant: { select: { name: true } }, branch: { select: { nameAr: true } } },
     take: 2000,
   });
+}
+
+/** اسم الدافع للعرض: العميل المسجل أو الزائر الخارجي للحجز */
+export function payerName(p: { tenant?: { name: string } | null; booking?: { visitorName: string | null } | null }) {
+  return p.tenant?.name ?? (p.booking?.visitorName ? `${p.booking.visitorName} (زائر)` : "—");
 }

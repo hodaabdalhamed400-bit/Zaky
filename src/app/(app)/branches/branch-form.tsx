@@ -1,5 +1,5 @@
 "use client";
-import { useActionState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
 import type { Branch } from "@prisma/client";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
@@ -14,9 +14,9 @@ export function BranchForm({
   initial?: Pick<Branch, "code" | "nameAr" | "city" | "address" | "mapUrl" | "managerName" | "managerActing" | "contactPerson" | "phone" | "notes" | "status">;
   codeLocked?: boolean;
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-6">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-6">
       {state.error && <Alert>{state.error}</Alert>}
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="اسم الفرع" htmlFor="nameAr" required>
@@ -76,14 +76,14 @@ export function BranchForm({
       <div className="flex justify-end">
         <SubmitButton>حفظ</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function FloorForm({ action }: { action: (prev: FormState, fd: FormData) => Promise<FormState> }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-3">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-3">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <div className="flex flex-wrap items-end gap-2">
@@ -99,14 +99,14 @@ export function FloorForm({ action }: { action: (prev: FormState, fd: FormData) 
         </div>
         <SubmitButton variant="secondary" pendingText="…">إضافة</SubmitButton>
       </div>
-    </form>
+    </ActionForm>
   );
 }
 
 export function DeleteFloorForm({ action }: { action: (prev: FormState, fd: FormData) => Promise<FormState> }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="inline">
+    <ActionForm onSubmit={formAction} pending={pending} className="inline">
       {state.error && <span role="alert" className="me-2 text-xs text-red-600">{state.error}</span>}
       <button
         type="submit"
@@ -117,6 +117,6 @@ export function DeleteFloorForm({ action }: { action: (prev: FormState, fd: Form
       >
         حذف
       </button>
-    </form>
+    </ActionForm>
   );
 }

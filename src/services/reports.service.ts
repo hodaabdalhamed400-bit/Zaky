@@ -11,7 +11,7 @@ import { BILLING_CYCLE_LABELS } from "@/lib/contract-pricing";
 import { computeOccupancy, unitOccupancyToday } from "./occupancy.service";
 import { BRANCH_STATUS_LABELS } from "./branches.service";
 import { CONTRACT_STATUS_LABELS } from "./contracts.service";
-import { PAYMENT_METHOD_LABELS } from "./payments.service";
+import { PAYMENT_METHOD_LABELS, payerName } from "./payments.service";
 import { TENANT_STATUS_LABELS } from "./tenants.service";
 import { effectiveUnitStatus } from "./units.service";
 import { overdueReport } from "./finance.service";
@@ -308,13 +308,13 @@ export const REPORTS: Record<string, Def> = {
         where: { status: "APPROVED", paidOn: { gte: dateOnly(from), lte: dateOnly(to) }, ...inBranches(ids) },
         orderBy: [{ paidOn: "asc" }, { receiptNo: "asc" }],
         take: MAX_ROWS + 1,
-        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } }, contract: { select: { contractNo: true } } },
+        include: { tenant: { select: { name: true } }, branch: { select: { nameAr: true } }, contract: { select: { contractNo: true } }, booking: { select: { bookingNo: true, visitorName: true } } },
       });
       const rows: Row[] = payments.slice(0, MAX_ROWS).map((p) => ({
         receipt: p.receiptNo,
         date: p.paidOn,
-        tenant: p.tenant.name,
-        contract: p.contract?.contractNo ?? "",
+        tenant: payerName(p),
+        contract: p.contract?.contractNo ?? (p.booking ? `حجز ${p.booking.bookingNo}` : ""),
         branch: p.branch.nameAr,
         method: PAYMENT_METHOD_LABELS[p.method],
         ref: p.referenceNo,
@@ -325,7 +325,7 @@ export const REPORTS: Record<string, Def> = {
           { key: "receipt", header: "رقم الإيصال", type: "text" },
           { key: "date", header: "تاريخ الدفع", type: "date" },
           { key: "tenant", header: "المستأجر", type: "text" },
-          { key: "contract", header: "العقد", type: "text" },
+          { key: "contract", header: "العقد / الحجز", type: "text" },
           { key: "branch", header: "الفرع", type: "text" },
           { key: "method", header: "الوسيلة", type: "text" },
           { key: "ref", header: "المرجع", type: "text" },

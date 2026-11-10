@@ -24,6 +24,7 @@ export const NAV: { title?: string; items: NavItem[] }[] = [
     items: [
       { href: "/tenants", label: "المستأجرون", icon: "tenants", perm: "tenants.view" },
       { href: "/contracts", label: "العقود", icon: "contracts", perm: "contracts.view" },
+      { href: "/bookings", label: "حجوزات القاعات", icon: "calendar", perm: "bookings.view" },
     ],
   },
   {

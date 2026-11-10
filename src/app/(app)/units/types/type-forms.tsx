@@ -1,13 +1,13 @@
 "use client";
-import { useActionState } from "react";
+import { ActionForm, useActionForm } from "@/components/ui/action-form";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/auth/server";
 
 export function TypeForm({ action }: { action: (prev: FormState, fd: FormData) => Promise<FormState> }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction} className="space-y-4">
+    <ActionForm onSubmit={formAction} pending={pending} className="space-y-4">
       {state.error && <Alert>{state.error}</Alert>}
       {state.success && <Alert kind="success">{state.success}</Alert>}
       <Field label="اسم النوع" htmlFor="type-name" required>
@@ -26,16 +26,16 @@ export function TypeForm({ action }: { action: (prev: FormState, fd: FormData) =
         </select>
       </Field>
       <SubmitButton className="w-full">إضافة النوع</SubmitButton>
-    </form>
+    </ActionForm>
   );
 }
 
 export function ToggleTypeForm({ action, active }: { action: (prev: FormState, fd: FormData) => Promise<FormState>; active: boolean }) {
-  const [state, formAction] = useActionState(action, {});
+  const [state, formAction, pending] = useActionForm(action, {});
   return (
-    <form action={formAction}>
+    <ActionForm onSubmit={formAction} pending={pending}>
       {state.error && <span role="alert" className="text-xs text-red-600">{state.error}</span>}
       <button type="submit" className="text-xs text-brand-700 hover:underline">{active ? "تعطيل" : "تفعيل"}</button>
-    </form>
+    </ActionForm>
   );
 }
