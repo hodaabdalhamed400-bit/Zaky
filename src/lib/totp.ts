@@ -4,6 +4,11 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 export const STEP_SECONDS = 30;
 
+/** يحول الأرقام العربية (٠-٩) والفارسية (۰-۹) إلى إنجليزية — لوحة المفاتيح العربية تكتبها هكذا. */
+export function normalizeDigits(s: string) {
+  return s.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x6f0));
+}
+
 export function base32Encode(buf: Buffer): string {
   let bits = 0, value = 0, out = "";
   for (const byte of buf) {
@@ -58,7 +63,7 @@ export function totpAt(secret: string, step: number): string {
  * يُرجع الخطوة المطابقة أو null.
  */
 export function verifyTotp(secret: string, code: string, lastStep: number | null, now = Date.now()): number | null {
-  const c = code.replace(/\s/g, "");
+  const c = normalizeDigits(code).replace(/\s/g, "");
   if (!/^\d{6}$/.test(c)) return null;
   const cur = currentStep(now);
   for (const step of [cur - 1, cur, cur + 1]) {

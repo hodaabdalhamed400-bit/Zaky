@@ -23,6 +23,9 @@ describe("TOTP", () => {
     expect(verifyTotp(secret, totpAt(secret, step - 2), null, now)).toBeNull();
     expect(verifyTotp(secret, totpAt(secret, step), step, now)).toBeNull();
     expect(verifyTotp(secret, "12345", null, now)).toBeNull();
+    // أرقام لوحة المفاتيح العربية
+    const ar = totpAt(secret, step).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]!);
+    expect(verifyTotp(secret, ar, null, now)).toBe(step);
   });
   it("تشفير الأسرار المخزنة (AES-256-GCM) ورفض أي عبث", () => {
     const s = seal("JBSWY3DPEHPK3PXP");

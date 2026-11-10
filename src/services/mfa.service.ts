@@ -8,7 +8,7 @@ import type { Actor, RequestMeta } from "@/lib/auth/actor";
 import { generateSessionToken, hashToken } from "@/lib/auth/tokens";
 import { createSession, revokeAllUserSessions } from "@/lib/auth/session";
 import { requirePermission } from "@/lib/rbac/guard";
-import { generateSecret, otpauthUri, verifyTotp } from "@/lib/totp";
+import { generateSecret, normalizeDigits, otpauthUri, verifyTotp } from "@/lib/totp";
 import { open, seal } from "@/lib/secret-box";
 
 /** إعدادات الفرض: الأدوار الإدارية تتطلب التحقق الثنائي (المواصفات: "دعم المصادقة متعددة العوامل للإدارة"). */
@@ -108,7 +108,7 @@ export async function verifyChallenge(db: Db, challengeToken: string | undefined
   const u = ch.user;
   if (!u.isActive || !u.mfaEnabled || !u.mfaSecretEnc) return { ok: false, error: "لا يمكن إكمال الدخول. تواصل مع مسؤول النظام.", restart: true };
 
-  const clean = code.trim();
+  const clean = normalizeDigits(code).trim();
   let step: number | null = null;
   let usedRecovery = false;
   let remaining = u.mfaRecoveryHashes;
