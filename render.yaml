@@ -7,7 +7,8 @@ services:
     runtime: node
     region: frankfurt
     plan: starter
-    buildCommand: npm ci && npm run build
+    # --include=dev: Render يضبط NODE_ENV=production، وأدوات البناء (prisma, tailwind, tsx) في devDependencies
+    buildCommand: npm ci --include=dev && npm run build
     preDeployCommand: npx prisma migrate deploy && npm run db:seed
     startCommand: npm start
     healthCheckPath: /api/health
@@ -64,4 +65,5 @@ databases:
     region: frankfurt
     plan: basic-1gb
     postgresMajorVersion: "16"
+    # قاعدة خاصة: لا وصول من الإنترنت. للنسخ الخارجي أضف عنوان IP جهازك مؤقتًا من لوحة Render ثم احذفه
     ipAllowList: []
