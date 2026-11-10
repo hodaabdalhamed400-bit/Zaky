@@ -46,8 +46,8 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
             {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
           </select>
           <div className="flex gap-2 lg:col-span-6">
-            <label className="flex items-center gap-2 text-sm text-gray-600">من <input type="date" name="from" defaultValue={filters.from} className={inputClass + " w-40"} /></label>
-            <label className="flex items-center gap-2 text-sm text-gray-600">إلى <input type="date" name="to" defaultValue={filters.to} className={inputClass + " w-40"} /></label>
+            <label className="flex items-center gap-2 text-sm text-gray-600">من <input type="date" name="from" defaultValue={filters.from} className={inputClass.replace("w-full", "w-40")} /></label>
+            <label className="flex items-center gap-2 text-sm text-gray-600">إلى <input type="date" name="to" defaultValue={filters.to} className={inputClass.replace("w-full", "w-40")} /></label>
             <button className={buttonClass("primary")}>بحث</button>
           </div>
         </form>

@@ -106,3 +106,87 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
     expiringWithinDays,
   };
 }
+
+// ───── بيانات الرسوم البيانية ─────
+
+export type ChartsData = {
+  months: string[];
+  occupancyByBranch: { name: string; unitsPct: number | null; seatsPct: number | null; units: number }[];
+  occupancyTrend: { month: string; unitsPct: number | null; seatsPct: number | null }[];
+  contractsFlow: { month: string; started: number; ended: number }[];
+  money: { month: string; billed: number; collected: number }[] | null;
+};
+
+function monthEnds(today: string, count: number) {
+  const out: { month: string; start: string; end: string; at: string }[] = [];
+  const first = `${today.slice(0, 7)}-01`;
+  for (let i = count - 1; i >= 0; i--) {
+    const start = addMonthsKeepDayLocal(first, -i);
+    const end = addDays(addMonthsKeepDayLocal(start, 1), -1);
+    out.push({ month: start.slice(0, 7), start, end, at: end < today ? end : today });
+  }
+  return out;
+}
+function addMonthsKeepDayLocal(ymd: string, n: number) {
+  const [y, m] = ymd.split("-").map(Number) as [number, number];
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}-01`;
+}
+
+/**
+ * - الإشغال حسب الفرع: اليوم، حسب الوحدات والمقاعد.
+ * - تطور الإشغال: في آخر يوم من كل شهر (أو اليوم للشهر الحالي).
+ * - العقود الجديدة: عقود سرت فعلًا وبدأت في الشهر. المنتهية: انتهت أو أُنهيت أو جُددت في الشهر.
+ * - المستحق مقابل المحصّل: أقساط استحقت في الشهر مقابل دفعات معتمدة في الشهر (لمن يملك payments.view).
+ */
+export async function getDashboardCharts(db: Db, actor: Actor, opts: { branchId?: string; months?: number } = {}): Promise<ChartsData> {
+  requirePermission(actor, "dashboard.view");
+  if (opts.branchId) assertBranchAccess(actor, opts.branchId);
+  const branchIds: string[] | null = opts.branchId ? [opts.branchId] : actor.allBranches ? null : [...actor.branchIds];
+  const count = [6, 12, 24].includes(opts.months ?? 12) ? (opts.months ?? 12) : 12;
+  const today = todayInRiyadh();
+  const ms = monthEnds(today, count);
+  const cond = (col: string) =>
+    branchIds === null ? Prisma.sql`TRUE` : branchIds.length === 0 ? Prisma.sql`FALSE` : Prisma.sql`${Prisma.raw(col)} = ANY(${branchIds}::uuid[])`;
+
+  const branches = await db.branch.findMany({
+    where: { status: { not: "INACTIVE" }, ...(branchIds === null ? {} : { id: { in: branchIds } }) },
+    orderBy: { nameAr: "asc" },
+    select: { id: true, nameAr: true },
+  });
+  const [now, trend, flow, money] = await Promise.all([
+    computeOccupancy(db, branches.map((b) => b.id), today),
+    Promise.all(ms.map((m) => computeOccupancy(db, branchIds, m.at).then((o) => ({ month: m.month, unitsPct: o.total.unitsPct, seatsPct: o.total.seatsPct })))),
+    db.$queryRaw<{ m: string; started: bigint; ended: bigint }[]>`
+      WITH months AS (SELECT to_char(d, 'YYYY-MM') AS m, d::date AS ms, (d + interval '1 month - 1 day')::date AS me
+        FROM generate_series(${dateOnly(ms[0]!.start)}::date, ${dateOnly(ms[ms.length - 1]!.start)}::date, interval '1 month') d)
+      SELECT months.m,
+        (SELECT COUNT(*) FROM contracts c WHERE c.status IN ('ACTIVE','EXPIRED','RENEWED','TERMINATED')
+           AND c.start_date BETWEEN months.ms AND months.me AND ${cond("c.branch_id")}) AS started,
+        (SELECT COUNT(*) FROM contracts c WHERE c.status IN ('EXPIRED','RENEWED','TERMINATED')
+           AND COALESCE(c.ended_at, c.end_date) BETWEEN months.ms AND months.me AND ${cond("c.branch_id")}) AS ended
+      FROM months ORDER BY months.m`,
+    actor.permissions.has("payments.view")
+      ? db.$queryRaw<{ m: string; billed: Prisma.Decimal; collected: Prisma.Decimal }[]>`
+          WITH months AS (SELECT to_char(d, 'YYYY-MM') AS m, d::date AS ms, (d + interval '1 month - 1 day')::date AS me
+            FROM generate_series(${dateOnly(ms[0]!.start)}::date, ${dateOnly(ms[ms.length - 1]!.start)}::date, interval '1 month') d)
+          SELECT months.m,
+            COALESCE((SELECT SUM(s.amount_due) FROM payment_schedules s JOIN contracts c ON c.id = s.contract_id
+              WHERE s.status <> 'CANCELLED' AND s.due_date BETWEEN months.ms AND months.me AND ${cond("c.branch_id")}), 0) AS billed,
+            COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.status = 'APPROVED'
+              AND p.paid_on BETWEEN months.ms AND months.me AND ${cond("p.branch_id")}), 0) AS collected
+          FROM months ORDER BY months.m`
+      : Promise.resolve(null),
+  ]);
+  return {
+    months: ms.map((m) => m.month),
+    occupancyByBranch: branches.map((b) => {
+      const o = now.get(b.id);
+      return { name: b.nameAr, unitsPct: o.unitsPct, seatsPct: o.seatsPct, units: o.units };
+    }),
+    occupancyTrend: trend,
+    contractsFlow: flow.map((r) => ({ month: r.m, started: Number(r.started), ended: Number(r.ended) })),
+    // للرسم فقط (أرقام عادية بعد التقريب لمنزلتين)؛ الأرقام الرسمية في الجداول والتقارير
+    money: money ? money.map((r) => ({ month: r.m, billed: Number(new Prisma.Decimal(r.billed).toFixed(2)), collected: Number(new Prisma.Decimal(r.collected).toFixed(2)) })) : null,
+  };
+}

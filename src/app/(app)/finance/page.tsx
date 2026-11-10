@@ -46,12 +46,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <form className="flex flex-wrap items-end gap-3 p-4">
           <div>
             <label htmlFor="month" className="mb-1 block text-xs text-gray-500">الشهر</label>
-            <input id="month" name="month" type="month" defaultValue={s.filters.month} className={inputClass + " w-44"} />
+            <input id="month" name="month" type="month" defaultValue={s.filters.month} className={inputClass.replace("w-full", "w-44")} />
           </div>
           {branches.length > 1 && (
             <div>
               <label htmlFor="branch" className="mb-1 block text-xs text-gray-500">الفرع</label>
-              <select id="branch" name="branchId" defaultValue={s.filters.branchId ?? ""} className={inputClass + " w-48"}>
+              <select id="branch" name="branchId" defaultValue={s.filters.branchId ?? ""} className={inputClass.replace("w-full", "w-48")}>
                 <option value="">كل الفروع المتاحة لي</option>
                 {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
               </select>

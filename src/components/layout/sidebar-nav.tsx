@@ -58,7 +58,7 @@ function NavLinks({ sections, onNavigate }: { sections: Section[]; onNavigate?: 
   );
 }
 
-export function SidebarNav({ sections, footer }: { sections: Section[]; footer: React.ReactNode }) {
+export function SidebarNav({ sections, footer, topAction }: { sections: Section[]; footer: React.ReactNode; topAction?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   useEffect(() => setOpen(false), [pathname]);
@@ -77,6 +77,8 @@ export function SidebarNav({ sections, footer }: { sections: Section[]; footer: 
       <div className="sticky top-0 z-30 flex items-center justify-between bg-brand-900 px-4 py-2.5 lg:hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/zaki-logo-white.svg" alt="ذكي لحاضنات ومسرعات الأعمال" width={126} height={48} className="h-10 w-auto" />
+        <div className="flex items-center gap-1">
+        {topAction}
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -87,6 +89,7 @@ export function SidebarNav({ sections, footer }: { sections: Section[]; footer: 
         >
           <Icon name="menu" />
         </button>
+        </div>
       </div>
 
       {/* قائمة الجوال المنزلقة */}

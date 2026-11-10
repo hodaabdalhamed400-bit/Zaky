@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
-import { getDashboardStats } from "@/services/dashboard.service";
+import { getDashboardCharts, getDashboardStats } from "@/services/dashboard.service";
+import { ContractsFlowChart, MoneyChart, OccupancyByBranchChart, OccupancyTrendChart } from "@/components/charts/charts";
 import { formatSAR } from "@/lib/money";
 import { addDays, dateOnly, formatDate, formatDateTime, todayInRiyadh } from "@/lib/dates";
 import { AUDIT_ACTION_LABELS } from "@/lib/audit";
@@ -12,9 +13,10 @@ import { StatCard } from "@/components/ui/stat-card";
 
 export const metadata: Metadata = { title: "لوحة التحكم" };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ branch?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ branch?: string; range?: string }> }) {
   const actor = await requirePageActor("dashboard.view");
-  const { branch } = await searchParams;
+  const { branch, range } = await searchParams;
+  const months = range === "6" ? 6 : range === "24" ? 24 : 12;
 
   const branches = await prisma.branch.findMany({
     where: { status: { not: "INACTIVE" }, ...(actor.allBranches ? {} : { id: { in: [...actor.branchIds] } }) },
@@ -22,7 +24,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     select: { id: true, nameAr: true },
   });
   const branchId = branch && branches.some((b) => b.id === branch) && hasBranchAccess(actor, branch) ? branch : undefined;
-  const s = await getDashboardStats(prisma, actor, { branchId });
+  const [s, charts] = await Promise.all([getDashboardStats(prisma, actor, { branchId }), getDashboardCharts(prisma, actor, { branchId, months })]);
 
   const recent = actor.permissions.has("audit.view")
     ? await prisma.auditLog.findMany({
@@ -62,18 +64,26 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         title={`مرحبًا، ${actor.name}`}
         description="ملخص الفروع والإشغال والعقود والتحصيل — الأرقام محسوبة مباشرة من قاعدة البيانات."
         actions={
-          branches.length > 1 ? (
-            <form className="flex gap-2" role="search" aria-label="تصفية حسب الفرع">
-              <label htmlFor="branch" className="sr-only">الفرع</label>
-              <select id="branch" name="branch" defaultValue={branchId ?? ""} className={inputClass + " w-48"}>
-                <option value="">كل الفروع المتاحة لي</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.nameAr}</option>
-                ))}
-              </select>
-              <button type="submit" className={buttonClass("secondary")}>عرض</button>
-            </form>
-          ) : undefined
+          <form className="flex flex-wrap gap-2" role="search" aria-label="تصفية لوحة التحكم">
+            {branches.length > 1 && (
+              <>
+                <label htmlFor="branch" className="sr-only">الفرع</label>
+                <select id="branch" name="branch" defaultValue={branchId ?? ""} className={inputClass.replace("w-full", "w-44")}>
+                  <option value="">كل الفروع المتاحة لي</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.nameAr}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            <label htmlFor="range" className="sr-only">فترة الرسوم البيانية</label>
+            <select id="range" name="range" defaultValue={String(months)} className={inputClass.replace("w-full", "w-36")}>
+              <option value="6">آخر 6 أشهر</option>
+              <option value="12">آخر 12 شهرًا</option>
+              <option value="24">آخر 24 شهرًا</option>
+            </select>
+            <button type="submit" className={buttonClass("secondary")}>عرض</button>
+          </form>
         }
       />
 
@@ -110,6 +120,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             action={actor.permissions.has("units.manage") ? <Link href="/units/new" className={buttonClass("primary")}>إضافة وحدة</Link> : undefined}
           />
         </Card>
+      )}
+
+      {s.units > 0 && (
+        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+          {charts.money && <MoneyChart data={charts.money} />}
+          <OccupancyTrendChart data={charts.occupancyTrend} />
+          {!branchId && charts.occupancyByBranch.length > 1 && <OccupancyByBranchChart data={charts.occupancyByBranch} />}
+          <ContractsFlowChart data={charts.contractsFlow} />
+        </div>
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">

@@ -5,6 +5,8 @@ import { NAV } from "@/components/layout/nav";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { Icon } from "@/components/ui/icons";
 import { logoutAction } from "../actions";
+import { prisma } from "@/lib/db";
+import { unreadCount } from "@/services/notifications.service";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor();
@@ -13,6 +15,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // القائمة تعرض فقط ما يملك المستخدم صلاحيته (والتحقق الحقيقي يتم في كل صفحة/إجراء)
   const sections = NAV.map((s) => ({ ...s, items: s.items.filter((i) => actor.permissions.has(i.perm)) })).filter(
     (s) => s.items.length > 0,
+  );
+
+  const unread = await unreadCount(prisma, actor);
+  const bell = (dark: boolean) => (
+    <Link
+      href="/notifications"
+      className={`relative inline-flex items-center gap-2 rounded-lg p-2 text-sm ${dark ? "text-white hover:bg-white/10" : "text-gray-600 hover:bg-gray-100"}`}
+      aria-label={unread ? `الإشعارات: ${unread} غير مقروء` : "الإشعارات"}
+    >
+      <Icon name="bell" />
+      {unread > 0 && (
+        <span className="tabular absolute -top-0.5 -end-0.5 grid min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+          {unread > 99 ? "99+" : unread}
+        </span>
+      )}
+    </Link>
   );
 
   const footer = (
@@ -40,8 +58,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-white focus:p-2">
         تخطَّ إلى المحتوى
       </a>
-      <SidebarNav sections={sections} footer={footer} />
+      <SidebarNav sections={sections} footer={footer} topAction={bell(true)} />
       <main id="main" className="lg:ps-64">
+        <div className="hidden justify-end border-b border-gray-200 bg-white px-8 py-2 lg:flex">{bell(false)}</div>
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
       </main>
     </div>

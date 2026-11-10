@@ -135,7 +135,7 @@ export function InteractionForm({ action }: { action: (p: FormState, fd: FormDat
       {state.error && <Alert>{state.error}</Alert>}
       <div className="flex gap-2">
         <label htmlFor="i-channel" className="sr-only">الوسيلة</label>
-        <select id="i-channel" name="channel" className={inputClass + " w-32"} defaultValue="CALL">
+        <select id="i-channel" name="channel" className={inputClass.replace("w-full", "w-32")} defaultValue="CALL">
           <option value="CALL">اتصال</option>
           <option value="VISIT">زيارة</option>
           <option value="WHATSAPP">واتساب</option>

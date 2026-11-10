@@ -10,6 +10,7 @@ import { computeContract } from "@/lib/contract-pricing";
 import { decimalString, optionalText, parseInput } from "@/lib/validation";
 import { assertTenantAccess } from "./access";
 import { syncTenantStatus } from "./tenants.service";
+import { notify, resolve } from "./notifications.service";
 
 type Tx = Prisma.TransactionClient;
 
@@ -308,6 +309,19 @@ export async function submitForApproval(db: Db, actor: Actor, id: string, meta: 
       await tx.contractUnit.updateMany({ where: { contractId: id }, data: { blocksOccupancy: true } });
       const u = await tx.contract.update({ where: { id }, data: { status: "PENDING_APPROVAL", submittedAt: new Date(), rejectionReason: null } });
       await writeAudit(tx, { actorId: actor.id, action: "contract.submit", entityType: "contract", entityId: id, branchId: c.branchId, meta });
+      const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: c.tenantId }, select: { name: true } });
+      await notify(tx, {
+        type: "CONTRACT_PENDING_APPROVAL",
+        title: `عقد بانتظار الاعتماد: ${c.contractNo}`,
+        body: `${tenant.name} — الإجمالي ${c.totalAmount.toFixed(2)} ر.س`,
+        link: `/contracts/${id}`,
+        entityType: "contract",
+        entityId: id,
+        dedupeKey: `CONTRACT_PENDING_APPROVAL:${id}:${Date.now()}`,
+        branchId: c.branchId,
+        permission: "contracts.approve",
+        excludeUserId: actor.id,
+      });
       return u;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
   } catch (e) {
@@ -349,6 +363,7 @@ export async function approveContract(db: Db, actor: Actor, id: string, meta: Re
     await snapshot(tx, id, "اعتماد العقد", actor.id);
     await syncTenantStatus(tx, c.tenantId);
     await writeAudit(tx, { actorId: actor.id, action: "contract.approve", entityType: "contract", entityId: id, branchId: c.branchId, after: { installments: calc.installments.length, total: calc.total.toFixed(2) }, meta });
+    await resolve(tx, ["CONTRACT_PENDING_APPROVAL"], [id]);
     return tx.contract.findUniqueOrThrow({ where: { id } });
   });
 }
@@ -362,6 +377,7 @@ export async function rejectContract(db: Db, actor: Actor, id: string, reason: s
     await tx.contractUnit.updateMany({ where: { contractId: id }, data: { blocksOccupancy: false } });
     const u = await tx.contract.update({ where: { id }, data: { status: "DRAFT", rejectionReason: r } });
     await writeAudit(tx, { actorId: actor.id, action: "contract.reject", entityType: "contract", entityId: id, branchId: c.branchId, after: { reason: r }, meta });
+    await resolve(tx, ["CONTRACT_PENDING_APPROVAL"], [id]);
     return u;
   });
 }
@@ -376,6 +392,7 @@ export async function cancelContract(db: Db, actor: Actor, id: string, reason: s
     await tx.contractUnit.updateMany({ where: { contractId: id }, data: { blocksOccupancy: false } });
     const u = await tx.contract.update({ where: { id }, data: { status: "CANCELLED", endReason: r } });
     await writeAudit(tx, { actorId: actor.id, action: "contract.cancel", entityType: "contract", entityId: id, branchId: c.branchId, after: { reason: r }, meta });
+    await resolve(tx, ["CONTRACT_PENDING_APPROVAL"], [id]);
     return u;
   });
 }
@@ -593,8 +610,19 @@ export async function runContractMaintenance(db: Db, today = todayInRiyadh()) {
   const system = { id: "system", permissions: new Set<string>(), allBranches: true, branchIds: [] } as unknown as Actor;
   for (const c of due) {
     try {
-      await createRenewalDraft(db, system, c.id, {}, { systemActor: true });
+      const d = await createRenewalDraft(db, system, c.id, {}, { systemActor: true });
       drafts++;
+      await notify(db, {
+        type: "SYSTEM",
+        title: `مسودة تجديد جاهزة: ${d.contractNo}`,
+        body: `تجديد للعقد ${c.contractNo} — راجع السعر حسب الاتفاق ثم أرسلها للاعتماد`,
+        link: `/contracts/${d.id}`,
+        entityType: "contract",
+        entityId: d.id,
+        dedupeKey: `RENEWAL_DRAFT:${d.id}`,
+        branchId: d.branchId,
+        permission: "contracts.create",
+      });
     } catch (e) {
       // مثال: الوحدة محجوزة لعميل آخر بعد الانتهاء — تبقى للمعالجة اليدوية
       skipped.push(`${c.contractNo}: ${e instanceof Error ? e.message : "خطأ"}`);

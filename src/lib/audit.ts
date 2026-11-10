@@ -92,4 +92,5 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "payment.reject": "رفض دفعة",
   "payment.reverse": "عكس دفعة",
   "adjustment.create": "تسوية على قسط",
+  "report.export": "تصدير تقرير",
 };

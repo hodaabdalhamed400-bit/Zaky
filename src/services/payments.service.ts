@@ -8,6 +8,7 @@ import { assertBranchAccess, branchWhere, requirePermission } from "@/lib/rbac/g
 import { dateOnly, todayInRiyadh } from "@/lib/dates";
 import { money } from "@/lib/money";
 import { decimalString, optionalText, parseInput } from "@/lib/validation";
+import { notify, resolve } from "./notifications.service";
 
 type Tx = Prisma.TransactionClient;
 
@@ -173,6 +174,18 @@ export async function recordPayment(db: Db, actor: Actor, raw: unknown, meta: Re
         after: { contractNo: contract.contractNo, amount: amount.toFixed(2), method: p.method, referenceNo: p.referenceNo, paidOn: input.paidOn, allocations: input.allocations },
         meta,
       });
+      await notify(tx, {
+        type: "PAYMENT_PENDING_REVIEW",
+        title: `دفعة بانتظار المراجعة: ${amount.toFixed(2)} ر.س`,
+        body: `العقد ${contract.contractNo} — ${PAYMENT_METHOD_LABELS[p.method]}`,
+        link: `/finance/payments/${p.id}`,
+        entityType: "payment",
+        entityId: p.id,
+        dedupeKey: `PAYMENT_PENDING_REVIEW:${p.id}`,
+        branchId: p.branchId,
+        permission: "payments.approve",
+        excludeUserId: actor.id,
+      });
       return p;
     });
   } catch (e) {
@@ -208,6 +221,7 @@ export async function approvePayment(db: Db, actor: Actor, id: string, meta: Req
       if (done.count !== 1) throw new AppError("STATE", "تمت مراجعة الدفعة بالفعل");
       await recomputeSchedules(tx, ids);
       await writeAudit(tx, { actorId: actor.id, action: "payment.approve", entityType: "payment", entityId: id, branchId: p.branchId, after: { receiptNo, amount: p.amount.toFixed(2) }, meta });
+      await resolve(tx, ["PAYMENT_PENDING_REVIEW"], [id]);
       return tx.payment.findUniqueOrThrow({ where: { id } });
     });
   } catch (e) {
@@ -224,6 +238,7 @@ export async function rejectPayment(db: Db, actor: Actor, id: string, reason: st
     const done = await tx.payment.updateMany({ where: { id, status: "PENDING_REVIEW" }, data: { status: "REJECTED", rejectedReason: r, rejectedById: actor.id, rejectedAt: new Date() } });
     if (done.count !== 1) throw new AppError("STATE", "تمت مراجعة الدفعة بالفعل");
     await writeAudit(tx, { actorId: actor.id, action: "payment.reject", entityType: "payment", entityId: id, branchId: p.branchId, after: { reason: r }, meta });
+    await resolve(tx, ["PAYMENT_PENDING_REVIEW"], [id]);
     return tx.payment.findUniqueOrThrow({ where: { id } });
   });
 }

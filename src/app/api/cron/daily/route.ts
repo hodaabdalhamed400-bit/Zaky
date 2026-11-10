@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { runContractMaintenance } from "@/services/contracts.service";
+import { runDaily } from "@/services/jobs.service";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,6 @@ export async function POST(req: Request) {
   const given = Buffer.from(req.headers.get("authorization")?.replace(/^Bearer /, "") ?? "");
   const expected = Buffer.from(secret);
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return new Response("Unauthorized", { status: 401 });
-  const result = await runContractMaintenance(prisma);
+  const result = await runDaily(prisma);
   return Response.json(result);
 }

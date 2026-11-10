@@ -24,7 +24,7 @@ export default async function OverduePage({ searchParams }: { searchParams: Prom
       {branches.length > 1 && (
         <Card className="mb-4">
           <form className="flex gap-2 p-4">
-            <select name="branchId" defaultValue={sp.branchId ?? ""} aria-label="الفرع" className={inputClass + " w-56"}>
+            <select name="branchId" defaultValue={sp.branchId ?? ""} aria-label="الفرع" className={inputClass.replace("w-full", "w-56")}>
               <option value="">كل الفروع</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.nameAr}</option>)}
             </select>

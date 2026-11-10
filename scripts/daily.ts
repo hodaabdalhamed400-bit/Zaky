@@ -1,10 +1,10 @@
 /** مهمة الصيانة اليومية من سطر الأوامر (Render Cron Job): npm run job:daily */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { runContractMaintenance } from "../src/services/contracts.service";
+import { runDaily } from "../src/services/jobs.service";
 
 const db = new PrismaClient();
-runContractMaintenance(db)
+runDaily(db)
   .then((r) => console.log(JSON.stringify({ at: new Date().toISOString(), ...r })))
   .catch((e) => {
     console.error(e);
