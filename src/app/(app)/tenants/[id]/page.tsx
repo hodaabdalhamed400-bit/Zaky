@@ -50,7 +50,7 @@ export default async function TenantPage({ params, searchParams }: { params: Pro
       )}
 
       {balance && (
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="stagger mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard label="المستحق حتى اليوم" value={formatSAR(balance.due)} icon="finance" />
           <StatCard label="المتأخر" value={formatSAR(balance.overdue)} icon="alert" tone="bad" />
           <StatCard label="أقساط قادمة" value={formatSAR(balance.future)} icon="finance" />

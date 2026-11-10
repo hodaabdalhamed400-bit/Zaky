@@ -54,8 +54,11 @@ try {
 
   // ── الرسوم البيانية ──
   await page.goto(BASE + "/");
-  for (const t of ["المستحقات مقابل المحصّل", "تطور الإشغال", "نسبة الإشغال حسب الفرع", "العقود الجديدة والمنتهية"])
+  for (const t of ["المستحقات مقابل المحصّل", "تطور الإشغال", "نسبة الإشغال حسب الفرع", "العقود الجديدة والمنتهية"]) {
+    // الرسوم تُرسم في المتصفح بعد قياس الحاوية، فننتظر ظهورها قبل العدّ
+    await page.locator(`section[aria-label="${t}"] svg.recharts-surface`).first().waitFor({ timeout: 10000 }).catch(() => {});
     check(`رسم بياني: ${t}`, (await page.locator(`section[aria-label="${t}"] svg.recharts-surface`).count()) === 1);
+  }
   await page.screenshot({ path: `${OUT}/p5-dashboard.png`, fullPage: true });
   await page.locator('section[aria-label="المستحقات مقابل المحصّل"] summary').click();
   check("كل رسم له جدول بيانات بديل", (await page.locator('section[aria-label="المستحقات مقابل المحصّل"] details tbody tr').count()) === 12);

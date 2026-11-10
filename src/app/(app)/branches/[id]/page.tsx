@@ -46,7 +46,7 @@ export default async function BranchPage({ params, searchParams }: { params: Pro
       {saved && <div className="mb-4"><Alert kind="success">تم حفظ بيانات الفرع.</Alert></div>}
       {branch.status === "INACTIVE" && <div className="mb-4"><Alert kind="warning">هذا الفرع موقوف منذ {formatDateTime(branch.archivedAt)}. بياناته محفوظة للاطلاع والتقارير.</Alert></div>}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="إجمالي الوحدات" value={String(occupancy.units)} hint={`${unitsByStatus.MAINTENANCE ?? 0} صيانة · ${unitsByStatus.RESERVED ?? 0} محجوزة`} icon="units" />
         <StatCard label="الوحدات المؤجرة" value={String(occupancy.occupiedUnits)} icon="units" tone="good" />
         <StatCard label="العقود النشطة" value={String(activeContracts)} icon="contracts" />

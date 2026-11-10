@@ -70,7 +70,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="المحصّل في الشهر" value={formatSAR(s.collected.current)} hint={`مقابل الشهر السابق: ${pct(mPrev)}`} icon="finance" tone="good" />
         <StatCard label="المستحق حتى اليوم" value={formatSAR(s.due)} hint="أقساط حلّ موعدها ولم تُسدد" icon="finance" />
         <StatCard label="المتأخر" value={formatSAR(s.overdue)} hint="تجاوز يوم استحقاقه" icon="alert" tone="bad" />

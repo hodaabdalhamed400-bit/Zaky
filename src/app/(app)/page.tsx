@@ -94,7 +94,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatCard label="الفروع العاملة" value={String(s.branches)} hint={s.preparingBranches ? `+ ${s.preparingBranches} قيد التجهيز` : undefined} icon="branches" />
         <StatCard label="إجمالي الوحدات" value={String(s.units)} icon="units" />
         <StatCard label="الوحدات المؤجرة" value={String(s.rentedUnits)} icon="units" tone="good" />
@@ -124,7 +124,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       )}
 
       {s.units > 0 && (
-        <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <div className="stagger mt-6 grid gap-6 xl:grid-cols-2">
           {charts.money && <MoneyChart data={charts.money} />}
           <OccupancyTrendChart data={charts.occupancyTrend} />
           {!branchId && charts.occupancyByBranch.length > 1 && <OccupancyByBranchChart data={charts.occupancyByBranch} />}
@@ -132,7 +132,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="stagger mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title="العقود التي ستنتهي قريبًا" action={<Link href="/contracts?expiring=30" className="text-sm text-brand-700 hover:underline">الكل</Link>} />
           {expiring.length === 0 ? (

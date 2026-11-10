@@ -9,6 +9,8 @@ import {
  * السلسلة 1 أزرق، السلسلة 2 سماوي هوية ذكي. السماوي أقل من 3:1 على الخلفية،
  * لذلك كل رسم معه وسيلة إيضاح وتلميح وجدول بيانات.
  */
+/** الحركة عند الظهور، إلا إذا طلب المستخدم تقليل الحركة */
+const ANIM = typeof window !== "undefined" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const S1 = "#2a78d6";
 const S2 = "#1eadc0";
 const GRID = "#e5e7eb";
@@ -82,10 +84,10 @@ export function ChartFrame({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-label={title}>
+    <section className="animate-fade-up rounded-2xl border border-gray-200/80 bg-white p-5 shadow-[0_1px_2px_rgb(16_24_40/0.04),0_4px_16px_-6px_rgb(19_46_75/0.08)] transition-shadow duration-300 hover:shadow-[0_2px_4px_rgb(16_24_40/0.05),0_12px_28px_-10px_rgb(19_46_75/0.16)]" aria-label={title}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-gray-900"><span className="h-4 w-1 rounded-full bg-gradient-to-b from-accent-500 to-brand-700" aria-hidden="true" />{title}</h2>
           {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
         </div>
         <Legend series={series} />
@@ -134,8 +136,8 @@ export function OccupancyByBranchChart({ data }: { data: { name: string; unitsPc
           <XAxis type="number" domain={[0, 100]} reversed tickFormatter={(v) => `${v}%`} tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} />
           <YAxis type="category" dataKey="name" orientation="right" width={96} tick={{ fill: "#374151", fontSize: 12 }} axisLine={false} tickLine={false} />
           <Tooltip cursor={{ fill: "#f3f4f6" }} content={makeTip(series, pctFmt, (l) => l)} />
-          <Bar isAnimationActive={false} dataKey="unitsPct" fill={S1} radius={[4, 0, 0, 4]} maxBarSize={14} stroke={SURFACE} strokeWidth={0} />
-          <Bar isAnimationActive={false} dataKey="seatsPct" fill={S2} radius={[4, 0, 0, 4]} maxBarSize={14} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="unitsPct" fill={S1} radius={[4, 0, 0, 4]} maxBarSize={14} stroke={SURFACE} strokeWidth={0} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="seatsPct" fill={S2} radius={[4, 0, 0, 4]} maxBarSize={14} />
         </BarChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -163,8 +165,8 @@ export function MoneyChart({ data }: { data: { month: string; billed: number; co
           <XAxis dataKey="month" reversed tickFormatter={monthShort} tick={{ fill: AXIS, fontSize: 11 }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
           <YAxis orientation="right" tickFormatter={(v) => compact.format(v)} tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} width={48} />
           <Tooltip cursor={{ fill: "#f3f4f6" }} content={makeTip(series, sar, monthLong)} />
-          <Bar isAnimationActive={false} dataKey="billed" fill={S1} radius={[4, 4, 0, 0]} maxBarSize={16} />
-          <Bar isAnimationActive={false} dataKey="collected" fill={S2} radius={[4, 4, 0, 0]} maxBarSize={16} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="billed" fill={S1} radius={[4, 4, 0, 0]} maxBarSize={16} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="collected" fill={S2} radius={[4, 4, 0, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -192,8 +194,8 @@ export function ContractsFlowChart({ data }: { data: { month: string; started: n
           <XAxis dataKey="month" reversed tickFormatter={monthShort} tick={{ fill: AXIS, fontSize: 11 }} axisLine={{ stroke: GRID }} tickLine={false} interval="preserveStartEnd" />
           <YAxis orientation="right" allowDecimals={false} tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
           <Tooltip cursor={{ fill: "#f3f4f6" }} content={makeTip(series, fmt, monthLong)} />
-          <Bar isAnimationActive={false} dataKey="started" fill={S1} radius={[4, 4, 0, 0]} maxBarSize={16} />
-          <Bar isAnimationActive={false} dataKey="ended" fill={S2} radius={[4, 4, 0, 0]} maxBarSize={16} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="started" fill={S1} radius={[4, 4, 0, 0]} maxBarSize={16} />
+          <Bar isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out" dataKey="ended" fill={S2} radius={[4, 4, 0, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -227,7 +229,7 @@ export function OccupancyTrendChart({ data }: { data: { month: string; unitsPct:
           <YAxis orientation="right" domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fill: AXIS, fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
           <Tooltip cursor={{ stroke: "#9ca3af", strokeDasharray: "3 3" }} content={makeTip(series, pctFmt, monthLong)} />
           {series.map((s) => (
-            <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={2} dot={{ r: 4, fill: s.color, stroke: SURFACE, strokeWidth: 2 }} activeDot={{ r: 5, stroke: SURFACE, strokeWidth: 2 }} connectNulls isAnimationActive={false}>
+            <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color} strokeWidth={2} dot={{ r: 4, fill: s.color, stroke: SURFACE, strokeWidth: 2 }} activeDot={{ r: 5, stroke: SURFACE, strokeWidth: 2 }} connectNulls isAnimationActive={ANIM} animationDuration={900} animationEasing="ease-out">
               <LabelList dataKey={s.key} content={endLabel(s.key as "unitsPct" | "seatsPct")} />
             </Line>
           ))}
