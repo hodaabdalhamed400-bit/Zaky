@@ -36,6 +36,10 @@ export const PERMISSIONS = {
   "bookings.view": { nameAr: "عرض حجوزات القاعات", groupAr: "حجوزات القاعات" },
   "bookings.manage": { nameAr: "إنشاء وإلغاء حجوزات القاعات", groupAr: "حجوزات القاعات" },
 
+  "purchases.view": { nameAr: "عرض فواتير الشراء", groupAr: "المشتريات" },
+  "purchases.create": { nameAr: "إضافة فواتير الشراء", groupAr: "المشتريات" },
+  "purchases.approve": { nameAr: "اعتماد فواتير الشراء والدفع والتصنيفات", groupAr: "المشتريات" },
+
   "reports.view": { nameAr: "عرض التقارير", groupAr: "التقارير" },
   "reports.export": { nameAr: "تصدير التقارير", groupAr: "التقارير" },
 
@@ -106,6 +110,9 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
       "payments.approve",
       "payments.refund",
       "finance.adjust",
+      "purchases.view",
+      "purchases.create",
+      "purchases.approve",
       "documents.upload",
       "documents.view_sensitive",
       "reports.view",
@@ -129,6 +136,8 @@ export const ROLE_DEFINITIONS: Record<RoleKey, RoleDef> = {
       "payments.view",
       "payments.record",
       "payments.approve",
+      "purchases.view",
+      "purchases.create",
       "documents.upload",
       "documents.view_sensitive",
       "reports.view",

@@ -410,6 +410,58 @@ export const REPORTS: Record<string, Def> = {
     },
   },
 
+  purchases: {
+    title: "تقرير فواتير الشراء",
+    description: "فواتير الشراء حسب تاريخ الفاتورة: المورد والتصنيف والضريبة وحالة الاعتماد والدفع.",
+    perms: ["purchases.view"],
+    filters: ["branch", "dateRange", "status"],
+    dateLabel: "تاريخ الفاتورة",
+    statuses: { APPROVED: "معتمدة", PENDING_REVIEW: "بانتظار المراجعة", REJECTED: "مُرجَعة للتعديل" },
+    async run(db, _a, f, ids) {
+      const today = todayInRiyadh();
+      const from = f.from ?? `${today.slice(0, 7)}-01`;
+      const to = f.to ?? today;
+      const status = f.status === "PENDING_REVIEW" || f.status === "REJECTED" ? f.status : "APPROVED";
+      const list = await db.purchaseInvoice.findMany({
+        where: { status, invoiceDate: { gte: dateOnly(from), lte: dateOnly(to) }, ...inBranches(ids) },
+        orderBy: [{ invoiceDate: "asc" }, { refNo: "asc" }],
+        take: MAX_ROWS + 1,
+        include: { branch: { select: { nameAr: true } }, category: { select: { nameAr: true } } },
+      });
+      const rows: Row[] = list.slice(0, MAX_ROWS).map((p) => ({
+        ref: p.refNo,
+        date: p.invoiceDate,
+        branch: p.branch.nameAr,
+        category: p.category.nameAr,
+        supplier: p.supplierName,
+        vatNo: p.supplierVatNo,
+        invoiceNo: p.invoiceNo,
+        net: p.netAmount.toFixed(2),
+        vat: p.vatAmount.toFixed(2),
+        total: p.totalAmount.toFixed(2),
+        paid: p.paymentStatus === "PAID" ? "مدفوعة" : "غير مدفوعة",
+      }));
+      return {
+        columns: [
+          { key: "ref", header: "الرقم الداخلي", type: "text" },
+          { key: "date", header: "تاريخ الفاتورة", type: "date" },
+          { key: "branch", header: "الفرع", type: "text" },
+          { key: "category", header: "التصنيف", type: "text" },
+          { key: "supplier", header: "المورد", type: "text" },
+          { key: "vatNo", header: "الرقم الضريبي للمورد", type: "text" },
+          { key: "invoiceNo", header: "رقم فاتورة المورد", type: "text" },
+          { key: "net", header: "قبل الضريبة", type: "money" },
+          { key: "vat", header: "الضريبة", type: "money" },
+          { key: "total", header: "الإجمالي شامل الضريبة", type: "money" },
+          { key: "paid", header: "الدفع", type: "text" },
+        ],
+        rows,
+        truncated: list.length > MAX_ROWS,
+        totals: { ref: "الإجمالي", net: sumCol(rows, "net"), vat: sumCol(rows, "vat"), total: sumCol(rows, "total") },
+        note: `من ${from} إلى ${to}. ${status === "APPROVED" ? "الفواتير المعتمدة فقط." : ""}`.trim(),
+      };
+    },
+  },
   activity: {
     title: "تقرير نشاط الموظفين",
     description: "عدد العمليات لكل موظف ونوع العملية خلال الفترة، من سجل التدقيق.",

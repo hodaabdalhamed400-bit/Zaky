@@ -16,6 +16,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   CONTRACT_PENDING_APPROVAL: "عقد يحتاج اعتمادًا",
   DOCUMENT_MISSING: "مستند ناقص",
   PAYMENT_PENDING_REVIEW: "تحصيل يحتاج مراجعة",
+  PURCHASE_PENDING_REVIEW: "فاتورة شراء تحتاج مراجعة",
   SYSTEM: "تنبيه النظام",
 };
 

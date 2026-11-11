@@ -7,7 +7,7 @@ import { Badge, Card, CardHeader } from "@/components/ui/primitives";
 import { DeleteDocButton, UploadForm } from "./upload-form";
 import { deleteDocumentAction, uploadDocumentAction } from "./actions";
 
-type Owner = { tenantId: string } | { contractId: string } | { unitId: string } | { paymentId: string };
+type Owner = { tenantId: string } | { contractId: string } | { unitId: string } | { paymentId: string } | { purchaseInvoiceId: string };
 
 export async function DocumentsPanel({
   actor,
@@ -16,6 +16,7 @@ export async function DocumentsPanel({
   categories,
   title = "المستندات والمرفقات",
   canUpload = true,
+  canDelete = true,
 }: {
   actor: Actor;
   owner: Owner;
@@ -23,6 +24,8 @@ export async function DocumentsPanel({
   categories: DocumentCategory[];
   title?: string;
   canUpload?: boolean;
+  /** إخفاء الحذف (مثل مرفقات فاتورة معتمدة — الخادم يمنعه أيضًا) */
+  canDelete?: boolean;
 }) {
   const { documents, hiddenSensitive, allowed } = await listDocuments(prisma, actor, owner);
   const upload = canUpload && actor.permissions.has("documents.upload");
@@ -48,7 +51,7 @@ export async function DocumentsPanel({
                     {d.isSensitive && <Badge color="red">حساس</Badge>}
                   </div>
                 </div>
-                {upload && <DeleteDocButton action={deleteDocumentAction.bind(null, d.id, path)} />}
+                {upload && canDelete && <DeleteDocButton action={deleteDocumentAction.bind(null, d.id, path)} />}
               </li>
             ))}
           </ul>

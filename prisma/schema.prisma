@@ -145,6 +145,7 @@ enum DocumentCategory {
   COMMERCIAL_REGISTER
   VAT_CERTIFICATE
   PAYMENT_PROOF
+  PURCHASE_INVOICE
   UNIT_PHOTO
   OTHER
 }
@@ -156,6 +157,7 @@ enum NotificationType {
   CONTRACT_PENDING_APPROVAL
   DOCUMENT_MISSING
   PAYMENT_PENDING_REVIEW
+  PURCHASE_PENDING_REVIEW
   SYSTEM
 }
 
@@ -317,6 +319,7 @@ model Branch {
   contracts     Contract[]
   payments      Payment[]
   bookings      RoomBooking[]
+  purchases     PurchaseInvoice[]
   userAccess    UserBranchAccess[]
   contractUnits ContractUnit[]
 
@@ -746,29 +749,32 @@ model NumberSequence {
 // ───────────────────────────── المستندات والإشعارات والتدقيق ─────────────────────────────
 
 model Document {
-  id           String           @id @default(uuid()) @db.Uuid
-  category     DocumentCategory
-  fileName     String           @map("file_name")
-  mimeType     String           @map("mime_type")
-  sizeBytes    Int              @map("size_bytes")
-  storageKey   String           @unique @map("storage_key") // مسار خاص في التخزين — لا يُعرض مباشرة
-  sha256       String
-  isSensitive  Boolean          @default(false) @map("is_sensitive")
-  tenantId     String?          @map("tenant_id") @db.Uuid
-  contractId   String?          @map("contract_id") @db.Uuid
-  paymentId    String?          @map("payment_id") @db.Uuid
-  unitId       String?          @map("unit_id") @db.Uuid
-  uploadedById String?          @map("uploaded_by_id") @db.Uuid
-  deletedAt    DateTime?        @map("deleted_at") @db.Timestamptz(3)
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                String           @id @default(uuid()) @db.Uuid
+  category          DocumentCategory
+  fileName          String           @map("file_name")
+  mimeType          String           @map("mime_type")
+  sizeBytes         Int              @map("size_bytes")
+  storageKey        String           @unique @map("storage_key") // مسار خاص في التخزين — لا يُعرض مباشرة
+  sha256            String
+  isSensitive       Boolean          @default(false) @map("is_sensitive")
+  tenantId          String?          @map("tenant_id") @db.Uuid
+  contractId        String?          @map("contract_id") @db.Uuid
+  paymentId         String?          @map("payment_id") @db.Uuid
+  unitId            String?          @map("unit_id") @db.Uuid
+  purchaseInvoiceId String?          @map("purchase_invoice_id") @db.Uuid
+  uploadedById      String?          @map("uploaded_by_id") @db.Uuid
+  deletedAt         DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
-  payment  Payment?  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
-  unit     Unit?     @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  tenant          Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contract        Contract?        @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  payment         Payment?         @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  unit            Unit?            @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  purchaseInvoice PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([contractId])
+  @@index([purchaseInvoiceId])
   @@map("documents")
 }
 
@@ -821,4 +827,65 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("system_settings")
+}
+
+// ───────────────────────────── فواتير الشراء (المصروفات) ─────────────────────────────
+
+enum PurchaseStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum PurchasePaymentStatus {
+  UNPAID
+  PAID
+}
+
+model ExpenseCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  nameAr    String   @unique @map("name_ar")
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(100) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  invoices PurchaseInvoice[]
+
+  @@map("expense_categories")
+}
+
+/// فاتورة شراء من مورد لفرع. المبلغ الإجمالي شامل الضريبة كما في فاتورة المورد.
+model PurchaseInvoice {
+  id              String                @id @default(uuid()) @db.Uuid
+  refNo           String                @unique @map("ref_no") // رقم داخلي PI-فرع-سنة-تسلسل
+  branchId        String                @map("branch_id") @db.Uuid
+  categoryId      String                @map("category_id") @db.Uuid
+  supplierName    String                @map("supplier_name")
+  supplierVatNo   String?               @map("supplier_vat_no")
+  invoiceNo       String                @map("invoice_no")
+  invoiceDate     DateTime              @map("invoice_date") @db.Date
+  totalAmount     Decimal               @map("total_amount") @db.Decimal(14, 2) // شامل الضريبة
+  vatAmount       Decimal               @map("vat_amount") @db.Decimal(14, 2)
+  netAmount       Decimal               @map("net_amount") @db.Decimal(14, 2) // = الإجمالي − الضريبة
+  description     String?
+  status          PurchaseStatus        @default(PENDING_REVIEW)
+  paymentStatus   PurchasePaymentStatus @default(UNPAID) @map("payment_status")
+  paymentMethod   PaymentMethod?        @map("payment_method")
+  paidOn          DateTime?             @map("paid_on") @db.Date
+  createdById     String                @map("created_by_id") @db.Uuid
+  approvedById    String?               @map("approved_by_id") @db.Uuid
+  approvedAt      DateTime?             @map("approved_at") @db.Timestamptz(3)
+  rejectedById    String?               @map("rejected_by_id") @db.Uuid
+  rejectedAt      DateTime?             @map("rejected_at") @db.Timestamptz(3)
+  rejectionReason String?               @map("rejection_reason")
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  branch    Branch          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  category  ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  documents Document[]
+
+  @@index([branchId, invoiceDate])
+  @@index([status])
+  @@map("purchase_invoices")
 }

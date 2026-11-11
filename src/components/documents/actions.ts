@@ -5,7 +5,7 @@ import { getRequestMeta, requireActionActor, type FormState } from "@/lib/auth/s
 import { toSafeMessage } from "@/lib/errors";
 import { deleteDocument, uploadDocument } from "@/services/documents.service";
 
-type Owner = { tenantId: string } | { contractId: string } | { unitId: string } | { paymentId: string };
+type Owner = { tenantId: string } | { contractId: string } | { unitId: string } | { paymentId: string } | { purchaseInvoiceId: string };
 
 export async function uploadDocumentAction(owner: Owner, revalidate: string, _prev: FormState, fd: FormData): Promise<FormState> {
   const actor = await requireActionActor();

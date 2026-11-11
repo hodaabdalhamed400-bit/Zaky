@@ -19,6 +19,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
   COMMERCIAL_REGISTER: "سجل تجاري",
   VAT_CERTIFICATE: "شهادة ضريبية",
   PAYMENT_PROOF: "إثبات دفع",
+  PURCHASE_INVOICE: "فاتورة شراء",
   UNIT_PHOTO: "صورة وحدة",
   OTHER: "أخرى",
 };
@@ -50,10 +51,13 @@ const uploadSchema = z.object({
     z.object({ contractId: z.string().uuid() }),
     z.object({ unitId: z.string().uuid() }),
     z.object({ paymentId: z.string().uuid() }),
+    z.object({ purchaseInvoiceId: z.string().uuid() }),
   ]),
 });
 
-async function assertOwnerAccess(db: Db, actor: Actor, owner: { tenantId?: string | null; contractId?: string | null; unitId?: string | null; paymentId?: string | null }) {
+type OwnerRef = { tenantId?: string | null; contractId?: string | null; unitId?: string | null; paymentId?: string | null; purchaseInvoiceId?: string | null };
+
+async function assertOwnerAccess(db: Db, actor: Actor, owner: OwnerRef) {
   if (owner.tenantId) return assertTenantAccess(db, actor, owner.tenantId);
   if (owner.contractId) {
     const c = await db.contract.findUnique({ where: { id: owner.contractId }, select: { branchId: true } });
@@ -70,7 +74,20 @@ async function assertOwnerAccess(db: Db, actor: Actor, owner: { tenantId?: strin
     if (!p) throw new NotFoundError("الدفعة غير موجودة");
     return assertBranchAccess(actor, p.branchId);
   }
+  if (owner.purchaseInvoiceId) {
+    requirePermission(actor, "purchases.view");
+    const pi = await db.purchaseInvoice.findUnique({ where: { id: owner.purchaseInvoiceId }, select: { branchId: true } });
+    if (!pi) throw new NotFoundError("الفاتورة غير موجودة");
+    return assertBranchAccess(actor, pi.branchId);
+  }
   throw new AppError("VALIDATION", "المستند غير مرتبط بأي سجل");
+}
+
+/** فحص الملف قبل الحفظ (الحجم والنوع الفعلي) — يُستخدم أيضًا قبل إنشاء سجل يتطلب مرفقًا. */
+export function validateUploadFile(file: { size: number; bytes: Uint8Array } | null) {
+  if (!file || file.size === 0) throw new AppError("VALIDATION", "اختر ملفًا");
+  if (file.size > MAX_UPLOAD_BYTES || file.bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("TOO_LARGE", "حجم الملف يتجاوز 10 ميجابايت");
+  if (!sniffMime(file.bytes)) throw new AppError("BAD_TYPE", "نوع الملف غير مسموح. المسموح: PDF أو صور JPG/PNG/WEBP");
 }
 
 export async function uploadDocument(
@@ -121,7 +138,7 @@ export async function uploadDocument(
 }
 
 /** قائمة مستندات كيان: الحساسة لا تُعرض لمن لا يملك صلاحيتها (يظهر عددها فقط). */
-export async function listDocuments(db: Db, actor: Actor, owner: { tenantId?: string; contractId?: string; unitId?: string; paymentId?: string }) {
+export async function listDocuments(db: Db, actor: Actor, owner: { tenantId?: string; contractId?: string; unitId?: string; paymentId?: string; purchaseInvoiceId?: string }) {
   if (!actor.permissions.has("documents.view")) return { documents: [], hiddenSensitive: 0, allowed: false };
   const all = await db.document.findMany({
     where: { ...owner, deletedAt: null },
@@ -156,6 +173,10 @@ export async function deleteDocument(db: Db, actor: Actor, id: string, meta: Req
     const c = await db.contract.findUnique({ where: { id: d.contractId }, select: { status: true } });
     if (c && c.status !== "DRAFT" && c.status !== "CANCELLED" && !actor.permissions.has("contracts.approve"))
       throw new ForbiddenError("حذف نسخة العقد الموقعة يتطلب صلاحية اعتماد العقود");
+  }
+  if (d.purchaseInvoiceId) {
+    const pi = await db.purchaseInvoice.findUnique({ where: { id: d.purchaseInvoiceId }, select: { status: true } });
+    if (pi?.status === "APPROVED") throw new ForbiddenError("لا يمكن حذف مرفق فاتورة شراء معتمدة");
   }
   await db.$transaction(async (tx) => {
     await tx.document.update({ where: { id }, data: { deletedAt: new Date() } });

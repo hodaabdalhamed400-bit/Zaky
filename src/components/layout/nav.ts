@@ -31,6 +31,7 @@ export const NAV: { title?: string; items: NavItem[] }[] = [
     title: "المالية",
     items: [
       { href: "/finance", label: "التحصيل والمستحقات", icon: "finance", perm: "payments.view" },
+      { href: "/purchases", label: "فواتير الشراء", icon: "receipt", perm: "purchases.view" },
       { href: "/reports", label: "التقارير", icon: "reports", perm: "reports.view" },
     ],
   },

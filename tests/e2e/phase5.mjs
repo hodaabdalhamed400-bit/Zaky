@@ -120,7 +120,7 @@ try {
   // ── التقارير والتصدير ──
   await login(page, process.env.E2E_EMAIL, process.env.E2E_PASSWORD);
   await page.goto(BASE + "/reports");
-  check("ثمانية تقارير لمسؤول النظام", (await page.locator("main a[href^='/reports/']").count()) === 8);
+  check("تسعة تقارير لمسؤول النظام", (await page.locator("main a[href^='/reports/']").count()) === 9);
   await page.goto(BASE + "/reports/branches");
   check("تقرير الفروع يعرض 11 فرعًا مع إجمالي", (await page.locator("tbody tr").count()) === 11 && (await page.isVisible("tfoot >> text=الإجمالي")));
   await page.screenshot({ path: `${OUT}/p5-report.png`, fullPage: true });

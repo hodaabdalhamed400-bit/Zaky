@@ -17,6 +17,7 @@ const COLOR = {
   CONTRACT_PENDING_APPROVAL: "amber",
   DOCUMENT_MISSING: "amber",
   PAYMENT_PENDING_REVIEW: "amber",
+  PURCHASE_PENDING_REVIEW: "amber",
   SYSTEM: "gray",
 } as const;
 

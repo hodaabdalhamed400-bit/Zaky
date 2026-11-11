@@ -67,6 +67,19 @@ export const DEFAULT_SETTINGS = [
   { key: "system.timezone", value: "Asia/Riyadh", description: "المنطقة الزمنية" },
 ];
 
+export const EXPENSE_CATEGORIES = [
+  "صيانة وإصلاحات",
+  "كهرباء ومياه",
+  "إنترنت واتصالات",
+  "نظافة",
+  "أدوات مكتبية وقرطاسية",
+  "ضيافة",
+  "أثاث ومعدات",
+  "رسوم حكومية",
+  "تسويق وإعلان",
+  "أخرى",
+];
+
 /** مزامنة غير هدامة (idempotent): تنشئ المفقود وتحدّث تعريفات الأدوار النظامية. */
 export async function seedReferenceData(db: PrismaClient) {
   for (const [key, def] of Object.entries(PERMISSIONS)) {
@@ -92,6 +105,11 @@ export async function seedReferenceData(db: PrismaClient) {
         data: def.permissions.map((p) => ({ roleId: role.id, permissionId: permId.get(p)! })),
       }),
     ]);
+  }
+
+  // تصنيفات المصروفات الأساسية — لا تُعدَّل إن كانت موجودة (المحاسب يدير القائمة من النظام)
+  for (const [i, nameAr] of EXPENSE_CATEGORIES.entries()) {
+    await db.expenseCategory.upsert({ where: { nameAr }, create: { nameAr, sortOrder: (i + 1) * 10 }, update: {} });
   }
 
   for (const b of INITIAL_BRANCHES) {
