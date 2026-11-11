@@ -91,7 +91,7 @@ try {
   await page.goto(BASE + "/users");
   check("الوصول المباشر لصفحة المستخدمين محظور على الخادم", page.url().includes("/forbidden"));
   await page.goto(BASE + "/branches");
-  const rows = await page.locator("tbody tr").count();
+  const rows = await page.locator("[data-branch-card]").count();
   check("مدير الفرع يرى فرعه فقط", rows === 1 && (await page.isVisible("text=غرناطة مول")), `rows=${rows}`);
   check("لا أخطاء في وحدة التحكم", consoleErrors.length === 0, consoleErrors.join(" | "));
   await ctx.close();

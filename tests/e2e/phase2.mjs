@@ -42,7 +42,13 @@ try {
 
   // ── الفروع ──
   await page.goto(BASE + "/branches");
-  check("قائمة الفروع تعرض 11 فرعًا", (await page.locator("tbody tr").count()) === 11);
+  check("قائمة الفروع تعرض 11 فرعًا (بطاقات)", (await page.locator("[data-branch-card]").count()) === 11);
+  check("تقسيم الفروع: عاملة وقيد التجهيز", (await page.isVisible("h2:has-text('الفروع العاملة')")) && (await page.isVisible("h2:has-text('قيد التجهيز')")));
+  await page.goto(BASE + "/branches?view=table");
+  check("عرض الجدول يعرض 11 فرعًا", (await page.locator("tbody tr").count()) === 11);
+  await page.goto(BASE + "/branches?q=" + encodeURIComponent("تبوك"));
+  check("البحث في الفروع", (await page.locator("[data-branch-card]").count()) === 1);
+  await page.goto(BASE + "/branches");
   await page.click("text=الازدهار");
   await page.waitForURL(/\/branches\/[0-9a-f-]{36}$/);
   const branchUrl = page.url();

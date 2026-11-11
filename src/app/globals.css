@@ -164,3 +164,11 @@ body {
   from { transform: scaleX(0.05); }
   to { transform: scaleX(0.92); }
 }
+
+/* حلقة الإشغال: تمتلئ من الصفر حتى قيمتها */
+@keyframes ring-fill {
+  from { stroke-dashoffset: var(--ring-c); }
+}
+.ring-anim {
+  animation: ring-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
