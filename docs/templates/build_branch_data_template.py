@@ -9,6 +9,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 OUT = sys.argv[1]
+ONE = sys.argv[2] if len(sys.argv) > 2 else None  # نسخة خاصة بفرع واحد
 
 BRANCHES = ["الازدهار", "النفل", "جامعة الإمام", "المركز", "الروضة", "السويدي", "تبوك", "غرناطة مول", "لافالي 2", "حطين", "الملقا"]
 UNIT_TYPES = ["مكتب خاص", "مكتب مشترك", "قاعة اجتماعات", "مساحة إدارية"]
@@ -132,6 +133,14 @@ def data_sheet(name, title, subtitle, columns, rows, example):
 L = lists_sheet()
 
 
+def branch_col(width, trigger, header="الفرع"):
+    """في نسخة الفرع: عمود الفرع يُملأ تلقائيًا عند تعبئة السطر. في النسخة العامة: قائمة منسدلة."""
+    if ONE:
+        return (header + " (تلقائي)", width, "auto", {"formula": f'=IF({trigger}{{r}}="","","{ONE}")'})
+    return (header, width, "input", {"list": L["الفروع"], "required": True})
+
+
+
 def positive(label):
     return DataValidation(type="decimal", operator="greaterThan", formula1="0", allow_blank=True, showErrorMessage=True,
                           errorTitle="رقم غير صحيح", error=f"{label}: أدخل رقمًا أكبر من صفر")
@@ -156,7 +165,7 @@ units, U_LAST = data_sheet(
     "1) المكاتب والوحدات",
     "سطر لكل مكتب أو وحدة أو قاعة في الفرع، سواء كانت مؤجرة أو متاحة. رقم الوحدة لا يتكرر داخل نفس الفرع.",
     [
-        ("الفرع", 16, "input", {"list": L["الفروع"], "required": True}),
+        branch_col(16, "B"),
         ("رقم الوحدة / المكتب", 16, "input", {"required": True, "fmt": "@", "note": "كما هو مكتوب على باب المكتب، مثل 101 أو A-12 أو قاعة 1"}),
         ("نوع الوحدة", 16, "input", {"list": L["أنواع الوحدات"], "required": True, "note": "قاعة الاجتماعات تُحجز بالساعة ولا تحتاج عقدًا"}),
         ("الدور", 10, "input", {"fmt": "@"}),
@@ -169,7 +178,7 @@ units, U_LAST = data_sheet(
         ("ملاحظات", 30, "input", {}),
     ],
     500,
-    ["الازدهار", "101", "مكتب خاص", "الأول", 20, 4, 3450, "شهري", "مؤجرة", "=ROUND(G4/1.15,2)", "مطل على الشارع"],
+    [ONE or "الازدهار", "101", "مكتب خاص", "الأول", 20, 4, 3450, "شهري", "مؤجرة", "=ROUND(G4/1.15,2)", "مطل على الشارع"],
 )
 units.conditional_formatting.add(
     f"A{FIRST}:B{U_LAST}",
@@ -185,7 +194,7 @@ tenants, T_LAST = data_sheet(
     [
         ("اسم العميل / المنشأة", 28, "input", {"required": True, "note": "الاسم الرسمي كما في السجل التجاري أو الهوية"}),
         ("نوع العميل", 11, "input", {"list": L["نوع العميل"], "required": True}),
-        ("الفرع الأساسي", 15, "input", {"list": L["الفروع"], "required": True}),
+        branch_col(15, "A", "الفرع الأساسي"),
         ("اسم الشخص المسؤول", 20, "input", {}),
         ("الجوال", 14, "input", {"required": True, "fmt": "@", "validate": (f'AND(LEN(E{FIRST})=10,LEFT(E{FIRST},2)="05")', "رقم الجوال 10 أرقام ويبدأ بـ 05"), "note": "10 أرقام يبدأ بـ 05 — يُستخدم لتذكير واتساب"}),
         ("البريد الإلكتروني", 24, "input", {"fmt": "@", "validate": (f'ISNUMBER(SEARCH("@",F{FIRST}))', "البريد الإلكتروني غير صحيح")}),
@@ -197,7 +206,7 @@ tenants, T_LAST = data_sheet(
         ("ملاحظات", 30, "input", {}),
     ],
     500,
-    ["شركة المثال للتقنية", "منشأة", "الازدهار", "أحمد محمد", "0551234567", "info@example.sa", "1010123456", "300000000000003", "", "الرياض، حي الازدهار", "نشط", ""],
+    ["شركة المثال للتقنية", "منشأة", ONE or "الازدهار", "أحمد محمد", "0551234567", "info@example.sa", "1010123456", "300000000000003", "", "الرياض، حي الازدهار", "نشط", ""],
 )
 tenants.conditional_formatting.add(
     f"A{FIRST}:A{T_LAST}",
@@ -215,7 +224,7 @@ contracts, C_LAST = data_sheet(
         ("رقم مرجع العقد", 12, "input", {"required": True, "fmt": "0", "dv": whole("رقم المرجع", 1, 100000), "note": "رقم بسيط تختاره (1، 2، 3...) يربط سطور العقد الواحد ببعضها وبشيت السداد"}),
         ("رقم العقد الورقي (إن وجد)", 16, "input", {"fmt": "@"}),
         ("اسم العميل", 26, "input", {"required": True, "list": f"العملاء!$A${FIRST}:$A${T_LAST}", "note": "اختر من القائمة — تظهر أسماء العملاء المسجلين في شيت العملاء"}),
-        ("الفرع", 15, "input", {"list": L["الفروع"], "required": True}),
+        branch_col(15, "C"),
         ("رقم الوحدة", 13, "input", {"required": True, "fmt": "@", "validate": (f"COUNTIFS(الوحدات!$A${FIRST}:$A${U_LAST},D{FIRST},الوحدات!$B${FIRST}:$B${U_LAST},E{FIRST})>0", "هذه الوحدة غير مسجلة في شيت الوحدات لنفس الفرع")}),
         ("عدد المقاعد", 10, "input", {"fmt": "0", "dv": whole("عدد المقاعد"), "note": "للمكتب المشترك فقط: عدد المقاعد المؤجرة لهذا العميل. للمكتب الخاص اتركه فارغًا"}),
         ("الإيجار الشهري للوحدة شامل الضريبة (ر.س)", 18, "input", {"required": True, "fmt": MONEY, "dv": positive("الإيجار الشهري"), "note": "المبلغ الشهري المتفق عليه لهذه الوحدة، شامل ضريبة 15%"}),
@@ -228,7 +237,7 @@ contracts, C_LAST = data_sheet(
         ("ملاحظات (شروط خاصة)", 30, "input", {}),
     ],
     CL,
-    [1, "", "شركة المثال للتقنية", "الازدهار", "101", "", 3450, date(2026, 1, 1), 12, "=EDATE(H4,I4)-1", "ربع سنوي", "=G4*3", "=G4*I4", ""],
+    [1, "", "شركة المثال للتقنية", ONE or "الازدهار", "101", "", 3450, date(2026, 1, 1), 12, "=EDATE(H4,I4)-1", "ربع سنوي", "=G4*3", "=G4*I4", ""],
 )
 
 # ───── السداد ─────
@@ -274,7 +283,8 @@ for i, (h, w) in enumerate(zip(heads, widths), start=1):
     s.column_dimensions[get_column_letter(i)].width = w
 s.row_dimensions[3].height = 36
 U, T, C = f"$A${FIRST}:$A${U_LAST}", f"$C${FIRST}:$C${T_LAST}", f"$D${FIRST}:$D${C_LAST}"
-for k, b in enumerate(BRANCHES):
+SUMMARY = [ONE] if ONE else BRANCHES
+for k, b in enumerate(SUMMARY):
     r = 4 + k
     vals = [
         b,
@@ -293,7 +303,7 @@ for k, b in enumerate(BRANCHES):
         c.alignment = Alignment(horizontal="right" if i == 1 else "center")
         if i == 7:
             c.number_format = MONEY
-tr = 4 + len(BRANCHES)
+tr = 4 + len(SUMMARY)
 s.cell(tr, 1, "الإجمالي").font = Font(name=F, bold=True, color="FFFFFF")
 for i in range(1, 9):
     c = s.cell(tr, i)
@@ -316,8 +326,8 @@ rtl(ins)
 ins.column_dimensions["A"].width = 4
 ins.column_dimensions["B"].width = 110
 lines = [
-    ("title", "قالب بيانات الفروع — ZAKI Smart ERP"),
-    ("sub", "شركة ذكي لحاضنات ومسرعات الأعمال · يُعبأ من مدير كل فرع ويُرسل لإدارة النظام لإدخاله دفعة واحدة"),
+    ("title", f"بيانات فرع {ONE} — ZAKI Smart ERP" if ONE else "قالب بيانات الفروع — ZAKI Smart ERP"),
+    ("sub", f"شركة ذكي لحاضنات ومسرعات الأعمال · هذا الملف خاص بفرع {ONE} فقط — عمود الفرع يُملأ تلقائيًا" if ONE else "شركة ذكي لحاضنات ومسرعات الأعمال · يُعبأ من مدير كل فرع ويُرسل لإدارة النظام لإدخاله دفعة واحدة"),
     ("", ""),
     ("h", "ترتيب التعبئة"),
     ("p", "1) شيت «الوحدات»: كل المكاتب والوحدات والقاعات في الفرع (المؤجرة والمتاحة)."),
@@ -341,10 +351,10 @@ lines = [
     ("p", "• المكتب المشترك: سجّل في الوحدات عدد مقاعده الكلي، وفي العقود عدد المقاعد المؤجرة لكل عميل."),
     ("p", "• رقم الهوية الوطنية اختياري، ويُفضّل تركه فارغًا حاليًا."),
     ("p", "• لا تغيّر أسماء الشيتات ولا عناوين الأعمدة ولا ترتيبها — حتى يُدخل الملف للنظام تلقائيًا."),
-    ("p", "• يمكن لكل فرع تعبئة نسخة مستقلة من الملف، أو تعبئة ملف واحد لكل الفروع."),
+    ("p", f"• هذا الملف لفرع {ONE} فقط. عميل مسجل في فرع آخر يُكتب هنا فقط إن كان له عقد في هذا الفرع." if ONE else "• يمكن لكل فرع تعبئة نسخة مستقلة من الملف، أو تعبئة ملف واحد لكل الفروع."),
     ("", ""),
     ("h", "عند الانتهاء"),
-    ("p", "احفظ الملف باسم الفرع (مثل: بيانات-الازدهار.xlsx) وأرسله لإدارة النظام. لا ترسل الملف في مجموعات عامة لأنه يحتوي بيانات عملاء."),
+    ("p", "احفظ الملف بعد التعبئة وأرسله لإدارة النظام على الخاص. لا ترسل الملف في مجموعات عامة لأنه يحتوي بيانات عملاء." if ONE else "احفظ الملف باسم الفرع (مثل: بيانات-الازدهار.xlsx) وأرسله لإدارة النظام. لا ترسل الملف في مجموعات عامة لأنه يحتوي بيانات عملاء."),
 ]
 r = 1
 for kind, text in lines:
