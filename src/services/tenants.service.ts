@@ -117,6 +117,23 @@ export async function listTenants(db: Db, actor: Actor, raw: unknown) {
   return { filters: f, page, total, pages: Math.max(1, Math.ceil(total / TENANTS_PAGE_SIZE)), tenants: rows.map((t) => redactTenant(actor, t)) };
 }
 
+/** أعداد العملاء حسب الحالة ضمن نطاق المستخدم (لأزرار التصفية والبطاقات العلوية) */
+export async function tenantStats(db: Db, actor: Actor, branchId?: string) {
+  requirePermission(actor, "tenants.view");
+  if (branchId) assertBranchAccess(actor, branchId);
+  const base: Prisma.TenantWhereInput[] = [tenantScope(actor), { archivedAt: null }];
+  if (branchId) base.push({ OR: [{ primaryBranchId: branchId }, { contracts: { some: { branchId } } }] });
+  const count = (extra: Prisma.TenantWhereInput) => db.tenant.count({ where: { AND: [...base, extra] } });
+  const [all, active, prospect, former, companies] = await Promise.all([
+    count({}),
+    count({ status: "ACTIVE" }),
+    count({ status: "PROSPECT" }),
+    count({ status: "FORMER" }),
+    count({ type: "COMPANY" }),
+  ]);
+  return { all, active, prospect, former, companies, individuals: all - companies };
+}
+
 export async function getTenant(db: Db, actor: Actor, id: string) {
   requirePermission(actor, "tenants.view");
   await assertTenantAccess(db, actor, id);

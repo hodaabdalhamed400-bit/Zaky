@@ -107,7 +107,7 @@ export async function listUnits(db: Db, actor: Actor, rawFilters: unknown) {
       include: {
         branch: { select: { id: true, nameAr: true, code: true } },
         floor: { select: { id: true, name: true } },
-        unitType: { select: { id: true, nameAr: true } },
+        unitType: { select: { id: true, nameAr: true, key: true } },
       },
       orderBy: [{ branch: { nameAr: "asc" } }, { code: "asc" }],
       skip: (page - 1) * UNITS_PAGE_SIZE,
@@ -115,13 +115,43 @@ export async function listUnits(db: Db, actor: Actor, rawFilters: unknown) {
     }),
   ]);
   const occ = await unitOccupancyToday(db, units.map((u) => u.id), today);
+  // المستأجرون الحاليون لكل وحدة (للعرض في البطاقات)
+  const current = await db.contractUnit.findMany({
+    where: { unitId: { in: units.map((u) => u.id) }, contract: { status: { in: [...IN_FORCE_STATUSES] } }, startDate: { lte: dateOnly(today) }, endDate: { gte: dateOnly(today) } },
+    select: { unitId: true, endDate: true, contract: { select: { tenant: { select: { name: true } } } } },
+    orderBy: { endDate: "asc" },
+  });
+  const tenantsByUnit = new Map<string, { names: string[]; until: Date }>();
+  for (const c of current) {
+    const e = tenantsByUnit.get(c.unitId) ?? { names: [], until: c.endDate };
+    if (!e.names.includes(c.contract.tenant.name)) e.names.push(c.contract.tenant.name);
+    tenantsByUnit.set(c.unitId, e);
+  }
   return {
     filters: f,
     page,
     total,
     pages: Math.max(1, Math.ceil(total / UNITS_PAGE_SIZE)),
-    units: units.map((u) => ({ ...u, occupiedSeats: occ.get(u.id) ?? 0 })),
+    units: units.map((u) => ({ ...u, occupiedSeats: occ.get(u.id) ?? 0, current: tenantsByUnit.get(u.id) ?? null })),
   };
+}
+
+/** أعداد الوحدات حسب الحالة الفعلية (للبطاقات العلوية وأزرار التصفية) — ضمن الفروع المتاحة وفرع مختار إن وُجد. */
+export async function unitStats(db: Db, actor: Actor, branchId?: string) {
+  requirePermission(actor, "units.view");
+  if (branchId) assertBranchAccess(actor, branchId);
+  const today = todayInRiyadh();
+  const base: Prisma.UnitWhereInput = { AND: [branchWhere(actor, "branchId"), { archivedAt: null }, ...(branchId ? [{ branchId }] : [])] };
+  const count = (extra: Prisma.UnitWhereInput) => db.unit.count({ where: { AND: [base, extra] } });
+  const [all, occupied, free, reserved, maintenance, inactive] = await Promise.all([
+    count({}),
+    count({ contractUnits: occupiedNow(today) }),
+    count({ status: "AVAILABLE", NOT: { contractUnits: occupiedNow(today) } }),
+    count({ status: "RESERVED" }),
+    count({ status: "MAINTENANCE" }),
+    count({ status: "INACTIVE" }),
+  ]);
+  return { all, occupied, free, reserved, maintenance, inactive };
 }
 
 /** الحالة المعروضة: المشتقة من العقود تتقدم على الحالة اليدوية. */

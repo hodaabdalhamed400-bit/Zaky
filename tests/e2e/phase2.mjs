@@ -105,25 +105,27 @@ try {
   check("منع تكرار رقم الوحدة في نفس الفرع", (await page.textContent("form [role=alert]")).includes("مستخدم"));
 
   await page.goto(BASE + "/units");
+  check("قائمة الوحدات (بطاقات) تعرض 3 وحدات مع شريط الحالات", (await page.locator("[data-unit-card]").count()) === 3 && (await page.isVisible("nav[aria-label='تصفية حسب الحالة']")));
+  await page.goto(BASE + "/units?view=table");
   check("قائمة الوحدات تعرض 3 وحدات", (await page.locator("tbody tr").count()) === 3);
   await page.screenshot({ path: `${OUT}/p2-units-table.png`, fullPage: true });
   await page.fill("#q", "10");
   await page.click("text=تطبيق");
   await page.waitForURL(/q=10/);
   check("البحث برقم الوحدة", (await page.locator("tbody tr").count()) === 2);
-  await page.goto(BASE + "/units?minPrice=1000&maxPrice=3000");
+  await page.goto(BASE + "/units?view=table&minPrice=1000&maxPrice=3000");
   check("التصفية بالسعر", (await page.locator("tbody tr").count()) === 1);
   await page.goto(BASE + "/units?status=FREE&view=cards");
-  check("عرض البطاقات وفلتر المتاحة فعليًا", (await page.locator("main ul > li").count()) === 3);
+  check("عرض البطاقات وفلتر المتاحة فعليًا", (await page.locator("[data-unit-card]").count()) === 3);
   await page.screenshot({ path: `${OUT}/p2-units-cards.png`, fullPage: true });
 
-  await page.goto(BASE + "/units?q=102");
+  await page.goto(BASE + "/units?view=table&q=102");
   await page.click("tbody >> text=102");
   await page.click("text=أرشفة الوحدة");
   await page.waitForSelector("text=تمت أرشفة الوحدة");
-  await page.goto(BASE + "/units");
+  await page.goto(BASE + "/units?view=table");
   check("الوحدة المؤرشفة تختفي من القائمة", (await page.locator("tbody tr").count()) === 2);
-  await page.goto(BASE + "/units?archived=1");
+  await page.goto(BASE + "/units?view=table&archived=1");
   check("وتظهر في المؤرشفة", (await page.locator("tbody tr").count()) === 1);
   await page.screenshot({ path: `${OUT}/p2-unit-detail.png`, fullPage: true });
 

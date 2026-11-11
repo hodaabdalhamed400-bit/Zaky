@@ -135,6 +135,10 @@ try {
   check("لوحة التحكم: عقد نشط واحد", (await page.locator("p:has-text('العقود النشطة') >> xpath=../../p[contains(@class,'text-2xl')]").textContent()) === "1");
 
   await page.goto(BASE + "/units?status=OCCUPIED");
+  check("بطاقة الوحدة المؤجرة تعرض اسم المستأجر", (await page.locator("[data-unit-card]").count()) === 1 && (await page.locator("[data-unit-card] >> text=شركة الريادة للتقنية").count()) === 1);
+  await page.goto(BASE + "/tenants");
+  check("بطاقات المستأجرين مع أزرار الحالة", (await page.locator("[data-tenant-card]").count()) >= 1 && (await page.isVisible("nav[aria-label='تصفية حسب الحالة']")));
+  await page.goto(BASE + "/units?view=table&status=OCCUPIED");
   check("الوحدة 101 مؤجرة في قائمة الوحدات", (await page.locator("tbody tr").count()) === 1 && (await page.isVisible("td:has-text('مؤجرة')")));
 
   // نسخة الطباعة
