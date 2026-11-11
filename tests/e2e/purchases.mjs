@@ -11,6 +11,8 @@ const results = [];
 const check = (name, ok, extra = "") => { results.push({ name, ok }); console.log(`${ok ? "✓" : "✗"} ${name}${extra ? " — " + extra : ""}`); };
 const PDF = join(OUT, "supplier-invoice.pdf");
 writeFileSync(PDF, "%PDF-1.4\n%supplier invoice\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
+const PNG = join(OUT, "camera-photo.png");
+writeFileSync(PNG, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64"));
 const INV = `F-${Date.now().toString().slice(-6)}`;
 
 async function login(page) {
@@ -56,6 +58,13 @@ try {
   check("الحفظ برقم داخلي من تسلسل الفرع", /PI-IZD-\d{4}-00001/.test(await page.textContent("h1")));
   check("الحالة: بانتظار المراجعة", await page.isVisible("main >> text=بانتظار المراجعة"));
   check("صورة الفاتورة مرفقة", await page.isVisible("text=فاتورة شراء >> nth=0") && (await page.locator('a[href^="/api/documents/"]').count()) === 1);
+
+  await page.goto(BASE + "/purchases/new");
+  const cam = page.locator('input[type=file][capture="environment"]');
+  check("زر تصوير الفاتورة يفتح الكاميرا الخلفية", (await page.isVisible("button:has-text('تصوير الفاتورة')")) && (await cam.count()) === 1 && (await cam.getAttribute("accept")) === "image/*");
+  await cam.setInputFiles(PNG);
+  await page.waitForSelector("text=جاهز للرفع");
+  check("الصورة الملتقطة تُجهَّز للرفع مع معاينة", (await page.evaluate(() => document.querySelector("#file").files.length)) === 1 && (await page.locator('img[alt="معاينة الفاتورة"]').count()) === 1);
 
   await page.goto(BASE + "/purchases/new");
   await fillInvoice(page);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActionForm, useActionForm } from "@/components/ui/action-form";
 import { Alert, Field, buttonClass, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FileOrCamera } from "@/components/ui/file-or-camera";
 import type { FormState } from "@/lib/auth/server";
 
 /** تحويل نص المبلغ إلى هللات (عدد صحيح) لتجنب أخطاء الكسور العشرية في المعاينة */
@@ -129,8 +130,8 @@ export function PurchaseForm({
       </Field>
 
       {mode === "create" && (
-        <Field label="صورة الفاتورة" htmlFor="file" required hint="PDF أو صورة واضحة، حتى 10 ميجابايت — مطلوبة لاعتماد الفاتورة">
-          <input id="file" name="file" type="file" required accept="application/pdf,image/png,image/jpeg,image/webp" className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-brand-900" />
+        <Field label="صورة الفاتورة" htmlFor="file" required>
+          <FileOrCamera id="file" hint="صوّر الفاتورة الورقية بالكاميرا، أو اختر ملف PDF أو صورة (حتى 10 ميجابايت). مطلوبة لاعتماد الفاتورة." />
         </Field>
       )}
 

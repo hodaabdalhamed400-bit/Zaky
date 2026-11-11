@@ -3,6 +3,7 @@ import { ActionForm, useActionForm } from "@/components/ui/action-form";
 import { useRef } from "react";
 import { Alert, Field, inputClass } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { FileOrCamera } from "@/components/ui/file-or-camera";
 import type { FormState } from "@/lib/auth/server";
 
 export function UploadForm({
@@ -31,8 +32,8 @@ export function UploadForm({
             {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </Field>
-        <Field label="الملف" htmlFor="doc-file" required hint="PDF أو صورة، حتى 10 ميجابايت">
-          <input id="doc-file" name="file" type="file" required accept="application/pdf,image/png,image/jpeg,image/webp" className="block w-full text-sm file:me-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-brand-900" />
+        <Field label="الملف" htmlFor="doc-file" required hint="صوّر بالكاميرا أو اختر PDF/صورة، حتى 10 ميجابايت">
+          <FileOrCamera id="doc-file" />
         </Field>
       </div>
       {canSensitive && (
