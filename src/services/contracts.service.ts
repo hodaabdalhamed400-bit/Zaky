@@ -527,6 +527,30 @@ export async function listContracts(db: Db, actor: Actor, raw: unknown) {
   return { filters: f, page, total, pages: Math.max(1, Math.ceil(total / CONTRACTS_PAGE_SIZE)), contracts };
 }
 
+/** أعداد العقود حسب الحالة + المنتهية قريبًا + القيمة الشهرية للعقود النشطة (للبطاقات وأزرار التصفية) */
+export async function contractStats(db: Db, actor: Actor, branchId?: string) {
+  requirePermission(actor, "contracts.view");
+  if (branchId) assertBranchAccess(actor, branchId);
+  const base: Prisma.ContractWhereInput[] = [branchWhere(actor, "branchId"), ...(branchId ? [{ branchId }] : [])];
+  const today = todayInRiyadh();
+  const [byStatus, expiring, monthly] = await Promise.all([
+    db.contract.groupBy({ by: ["status"], where: { AND: base }, _count: true }),
+    db.contract.count({ where: { AND: [...base, { status: "ACTIVE", endDate: { gte: dateOnly(today), lte: dateOnly(addDays(today, 30)) } }] } }),
+    db.contractUnit.aggregate({ where: { contract: { AND: [...base, { status: "ACTIVE" }] } }, _sum: { price: true } }),
+  ]);
+  const n = (s: ContractStatus) => byStatus.find((x) => x.status === s)?._count ?? 0;
+  return {
+    all: byStatus.reduce((a, x) => a + x._count, 0),
+    active: n("ACTIVE"),
+    pending: n("PENDING_APPROVAL"),
+    draft: n("DRAFT"),
+    expired: n("EXPIRED"),
+    ended: n("TERMINATED") + n("CANCELLED"),
+    expiring,
+    monthlyActive: monthly._sum.price ?? new Prisma.Decimal(0),
+  };
+}
+
 export async function getContract(db: Db, actor: Actor, id: string) {
   requirePermission(actor, "contracts.view");
   const c = await db.contract.findUnique({

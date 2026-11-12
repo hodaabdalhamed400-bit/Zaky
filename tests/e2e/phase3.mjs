@@ -136,6 +136,8 @@ try {
 
   await page.goto(BASE + "/units?status=OCCUPIED");
   check("بطاقة الوحدة المؤجرة تعرض اسم المستأجر", (await page.locator("[data-unit-card]").count()) === 1 && (await page.locator("[data-unit-card] >> text=شركة الريادة للتقنية").count()) === 1);
+  await page.goto(BASE + "/contracts");
+  check("بطاقات العقود مع شريط المدة والتصفية السريعة", (await page.locator("[data-contract-card]").count()) >= 1 && (await page.locator("[data-contract-card] [role=progressbar]").count()) >= 1 && (await page.isVisible("nav[aria-label='تصفية سريعة']")));
   await page.goto(BASE + "/tenants");
   check("بطاقات المستأجرين مع أزرار الحالة", (await page.locator("[data-tenant-card]").count()) >= 1 && (await page.isVisible("nav[aria-label='تصفية حسب الحالة']")));
   await page.goto(BASE + "/units?view=table&status=OCCUPIED");

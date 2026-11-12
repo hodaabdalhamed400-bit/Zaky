@@ -7,6 +7,45 @@ import { formatSAR } from "@/lib/money";
 import { getFinanceSummary } from "@/services/finance.service";
 import { Alert, Card, CardHeader, LinkButton, PageHeader, Table, Td, Th, buttonClass, inputClass } from "@/components/ui/primitives";
 import { StatCard } from "@/components/ui/stat-card";
+import { OccupancyRing } from "@/components/ui/occupancy-ring";
+import { Icon } from "@/components/ui/icons";
+
+const BILLED = "#2a78d6";
+const COLLECTED = "#1eadc0";
+
+/** أعمدة شهرية متحركة: المستحق مقابل المحصّل (لكل عمود تلميح بالقيمة، والجدول التفصيلي أسفل الصفحة) */
+function MonthlyBars({ data }: { data: { month: string; billed: string; collected: string }[] }) {
+  const max = Math.max(1, ...data.flatMap((m) => [Number(m.billed), Number(m.collected)]));
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-gray-600" aria-label="وسيلة الإيضاح">
+        <span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-sm" style={{ background: BILLED }} />أقساط مستحقة في الشهر</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-sm" style={{ background: COLLECTED }} />المحصّل في الشهر</span>
+      </div>
+      <div className="flex h-44 items-end gap-1.5 border-b border-gray-200 sm:gap-3" role="img" aria-label="المستحق مقابل المحصّل لآخر 12 شهرًا — الأرقام في الجدول أسفل الصفحة">
+        {data.map((m, i) => (
+          <div key={m.month} className="group flex h-full flex-1 flex-col justify-end">
+            <div className="flex h-full items-end justify-center gap-[2px]">
+              {[{ v: Number(m.billed), c: BILLED, k: "مستحق" }, { v: Number(m.collected), c: COLLECTED, k: "محصّل" }].map((b) => (
+                <div
+                  key={b.k}
+                  title={`${monthName(m.month)} — ${b.k}: ${formatSAR(b.k === "مستحق" ? m.billed : m.collected)}`}
+                  className="w-full max-w-4 origin-bottom rounded-t-[4px] transition-opacity duration-200 group-hover:opacity-80"
+                  style={{ height: `${(b.v / max) * 100}%`, minHeight: b.v > 0 ? 3 : 0, background: b.c, animation: `grow-y 0.8s cubic-bezier(0.22,1,0.36,1) ${i * 40}ms both` }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-1.5 flex gap-1.5 sm:gap-3">
+        {data.map((m) => (
+          <span key={m.month} className="flex-1 truncate text-center text-[10px] text-gray-500">{MONTHS[Number(m.month.slice(5, 7)) - 1]!.slice(0, 3)}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export const metadata: Metadata = { title: "التحصيل والمستحقات" };
 
@@ -80,6 +119,43 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <StatCard label="المحصّل في نفس الشهر العام الماضي" value={formatSAR(s.collected.lastYear)} hint={`التغير: ${pct(mLy)}`} icon="reports" />
         <StatCard label="إجمالي التسويات والخصومات" value={formatSAR(s.adjusted)} hint="مخفضة من المستحقات" icon="finance" />
       </div>
+
+      {(() => {
+        const cur = s.byMonth.find((m) => m.month === s.filters.month);
+        const rate = cur && Number(cur.billed) > 0 ? Math.round((Number(cur.collected) / Number(cur.billed)) * 1000) / 10 : null;
+        return (
+          <Card className="mt-6">
+            <div className="grid gap-6 p-5 lg:grid-cols-[16rem_1fr]">
+              <div className="flex flex-col items-center justify-center gap-3 text-center lg:border-e lg:border-gray-100 lg:pe-6">
+                <OccupancyRing pct={rate === null ? null : Math.min(100, rate)} size={132} stroke={11} label="نسبة التحصيل" />
+                <div>
+                  <p className="text-sm font-semibold text-brand-900">{monthName(s.filters.month)}</p>
+                  <p className="tabular text-xs text-gray-500">{cur ? `${formatSAR(cur.collected)} من ${formatSAR(cur.billed)}` : "لا توجد أقساط في هذا الشهر"}</p>
+                </div>
+                <div className="flex w-full flex-col gap-2">
+                  <Link href="/finance/overdue" className="group flex items-center justify-between rounded-xl bg-red-50 px-3 py-2 text-xs ring-1 ring-red-100 transition-colors hover:bg-red-100">
+                    <span className="flex items-center gap-1.5 font-medium text-red-800"><Icon name="alert" className="size-4" />المتأخرات</span>
+                    <span className="tabular font-bold text-red-700">{formatSAR(s.overdue)}</span>
+                  </Link>
+                  {s.pending.count > 0 && (
+                    <Link href="/finance/payments?status=PENDING_REVIEW" className="flex items-center justify-between rounded-xl bg-amber-50 px-3 py-2 text-xs ring-1 ring-amber-100 transition-colors hover:bg-amber-100">
+                      <span className="font-medium text-amber-900">بانتظار المراجعة</span>
+                      <span className="tabular font-bold text-amber-800">{s.pending.count}</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
+              <div>
+                <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-gray-900">
+                  <span className="h-4 w-1 rounded-full bg-gradient-to-b from-accent-500 to-brand-700" aria-hidden="true" />
+                  آخر 12 شهرًا
+                </h2>
+                <MonthlyBars data={s.byMonth} />
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
 
       <details className="mt-4 rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
         <summary className="cursor-pointer font-medium text-gray-800">كيف تُحسب هذه الأرقام؟</summary>

@@ -172,3 +172,8 @@ body {
 .ring-anim {
   animation: ring-fill 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
 }
+
+@keyframes grow-y {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
