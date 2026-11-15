@@ -409,7 +409,7 @@ io.on('connection', (socket) => {
     if (typeof ack !== 'function') return;
     const p = peer();
     const q = clean(question, 1000);
-    if (!p || !q) return ack({ error: 'اكتب سؤالك أولاً.' });
+    if (!p || !q) return ack({ error: 'اكتب سؤالك أولًا.' });
     if (!ai.enabled) return ack({ error: 'المساعد الذكي غير مفعّل على الخادم (ANTHROPIC_API_KEY غير موجود).' });
     if (aiBusy) return ack({ error: 'المساعد يجهز ردك السابق، انتظر لحظة.' });
     aiBusy = true;

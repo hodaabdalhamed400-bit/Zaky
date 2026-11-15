@@ -239,7 +239,7 @@
       if (!el.querySelector('.share-note')) {
         const n = document.createElement('div');
         n.className = 'share-note';
-        n.innerHTML = `<span class="sn-ic">${icon('screen', 30)}</span><b>إنت بتشارك شاشتك</b><small>الكل شايفها دلوقتي</small><button class="sn-stop" data-action="screen">إيقاف المشاركة</button>`;
+        n.innerHTML = `<span class="sn-ic">${icon('screen', 30)}</span><b>أنت بتشارك شاشتك</b><small>الكل شايفها دلوقتي</small><button class="sn-stop" data-action="screen">إيقاف المشاركة</button>`;
         el.append(n);
       }
     } else {
@@ -445,7 +445,7 @@
         me.id = res.selfId;
         me.host = !!res.host;
         roomSettings = res.settings || roomSettings;
-        if (me.host && !joinedOnce) toast('إنت منظّم الاجتماع — أدواتك في قايمة الحضور 👥', 4500);
+        if (me.host && !joinedOnce) toast('أنت منظّم الاجتماع — أدواتك في قائمة الحضور 👥', 4500);
         startedAt = res.startedAt;
         meetingTitle = res.title;
         $('meetingTitle').textContent = meetingTitle;
@@ -474,7 +474,7 @@
     socket.on('waitlist', (list) => {
       const added = list.filter((w) => !waitlist.some((x) => x.id === w.id));
       waitlist = list;
-      added.forEach((w) => toast(`🚪 ${w.name} مستني يدخل — وافق من قايمة الحضور`, 5000));
+      added.forEach((w) => toast(`🚪 ${w.name} مستني يدخل — وافق من قائمة الحضور`, 5000));
       document.querySelectorAll('[data-panel="people"]').forEach((b) => b.classList.toggle('attention', waitlist.length > 0));
       renderPeople();
     });
@@ -492,7 +492,7 @@
       leave();
     });
     socket.on('peer-host', ({ id }) => {
-      if (id === me.id) { me.host = true; toast('بقيت منظّم مشارك 🎉 — أدواتك في قايمة الحضور', 4500); renderSelf(); }
+      if (id === me.id) { me.host = true; toast('بقيت منظّم مشارك 🎉 — أدواتك في قائمة الحضور', 4500); renderSelf(); }
       const p = peers.get(id);
       if (p) { p.state.host = true; updateTile(p.tile, { state: p.state }); }
       renderPeople();
@@ -533,7 +533,7 @@
   function setStatus(ok) {
     const s = $('status');
     s.classList.toggle('bad', !ok);
-    s.querySelector('span').textContent = ok ? 'متصل' : 'جاري إعادة الاتصال…';
+    s.querySelector('span').textContent = ok ? 'متصل' : 'جارٍ إعادة الاتصال…';
   }
 
   setInterval(() => {
@@ -623,7 +623,7 @@
     $('endScreen').hidden = false;
     $('endBy').textContent = by ? `${by} أنهى الاجتماع` : 'انتهى الاجتماع';
     $('endStats').textContent = `${meetingTitle} · ${minutes} دقيقة`;
-    $('endSummary').innerHTML = '<div class="spinner"></div><p class="muted">جاري تجهيز ملخص الاجتماع بالذكاء الاصطناعي…</p>';
+    $('endSummary').innerHTML = '<div class="spinner"></div><p class="muted">جارٍ تجهيز ملخص الاجتماع بالذكاء الاصطناعي…</p>';
     $('endActions').hidden = true;
   }
   function renderSummaryHtml(text) {
@@ -853,7 +853,7 @@
       $('captions').append(el);
       captionEls.set(from, el);
     }
-    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}${corrected ? ' <span class="fixed" title="اتصلّح بالذكاء الاصطناعي">✨</span>' : ''}`;
+    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}${corrected ? ' <span class="fixed" title="اتصحّح بالذكاء الاصطناعي">✨</span>' : ''}`;
     const seq = (el._seq = (el._seq || 0) + 1);
     const expire = (ms) => {
       clearTimeout(el._t);
@@ -1318,7 +1318,7 @@
     $('previewAvatar').textContent = initial(nm || '؟');
     $('previewAvatar').style.setProperty('--avatar', colorFor(nm || 'x'));
     $('lbYou').textContent = nm ? `${nm} · أنت` : '';
-    $('lbHello').textContent = nm ? `أهلاً يا ${nm.split(' ')[0]} 👋` : 'أهلاً بيك 👋';
+    $('lbHello').textContent = nm ? `أهلًا يا ${nm.split(' ')[0]} 👋` : 'أهلًا بيك 👋';
     $('chkCam').className = `lb-check ${me.cam && camTrack ? 'ok' : 'off'}`;
     $('chkMic').className = `lb-check ${me.mic && micTrack ? 'ok' : 'off'}`;
     $('pMic').classList.toggle('off', !me.mic);
@@ -1441,7 +1441,7 @@
 
   $('joinBtn').onclick = () => {
     const name = $('lobbyName').value.trim();
-    if (!name) { $('lobbyErr').textContent = 'اكتب اسمك أولاً.'; $('lobbyName').focus(); return; }
+    if (!name) { $('lobbyErr').textContent = 'اكتب اسمك أولًا.'; $('lobbyName').focus(); return; }
     me.name = name;
     store.set('meet:name', name);
     // AudioContext لازم يبدأ بعد ضغطة المستخدم
