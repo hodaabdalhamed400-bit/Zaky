@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>لوحتي | smart Meet</title>
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="smart Meet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/home.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="hp">
+  <div class="hp-bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="grid-lines"></span></div>
+  <main class="dash" id="dash" hidden>
+    <header class="dash-top reveal" style="--d:0">
+      <a href="/"><img src="/img/logo-light.png" alt="ذكي smart" class="hp-logo"></a>
+      <div class="who">
+        <span class="ws-pill"><span data-icon="users" data-size="16"></span><select id="wsSel" aria-label="مساحة العمل"></select></span>
+        <button class="av-btn" id="avBtn" aria-label="حسابي"></button>
+      </div>
+    </header>
+    <div class="menu" id="menu" hidden>
+      <p><b id="mName"></b><span id="mEmail" dir="ltr"></span></p>
+      <button data-tab="account">⚙️ حسابي</button>
+      <button data-act="newws">➕ مساحة عمل جديدة</button>
+      <a href="/">🏠 الصفحة الرئيسية</a>
+      <button class="danger" data-act="signout">↩︎ تسجيل الخروج</button>
+    </div>
+
+    <section class="hello reveal" style="--d:1">
+      <div><h1 id="hi">أهلًا 👋</h1><p id="hiSub"></p></div>
+      <div class="hello-actions">
+        <button class="btn-go" id="nowBtn"><span data-icon="cam" data-size="18"></span> اجتماع الآن</button>
+        <button class="btn-soft" data-tab="meetings" data-focus="schedule"><span data-icon="clock" data-size="18"></span> جدولة اجتماع</button>
+      </div>
+    </section>
+
+    <nav class="tabs2 reveal" style="--d:2" role="tablist">
+      <button class="on" data-tab="meetings">📅 الاجتماعات</button>
+      <button data-tab="team">👥 الفريق</button>
+      <button data-tab="account">⚙️ حسابي</button>
+    </nav>
+
+    <!-- الاجتماعات -->
+    <section class="pane" data-pane="meetings">
+      <form class="box" id="schedForm">
+        <h2>🗓️ <span id="schedTitle">جدولة اجتماع جديد</span></h2>
+        <label class="f"><span>عنوان الاجتماع</span><input id="sTitle" maxlength="80" placeholder="مثلًا: لجنة تقييم الدفعة الجديدة" required></label>
+        <div class="grid3">
+          <label class="f"><span>اليوم</span><input id="sDate" type="date" required></label>
+          <label class="f"><span>الساعة</span><input id="sTime" type="time" required></label>
+          <label class="f"><span>المدة</span>
+            <select id="sDur"><option value="15">15 دقيقة</option><option value="30">30 دقيقة</option><option value="45">45 دقيقة</option><option value="60" selected>ساعة</option><option value="90">ساعة ونص</option><option value="120">ساعتين</option><option value="180">3 ساعات</option></select>
+          </label>
+        </div>
+        <label class="f"><span>ملاحظات أو جدول أعمال (اختياري)</span><textarea id="sNotes" maxlength="500" placeholder="النقاط اللي هتتناقش…"></textarea></label>
+        <div class="hello-actions">
+          <button class="btn-go" id="sSave">جدولة الاجتماع</button>
+          <button type="button" class="btn-soft" id="sCancel" hidden>إلغاء التعديل</button>
+        </div>
+        <p class="msg" id="sMsg"></p>
+      </form>
+
+      <div class="box">
+        <h2>⏳ الاجتماعات القادمة <small id="upCount"></small></h2>
+        <ul class="mlist" id="upList"></ul>
+      </div>
+      <div class="box">
+        <h2>🕘 اجتماعات سابقة</h2>
+        <ul class="mlist" id="pastList"></ul>
+      </div>
+    </section>
+
+    <!-- الفريق -->
+    <section class="pane" data-pane="team" hidden>
+      <div class="box" id="inviteBox" hidden>
+        <h2>✉️ دعوة أعضاء للفريق</h2>
+        <p class="muted small" style="margin:0">اعمل رابط دعوة وابعته على واتساب أو الإيميل. الرابط صالح 7 أيام ويستخدمه أكتر من شخص.</p>
+        <div class="hello-actions">
+          <select class="btn-soft" id="invRole"><option value="member">عضو</option><option value="admin">مدير</option></select>
+          <button class="btn-go" id="invBtn">إنشاء رابط دعوة</button>
+        </div>
+        <div class="invite-out" id="invOut" hidden><code id="invLink"></code><button class="chipb" id="invCopy">نسخ</button><a class="chipb" id="invWa" target="_blank" rel="noopener">واتساب</a></div>
+      </div>
+      <div class="box" id="wsNameBox" hidden>
+        <h2>🏢 اسم مساحة العمل</h2>
+        <div class="hello-actions"><input class="btn-soft" id="wsName" maxlength="60" style="flex:1;min-width:180px"><button class="btn-go" id="wsSave">حفظ</button></div>
+      </div>
+      <div class="box">
+        <h2>👥 أعضاء الفريق <small id="memCount"></small></h2>
+        <ul class="people2" id="memList"></ul>
+        <p class="muted small" style="margin:0">🟡 <b>مالك</b>: كل الصلاحيات · 🟣 <b>مدير</b>: يدعو الأعضاء ويدير كل الاجتماعات ويبقى منظّمها · 🔵 <b>عضو</b>: يعمل ويجدول اجتماعاته.</p>
+      </div>
+    </section>
+
+    <!-- حسابي -->
+    <section class="pane" data-pane="account" hidden>
+      <div class="box">
+        <h2>👤 بياناتي</h2>
+        <div class="grid2">
+          <label class="f"><span>الاسم</span><input id="aName" maxlength="60"></label>
+          <label class="f"><span>البريد الإلكتروني</span><input id="aEmail" dir="ltr" disabled></label>
+        </div>
+        <button class="btn-go" id="aSave" style="width:fit-content">حفظ</button>
+      </div>
+      <div class="box">
+        <h2>🔒 كلمة المرور</h2>
+        <div class="grid2">
+          <label class="f" id="curWrap"><span>كلمة المرور الحالية</span><input id="pCur" type="password" dir="ltr" autocomplete="current-password"></label>
+          <label class="f"><span>كلمة المرور الجديدة</span><input id="pNew" type="password" dir="ltr" autocomplete="new-password" placeholder="8 حروف على الأقل"></label>
+        </div>
+        <button class="btn-go" id="pSave" style="width:fit-content">تغيير كلمة المرور</button>
+        <p class="msg" id="pMsg"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

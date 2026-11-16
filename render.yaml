@@ -7,11 +7,19 @@ services:
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "22"
       - key: MAX_PARTICIPANTS
         value: "8"
+      - key: DATA_DIR
+        value: /var/data
+      - key: GOOGLE_CLIENT_ID
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ACCESS_CODE

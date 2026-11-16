@@ -130,7 +130,7 @@
 
   <header class="hp-nav reveal" style="--d:0">
     <img src="/img/logo-light.png" alt="ذكي smart لحاضنات ومسرعات الأعمال" class="hp-logo">
-    <span class="hp-tag"><i></i> smart Meet</span>
+    <a class="hp-tag" id="navAcct" href="/signin"><i></i> <span id="navAcctTxt">تسجيل الدخول</span></a>
   </header>
 
   <main class="hp-main">
@@ -444,11 +444,20 @@
       }
     } catch { /* ignore */ }
 
+    // لو مسجّل دخول: زرار "لوحتي" ومفيش داعي لكود الشركة
+    let signedIn = false;
+    fetch('/api/me').then((r) => r.json()).then((me) => {
+      if (!me.user) return;
+      signedIn = !!me.workspace;
+      $('navAcct').href = '/app'; $('navAcctTxt').textContent = 'لوحتي';
+      if (!$('name').value) $('name').value = me.user.name;
+      if (signedIn) $('accessField').hidden = true;
+    }).catch(() => {});
     // كود الشركة: بيظهر بس لو الخادم طالبه، والموبايل بيفتكره بعد أول مرة صح
     let needCode = false;
     fetch('/api/config').then((r) => r.json()).then((cfg) => {
       needCode = !!cfg.accessCode;
-      $('accessField').hidden = !needCode || !!store.get('meet:access');
+      $('accessField').hidden = !needCode || signedIn || !!store.get('meet:access');
     }).catch(() => {});
 
     const busy = (b, on) => { b.disabled = on; b.classList.toggle('loading', on); };
@@ -457,7 +466,7 @@
       $('err').textContent = '';
       if (!$('name').value.trim()) { $('err').textContent = 'اكتب اسمك الأول.'; $('name').focus(); return; }
       const code = $('access').value.trim() || store.get('meet:access') || '';
-      if (needCode && !code) { $('accessField').hidden = false; $('err').textContent = 'اكتب كود الشركة علشان تعمل اجتماع جديد.'; $('access').focus(); return; }
+      if (needCode && !code && !signedIn) { $('accessField').hidden = false; $('err').textContent = 'اكتب كود الشركة علشان تعمل اجتماع جديد.'; $('access').focus(); return; }
       busy($('create'), true);
       try {
         const r = await fetch('/api/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });

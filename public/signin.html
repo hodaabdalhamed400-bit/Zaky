@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <title>تسجيل الدخول | smart Meet</title>
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-title" content="smart Meet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/home.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="hp">
+  <div class="hp-bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span><span class="grid-lines"></span></div>
+  <main class="auth-wrap">
+    <section class="auth-card reveal" style="--d:0">
+      <a href="/" style="justify-self:center"><img src="/img/logo-light.png" alt="ذكي smart" class="hp-logo"></a>
+      <h1 id="aTitle">أهلًا بيك في smart Meet</h1>
+      <p class="auth-sub" id="aSub">سجّل دخولك علشان تجدول اجتماعاتك وتدير فريقك.</p>
+
+      <div class="seg2" id="seg" role="tablist">
+        <button class="on" data-m="in" role="tab">تسجيل الدخول</button>
+        <button data-m="up" role="tab">حساب جديد</button>
+      </div>
+
+      <form id="form" class="grid2" style="grid-template-columns:1fr" novalidate>
+        <label class="f" data-show="up"><span>اسمك</span><input id="name" maxlength="60" autocomplete="name" placeholder="محمود عبد الحميد"></label>
+        <label class="f"><span>البريد الإلكتروني</span><input id="email" type="email" dir="ltr" maxlength="120" autocomplete="email" placeholder="name@company.com"></label>
+        <label class="f"><span>كلمة المرور</span><input id="password" type="password" dir="ltr" maxlength="200" autocomplete="current-password" placeholder="8 حروف على الأقل"></label>
+        <label class="f" data-show="up-ws"><span>اسم مساحة العمل (اسم الشركة)</span><input id="ws" maxlength="60" placeholder="ذكي smart"></label>
+        <label class="f" data-show="up-code"><span>كود الشركة</span><input id="code" type="password" dir="ltr" autocomplete="off" placeholder="••••••"></label>
+        <button class="btn-main" id="go">تسجيل الدخول</button>
+      </form>
+
+      <div id="gWrap" hidden>
+        <div class="or">أو</div>
+        <div id="gbtn"></div>
+      </div>
+      <p class="msg" id="msg" role="alert"></p>
+      <p class="auth-foot"><a href="/">← الرجوع للرئيسية</a> · <a href="/terms">الشروط</a> · <a href="/privacy">الخصوصية</a></p>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const qs = new URLSearchParams(location.search);
+    const invite = qs.get('invite') || '';
+    let mode = 'in'; let codeRequired = true; let googleCred = null;
+    const ERR = {
+      bad_login: 'الإيميل أو كلمة المرور غلط.', email_taken: 'الإيميل ده عنده حساب بالفعل — سجّل دخول.', weak_password: 'كلمة المرور لازم تكون 8 حروف على الأقل.',
+      bad_input: 'راجع الاسم والإيميل.', need_workspace: 'اكتب اسم مساحة العمل.', bad_code: 'كود الشركة غلط.', bad_invite: 'رابط الدعوة غير صالح أو انتهى.',
+      too_many: 'محاولات كتير — استنى ربع ساعة وحاول تاني.', google_failed: 'تعذّر تسجيل الدخول بجوجل.',
+    };
+    function setMode(m) {
+      mode = m;
+      document.querySelectorAll('#seg button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+      document.querySelectorAll('[data-show]').forEach((el) => {
+        const k = el.dataset.show;
+        el.hidden = !(m === 'up' && (k === 'up' || (k === 'up-ws' && !invite) || (k === 'up-code' && !invite && codeRequired)));
+      });
+      $('go').textContent = m === 'in' ? 'تسجيل الدخول' : (invite ? 'انضم للفريق' : 'إنشاء مساحة العمل');
+      $('password').autocomplete = m === 'in' ? 'current-password' : 'new-password';
+      $('msg').textContent = '';
+    }
+    document.querySelectorAll('#seg button').forEach((b) => b.onclick = () => setMode(b.dataset.m));
+
+    async function post(url, body) {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      let d = {}; try { d = await r.json(); } catch {}
+      return { ok: r.ok, ...d };
+    }
+    const done = () => { location.href = qs.get('next') && qs.get('next').startsWith('/') ? qs.get('next') : '/app'; };
+
+    $('form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('msg').textContent = ''; $('go').disabled = true;
+      const body = { email: $('email').value.trim(), password: $('password').value, invite: invite || undefined, lang: (navigator.language || 'ar').slice(0, 2) };
+      if (mode === 'up') Object.assign(body, { name: $('name').value.trim(), workspaceName: invite ? undefined : $('ws').value.trim(), code: $('code').value.trim() });
+      const d = googleCred ? await post('/api/auth/google', { credential: googleCred, invite: invite || undefined, workspaceName: $('ws').value.trim(), code: $('code').value.trim() })
+        : await post(mode === 'in' ? '/api/auth/signin' : '/api/auth/signup', body);
+      $('go').disabled = false;
+      if (d.ok && !d.needWorkspace) return done();
+      $('msg').textContent = ERR[d.error] || 'حصلت مشكلة، حاول تاني.';
+    };
+
+    // تسجيل الدخول بجوجل
+    async function onGoogle(resp) {
+      googleCred = resp.credential;
+      const d = await post('/api/auth/google', { credential: googleCred, invite: invite || undefined });
+      if (d.ok && !d.needWorkspace) return done();
+      if (d.needWorkspace) {
+        setMode('up');
+        $('aSub').textContent = `أهلًا ${d.name || ''} — فاضل تسمّي مساحة العمل بتاعة شركتك.`;
+        document.querySelector('[data-show="up"]').hidden = true;
+        $('email').closest('label').hidden = true; $('password').closest('label').hidden = true;
+        $('seg').hidden = true; $('gWrap').hidden = true;
+        $('ws').focus();
+        return;
+      }
+      googleCred = null;
+      $('msg').textContent = ERR[d.error] || 'تعذّر تسجيل الدخول بجوجل.';
+    }
+
+    (async () => {
+      try { const me = await (await fetch('/api/me')).json(); if (me.user && !invite) return done(); } catch {}
+      let cfg = {}; try { cfg = await (await fetch('/api/auth/config')).json(); } catch {}
+      codeRequired = !!cfg.codeRequired;
+      if (invite) {
+        try {
+          const inv = await (await fetch(`/api/invites/${encodeURIComponent(invite)}`)).json();
+          if (inv.workspace) {
+            $('aTitle').textContent = 'دعوة للانضمام 🎉';
+            $('aSub').innerHTML = `اتدعيت تنضم لفريق <b></b> على smart Meet.`;
+            $('aSub').querySelector('b').textContent = inv.workspace;
+            setMode('up');
+          } else { $('msg').textContent = ERR.bad_invite; }
+        } catch {}
+      } else setMode('in');
+      if (cfg.google) {
+        $('gWrap').hidden = false;
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+        s.onload = () => {
+          google.accounts.id.initialize({ client_id: cfg.google, callback: onGoogle, ux_mode: 'popup' });
+          google.accounts.id.renderButton($('gbtn'), { theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', locale: 'ar', width: 300 });
+        };
+        document.head.append(s);
+      }
+    })();
+  </script>
+</body>
+</html>

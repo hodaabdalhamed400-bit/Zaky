@@ -302,3 +302,4 @@ body.hp { min-height: 100dvh; overflow-x: hidden; background: #050d19; }
 
 /* المحتوى يستنى لحد ما الشاشة الافتتاحية تخلص */
 html.splashing .reveal { animation-play-state: paused; }
+a.hp-tag { text-decoration: none; }

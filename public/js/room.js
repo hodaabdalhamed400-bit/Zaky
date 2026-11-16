@@ -1397,6 +1397,10 @@
     $('meetingCode').textContent = roomId;
     $('lbCodeTxt').textContent = roomId;
     try {
+      const acct = await (await fetch('/api/me')).json();
+      if (acct.user && !$('lobbyName').value.trim()) { $('lobbyName').value = acct.user.name; refreshPreview(); }
+    } catch { /* ignore */ }
+    try {
       const cfg = await (await fetch('/api/config')).json();
       if (cfg.iceServers?.length) iceServers = cfg.iceServers;
       aiOn = !!cfg.ai;

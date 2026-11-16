@@ -6,6 +6,8 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const ai = require('./ai');
+const createAuth = require('./auth');
+const { sessionFromCookie, metaForMeeting } = createAuth;
 
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_PARTICIPANTS = Number(process.env.MAX_PARTICIPANTS) || 8;
@@ -100,7 +102,7 @@ const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim(
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render بيحط الـ IP الحقيقي في X-Forwarded-For
-app.use(express.json({ limit: '2kb' }));
+app.use(express.json({ limit: '8kb' }));
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
 app.get('/healthz', (_req, res) => res.send('ok'));
@@ -120,7 +122,8 @@ app.get('/api/status', (_req, res) => {
   });
 });
 app.post('/api/new', (req, res) => {
-  if (ACCESS_CODE) {
+  const sess = sessionFromCookie(req.headers.cookie);
+  if (ACCESS_CODE && !sess?.workspace) {
     if (tooManyFailures(req.ip)) return res.status(429).json({ error: 'too_many' });
     if (!codeMatches(req.body?.code)) {
       recordFailure(req.ip);
@@ -137,10 +140,15 @@ app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   res.json({
     exists: !!room, valid: !!room || isAuthorizedRoomId(req.params.id),
-    participants: room ? room.peers.size : 0, title: room?.title || null,
+    participants: room ? room.peers.size : 0, title: room?.title || metaForMeeting(req.params.id)?.title || null,
     people: room ? [...room.peers.values()].slice(0, 5).map((p) => p.name) : [],
   });
 });
+// الحسابات ومساحات العمل والجدولة
+app.use('/api', createAuth({ ACCESS_CODE, codeMatches, tooManyFailures, recordFailure, newRoomId, hostKeyFor }));
+for (const [route, file] of [['/signin', 'signin.html'], ['/app', 'app.html']]) app.get(route, (_req, res) => res.sendFile(path.join(PUBLIC_DIR, file)));
+app.get('/invite/:token', (req, res) => res.redirect(`/signin?invite=${encodeURIComponent(req.params.token)}`));
+
 app.get('/m/:id', (req, res) => {
   if (!ROOM_ID_RE.test(req.params.id)) return res.redirect('/');
   res.sendFile(path.join(PUBLIC_DIR, 'room.html'));
@@ -197,8 +205,10 @@ io.on('connection', (socket) => {
       const ip = socket.handshake.headers['x-forwarded-for']?.split(',')[0].trim() || socket.handshake.address;
       if (tooManyFailures(ip)) return ack?.({ error: 'too_many' });
       if (!isAuthorizedRoomId(id)) { recordFailure(ip); return ack?.({ error: 'notfound' }); }
+      const meta = metaForMeeting(id);
       room = {
-        title: clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [],
+        workspaceId: meta?.workspace_id || null, createdBy: meta?.created_by || null,
+        title: meta?.title || clean(payload.title, 80) || 'اجتماع', startedAt: Date.now(), peers: new Map(), log: [],
         waitlist: new Map(), admitted: new Set(), banned: new Set(), coHosts: new Set(), locked: false, waiting: false,
         langs: new Set(['ar']), finished: false, emptyTimer: null,
       };
@@ -208,8 +218,12 @@ io.on('connection', (socket) => {
     if (room.finished) return ack?.({ error: 'ended' });
     const clientId = clean(payload.clientId, 64) || socket.id;
     const sumLang = String(payload.lang || 'ar').startsWith('ar') ? 'ar' : 'en';
-    const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId);
-    const name = clean(payload.name, 40) || 'ضيف';
+    // المنظّم: صاحب الرابط، أو اللي عمل الاجتماع، أو مالك/مدير مساحة العمل
+    const sess = sessionFromCookie(socket.handshake.headers.cookie);
+    const wsRole = sess && room.workspaceId && sess.workspace?.id === room.workspaceId ? sess.role : null;
+    const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId)
+      || (sess && room.createdBy === sess.user.id) || wsRole === 'owner' || wsRole === 'admin';
+    const name = clean(payload.name, 40) || sess?.user.name || 'ضيف';
     if (room.banned.has(clientId) && !isHost) return ack?.({ error: 'removed' });
     if (room.locked && !isHost) return ack?.({ error: 'locked' });
     if (room.peers.size >= MAX_PARTICIPANTS) return ack?.({ error: 'full', max: MAX_PARTICIPANTS });
