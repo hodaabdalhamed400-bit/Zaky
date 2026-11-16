@@ -422,19 +422,30 @@ io.on('connection', (socket) => {
   socket.on('ai-ask', async (question, ack) => {
     if (typeof ack !== 'function') return;
     const p = peer();
-    const q = clean(question, 1000);
+    const voice = !!(question && typeof question === 'object' && question.voice);
+    const q = clean(typeof question === 'object' && question ? question.q : question, 1000);
     if (!p || !q) return ack({ error: 'اكتب سؤالك أولًا.' });
     if (!ai.enabled) return ack({ error: 'المساعد الذكي غير مفعّل على الخادم (ANTHROPIC_API_KEY غير موجود).' });
     if (aiBusy) return ack({ error: 'المساعد يجهز ردك السابق، انتظر لحظة.' });
     aiBusy = true;
     try {
-      ack({ answer: await ai.ask(rooms.get(roomId), q, p.name) });
+      ack({ answer: await ai.ask(rooms.get(roomId), q, p.name, voice) });
     } catch (err) {
       console.error('ai-ask failed:', err.message);
       ack({ error: ai.friendlyError(err) });
     } finally {
       aiBusy = false;
     }
+  });
+
+  // السكرتير الذكي يقرأ ردًا بصوت عالٍ للجميع (للمنظّمين فقط)
+  let lastSay = 0;
+  socket.on('ai-say', (text) => {
+    const p = peer();
+    const t = clean(text, 1500);
+    if (!p || !p.host || !t || Date.now() - lastSay < 5000) return;
+    lastSay = Date.now();
+    io.to(roomId).emit('ai-say', { text: t, by: p.name });
   });
 
   socket.on('ai-translate', async ({ text, lang } = {}, ack) => {

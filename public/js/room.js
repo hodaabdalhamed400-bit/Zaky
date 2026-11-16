@@ -526,6 +526,7 @@
       renderPeople();
     });
     socket.on('chat', onChat);
+    socket.on('ai-say', onAiSay);
     socket.on('reaction', onReaction);
     socket.on('caption', showCaption);
   }
@@ -807,6 +808,7 @@
       if (!text) return;
       srFailures = [];
       capStatus(`🎙️ آخر كلام اتسمع: "${text}"`, 'ok');
+      if (r.isFinal && secWake(text)) return;
       socket.emit('caption', { text, final: r.isFinal });
       // لو التصحيح الذكي شغّال، النسخة النهائية المصلّحة هترجع من الخادم وهي اللي تتسجل في المحضر
       showCaption({ from: me.id, name: me.name, text, final: r.isFinal && !aiFix, ts: Date.now() });
@@ -910,11 +912,13 @@
     aiBusy = b;
     document.querySelectorAll('#aiQuick button, #aiForm button').forEach((x) => { x.disabled = b || !aiOn; });
   }
-  function aiAsk(question) {
+  function aiAsk(question, opts = {}) {
     question = question.trim();
     if (!question || aiBusy) return;
     if (!aiOn) { toast('المساعد الذكي غير مفعّل على الخادم.'); return; }
-    aiBubble('mine', 'أنت', esc(question));
+    const voice = !!opts.voice;
+    aiBubble('mine', 'أنت', (voice ? '🎙️ ' : '') + esc(question));
+    if (voice) secState('think');
     const pending = aiBubble('ai pending', '✨ المساعد الذكي', '<span class="dots">بيفكر</span>');
     setAiBusy(true);
     let done = false;
@@ -922,9 +926,14 @@
       if (done) return;
       done = true;
       setAiBusy(false);
+      if (voice) secState('');
       if (res?.answer) {
         pending.className = 'ai';
-        pending.querySelector('.bubble').innerHTML = `${mdLite(res.answer)}<br><button class="share-ai">↗ شارك الرد في المحادثة</button>`;
+        pending.querySelector('.bubble').innerHTML = `${mdLite(res.answer)}<br><button class="speak-btn">🔊 اسمعه</button>${me.host ? '<button class="say-all">📢 اسمعه للكل</button>' : ''}<button class="share-ai">↗ شارك الرد في المحادثة</button>`;
+        pending.querySelector('.speak-btn').onclick = () => secSpeak(res.answer);
+        const sa = pending.querySelector('.say-all');
+        if (sa) sa.onclick = () => { socket.emit('ai-say', res.answer); sa.remove(); toast('📢 السكرتير بيقرأ الرد للكل'); };
+        if (voice && voiceOn) secSpeak(res.answer);
         pending.querySelector('.share-ai').onclick = (e) => {
           const msg = `✨ المساعد الذكي:\n${res.answer}`;
           socket.emit('chat', msg.length > 2000 ? `${msg.slice(0, 1997)}…` : msg);
@@ -938,9 +947,107 @@
       $('aiThread').scrollTop = $('aiThread').scrollHeight;
       if (currentPanel !== 'assistant') toast('✨ رد المساعد الذكي جاهز');
     };
-    socket.emit('ai-ask', question, finish);
+    socket.emit('ai-ask', voice ? { q: question, voice: true } : question, finish);
     setTimeout(() => finish({ error: 'استغرق الرد وقتًا طويلًا، حاول مرة أخرى.' }), 180000);
   }
+  // ===================== السكرتير الذكي بالصوت =====================
+  let voiceOn = store.get('meet:voice') !== '0';
+  const syn = window.speechSynthesis;
+  const setVoiceToggle = () => { $('voiceToggle').setAttribute('aria-checked', String(voiceOn)); $('voiceToggle').classList.toggle('on', voiceOn); };
+  setVoiceToggle();
+  $('voiceToggle').onclick = () => {
+    voiceOn = !voiceOn; store.set('meet:voice', voiceOn ? '1' : '0'); setVoiceToggle();
+    if (!voiceOn) syn?.cancel();
+    toast(voiceOn ? '🔊 السكرتير هيرد عليك بالصوت' : '🔇 الردود هتظهر مكتوبة بس');
+  };
+  function secState(st) {
+    for (const o of document.querySelectorAll('.sec-orb')) o.className = `sec-orb ${st}`;
+    $('secMic').classList.toggle('on', st === 'listen');
+    $('secHint').textContent = { listen: '🎙️ بسمعك… اتكلم', think: '✨ بفكر في الرد…', speak: '🔊 بتكلم — دوس على الكرة علشان أسكت' }[st]
+      || 'اضغط 🎙️ واسأل بصوتك — أو قول «يا ذكي…» وتحويل الكلام شغّال';
+  }
+  const ttsLang = (t) => (/[\u0600-\u06FF]/.test(t) ? (speakLang().startsWith('ar') ? speakLang() : 'ar-SA')
+    : /[\u4e00-\u9fff]/.test(t) ? 'zh-CN' : /[\u0400-\u04FF]/.test(t) ? 'ru-RU' : (speakLang().startsWith('ar') ? 'en-US' : speakLang()));
+  function pickVoice(lang) {
+    const vs = syn?.getVoices() || [];
+    const base = lang.slice(0, 2);
+    return vs.find((v) => v.lang.replace('_', '-') === lang) || vs.find((v) => v.lang.toLowerCase().startsWith(base)) || null;
+  }
+  function secSpeak(text) {
+    if (!syn) { toast('المتصفح ده مش بيدعم القراءة بالصوت'); return; }
+    syn.cancel();
+    const clean = String(text).replace(/[#*_`>|]/g, ' ').replace(/^\s*[-•]\s*/gm, '').replace(/\s+/g, ' ').trim();
+    // تقسيم لجمل قصيرة علشان Chrome بيقطع الكلام الطويل
+    const parts = clean.match(/[^.!?؟…\n]+[.!?؟…]?/g) || [clean];
+    const lang = ttsLang(clean);
+    const voice = pickVoice(lang);
+    parts.forEach((part, i) => {
+      const u = new SpeechSynthesisUtterance(part.trim());
+      u.lang = lang; if (voice) u.voice = voice; u.rate = 1; u.pitch = 1;
+      if (i === 0) u.onstart = () => secState('speak');
+      if (i === parts.length - 1) { u.onend = () => secState(''); u.onerror = () => secState(''); }
+      syn.speak(u);
+    });
+  }
+  syn?.getVoices(); // تحميل الأصوات مبكرًا
+  $('secOrb').onclick = () => { if (syn?.speaking) { syn.cancel(); secState(''); } };
+
+  // كلمة التنبيه: «يا ذكي …» أثناء تشغيل تحويل الكلام
+  const WAKE = /^(?:يا\s*)?(?:ذكي|زكي|ذكى|زكى|hey\s+zaky|zaky)[\s،,:.!?؟-]+(.{3,})$/i;
+  function secWake(text) {
+    if (!aiOn) return false;
+    const m = text.trim().match(WAKE);
+    if (!m) return false;
+    openPanel('assistant');
+    aiAsk(m[1], { voice: true });
+    return true;
+  }
+
+  // زر اسأل بصوتك (اضغط واتكلم)
+  let secRec = null;
+  $('secMic').onclick = () => {
+    if (secRec) { try { secRec.stop(); } catch { /* ignore */ } return; }
+    if (!SR) { toast(isIOS ? 'السؤال بالصوت على الآيفون محتاج Safari' : 'السؤال بالصوت محتاج Chrome أو Edge أو Safari'); return; }
+    if (!aiOn) { toast('المساعد الذكي غير مفعّل على الخادم.'); return; }
+    if (aiBusy) { toast('استنى لحظة — بجهز الرد اللي قبله'); return; }
+    syn?.cancel();
+    const resumeCaptions = captionsOn;
+    if (captionsOn) stopCaptions(); // المتصفح بيسمح بتعرّف واحد بس في نفس الوقت
+    let heard = '';
+    secRec = new SR();
+    secRec.lang = speakLang();
+    secRec.interimResults = true;
+    secRec.continuous = false;
+    secRec.onstart = () => secState('listen');
+    secRec.onresult = (e) => {
+      heard = [...e.results].map((r) => r[0].transcript).join(' ').trim();
+      $('aiInput').value = heard;
+    };
+    secRec.onerror = (e) => {
+      if (e.error !== 'no-speech' && e.error !== 'aborted') toast(SR_ERRORS[e.error] || 'مقدرتش أسمعك — جرّب تاني', 5000);
+    };
+    secRec.onend = () => {
+      secRec = null;
+      secState('');
+      if (resumeCaptions) { startCaptions(true); refreshControls(); }
+      $('aiInput').value = '';
+      if (heard) aiAsk(heard, { voice: true }); else toast('مسمعتش حاجة — دوس 🎙️ واتكلم');
+    };
+    try { secRec.start(); } catch { secRec = null; secState(''); }
+  };
+  // الرد المقروء للجميع
+  function onAiSay({ text, by } = {}) {
+    if (!text) return;
+    document.querySelector('.ai-say-banner')?.remove();
+    const b = document.createElement('div');
+    b.className = 'ai-say-banner';
+    b.innerHTML = `<div class="sec-orb speak"><i></i><i></i><i></i></div><p><b>السكرتير الذكي</b> (بطلب ${esc(by)}): ${esc(text)}</p>`;
+    b.onclick = () => { syn?.cancel(); b.remove(); };
+    document.body.append(b);
+    if (voiceOn) secSpeak(text);
+    setTimeout(() => b.remove(), Math.min(60000, 4000 + text.length * 80));
+  }
+
   $('aiForm').onsubmit = (e) => { e.preventDefault(); aiAsk($('aiInput').value); $('aiInput').value = ''; };
   $('aiQuick').onclick = (e) => { const b = e.target.closest('button[data-q]'); if (b) aiAsk(b.dataset.q); };
   $('aiSummary').onclick = () => { openPanel('assistant'); aiAsk('اكتب ملخصًا منظمًا للاجتماع: أهم النقاط، القرارات، المهام ومسؤول كل مهمة، والخطوات التالية.'); };

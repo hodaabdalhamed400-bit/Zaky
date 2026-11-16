@@ -151,6 +151,11 @@
         <div class="ai-off" id="aiOff" hidden>
           المساعد الذكي غير مفعّل على الخادم. لتفعيله أضف المتغير <code dir="ltr">ANTHROPIC_API_KEY</code> ثم أعد تشغيل الخادم.
         </div>
+        <div class="sec-bar">
+          <div class="sec-orb" id="secOrb" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="sec-txt"><b>السكرتير الذكي</b><span class="muted small" id="secHint">اضغط 🎙️ واسأل بصوتك — أو قول «يا ذكي…» وتحويل الكلام شغّال</span></div>
+          <button class="toggle" id="voiceToggle" role="switch" aria-checked="true" title="الرد بالصوت"><i></i></button>
+        </div>
         <ol class="messages ai-thread" id="aiThread">
           <li class="ai-intro">
             <div class="bubble">أهلًا 👋 أنا المساعد الذكي للاجتماع. أقدر ألخّص اللي اتقال، وأطلع القرارات والمهام، وأجاوب على أسئلتك عن الاجتماع.
@@ -164,6 +169,7 @@
           <button data-q="اقترح نقاطًا مهمة لم تُناقش بعد وأسئلة يجب طرحها.">💡 اقتراحات</button>
         </div>
         <form class="composer" id="aiForm">
+          <button type="button" class="icon-btn sec-mic" id="secMic" aria-label="اسأل بصوتك"><span data-icon="mic" data-size="20"></span></button>
           <input id="aiInput" maxlength="1000" placeholder="اسأل المساعد عن الاجتماع…" autocomplete="off">
           <button class="icon-btn primary" aria-label="إرسال"><span data-icon="send" data-size="20"></span></button>
         </form>
