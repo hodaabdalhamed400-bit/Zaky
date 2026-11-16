@@ -102,6 +102,43 @@ body {
   to { transform: scaleX(1); }
 }
 
+/* صفحة الدخول: جسيمات صاعدة، تلويحة اليد، لمعة الزر */
+@keyframes rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(-110vh) scale(0.6); opacity: 0; }
+}
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(16deg); }
+  20%, 40% { transform: rotate(-8deg); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@keyframes sweep {
+  from { transform: translateX(120%) skewX(-20deg); }
+  to { transform: translateX(-220%) skewX(-20deg); }
+}
+.auth-particle {
+  position: absolute;
+  bottom: -12px;
+  border-radius: 9999px;
+  background: var(--color-accent-300);
+  box-shadow: 0 0 12px var(--color-accent-500);
+  animation: rise linear infinite;
+}
+.auth-field > * {
+  animation: var(--animate-fade-up);
+}
+.auth-field > *:nth-child(1) { animation-delay: 380ms; }
+.auth-field > *:nth-child(2) { animation-delay: 460ms; }
+.auth-field > *:nth-child(3) { animation-delay: 540ms; }
+.auth-field > *:nth-child(4) { animation-delay: 620ms; }
+
 /* ظهور متتابع لعناصر الشبكات والقوائم */
 .stagger > * {
   animation: var(--animate-fade-up);
