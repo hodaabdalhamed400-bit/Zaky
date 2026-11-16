@@ -686,3 +686,12 @@ body.in-meeting { overflow: hidden; height: 100dvh; }
 .ai-say-banner .sec-orb { width: 30px; height: 30px; }
 .ai-say-banner p { margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 @keyframes fadeIn { from { opacity: 0; } }
+
+/* ===== اختيار اللغة ===== */
+.lang-pick { appearance: none; -webkit-appearance: none; padding: .45rem .8rem; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .06); color: inherit; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; outline: none; backdrop-filter: blur(8px); }
+.lang-pick:focus { border-color: var(--brand); }
+.lang-pick option { color: #000; }
+.lang-pick.block { width: 100%; padding: .7rem .95rem; border-radius: 14px; }
+.nav-right, .lb-right { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+.auth-lang { display: flex; justify-content: center; }

@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
   <title>smart Meet | ذكي</title>
@@ -130,7 +131,8 @@
 
   <header class="hp-nav reveal" style="--d:0">
     <img src="/img/logo-light.png" alt="ذكي smart لحاضنات ومسرعات الأعمال" class="hp-logo">
-    <a class="hp-tag" id="navAcct" href="/signin"><i></i> <span id="navAcctTxt">تسجيل الدخول</span></a>
+    <span class="nav-right"><span data-lang-picker></span>
+    <a class="hp-tag" id="navAcct" href="/signin"><i></i> <span id="navAcctTxt">تسجيل الدخول</span></a></span>
   </header>
 
   <main class="hp-main">
@@ -185,7 +187,7 @@
           <div class="pv-tile s4"><span class="pv-av" style="--a:#22c55e">J</span><span class="wave"><i></i><i></i><i></i><i></i><i></i></span><span class="pv-nm">John</span></div>
           <div class="pv-emojis" id="pvEmojis"></div>
         </div>
-        <div class="pv-caps"><div class="pv-cap" id="pvCap"><b id="pvWho">Sara</b> <span id="pvText"></span><small id="pvTr"></small></div></div>
+        <div class="pv-caps"><div class="pv-cap" id="pvCap" translate="no"><b id="pvWho">Sara</b> <span id="pvText"></span><small id="pvTr"></small></div></div>
         <div class="pv-dock"><i class="o1"></i><i class="o2"></i><i class="o3"></i><i class="o4"></i><i class="o5"></i></div>
       </div>
       <div class="pv-float f1"><span data-icon="sparkles" data-size="16"></span> ملخص جاهز · 3 قرارات · 5 مهام</div>
@@ -275,8 +277,9 @@
     // ---- الكلمة اللي بتتكتب وتتمسح في العنوان ----
     (async () => {
       if (reduced) return;
-      const words = ['ذكية', 'مترجمة', 'منظّمة', 'آمنة', 'أسرع'];
+      const words = ['ذكية', 'مترجمة', 'منظّمة', 'آمنة', 'أسرع'].map((w) => (window.I18N ? I18N.t(w) : w));
       const el = $('rot');
+      el.setAttribute('translate', 'no');
       await sleep(2200);
       for (let i = 1; ; i++) {
         let t = el.textContent;
@@ -433,7 +436,7 @@
     try {
       const recent = JSON.parse(store.get('meet:recent') || '[]');
       if (recent.length) {
-        const fmt = (ts) => new Date(ts).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const fmt = (ts) => new Date(ts).toLocaleString(window.I18N?.locale || 'ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
         $('recentList').innerHTML = recent.slice(0, 6).map((r, i) => `
           <li style="--i:${i}"><a href="/m/${encodeURIComponent(r.id)}">
             <span class="r-ic">${icon('cam', 18)}</span>

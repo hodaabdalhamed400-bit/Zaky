@@ -9,11 +9,12 @@
     get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
     set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
   };
+  const T = (s) => (window.I18N ? I18N.t(s) : s);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const initial = (name) => (String(name).trim()[0] || '?').toUpperCase();
   const COLORS = ['#1faec1', '#2d5c8f', '#178a9a', '#3b6fb0', '#7a4fb0', '#c0703a', '#2f8f6b', '#b0475f'];
   const colorFor = (key) => { let h = 0; for (const c of String(key)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; };
-  const fmtClock = (ts) => new Date(ts).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  const fmtClock = (ts) => new Date(ts).toLocaleTimeString(window.I18N?.locale || 'ar-EG', { hour: '2-digit', minute: '2-digit' });
 
   document.title = BRAND.title;
   renderBrand();
@@ -206,7 +207,8 @@
   function updateTile(el, { name, isMe, state, key, stream }) {
     if (!el) return;
     if (name !== undefined) {
-      el.querySelector('.nm').textContent = isMe ? `${name} · أنت` : name;
+      el.querySelector('.nm').setAttribute('translate', 'no');
+      el.querySelector('.nm').textContent = isMe ? `${name} · ${T('أنت')}` : name;
       const av = el.querySelector('.avatar');
       av.textContent = initial(name);
       av.style.setProperty('--avatar', colorFor(key || name));
@@ -277,7 +279,7 @@
       <p class="section-title">في الانتظار (${waitlist.length})</p>
       <ul class="people waiting-list">${waitlist.map((w) => `
         <li><span class="av" style="--avatar:${colorFor(w.id)}">${esc(initial(w.name))}</span>
-          <span class="nm">${esc(w.name)}</span>
+          <span class="nm" translate="no">${esc(w.name)}</span>
           <span class="ic"><button class="mini ok" data-host="admit" data-id="${esc(w.id)}">قبول</button>
           <button class="mini" data-host="deny" data-id="${esc(w.id)}">رفض</button></span></li>`).join('')}
       </ul>${waitlist.length > 1 ? '<button class="btn btn-ghost btn-block" data-host="admit-all">قبول الكل</button>' : ''}` : '';
@@ -285,7 +287,7 @@
     $('people').innerHTML = all.map((p) => `
       <li>
         <span class="av" style="--avatar:${colorFor(p.id || p.name)}">${esc(initial(p.name))}</span>
-        <span class="nm">${esc(p.name)}${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}${p.state.host ? ' <span class="host-tag">منظّم</span>' : ''}</span>
+        <span class="nm"><span translate="no">${esc(p.name)}</span>${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}${p.state.host ? ' <span class="host-tag">منظّم</span>' : ''}</span>
         <span class="ic">
           ${p.state.hand ? `<span title="رافع يده" style="color:var(--warn)">${icon('hand', 18)}</span>` : ''}
           ${p.state.screen ? `<span title="يشارك الشاشة">${icon('screen', 18)}</span>` : ''}
@@ -624,6 +626,7 @@
     $('endScreen').hidden = false;
     $('endBy').textContent = by ? `${by} أنهى الاجتماع` : 'انتهى الاجتماع';
     $('endStats').textContent = `${meetingTitle} · ${minutes} دقيقة`;
+    $('endStats').setAttribute('translate', 'no');
     $('endSummary').innerHTML = '<div class="spinner"></div><p class="muted">جارٍ تجهيز ملخص الاجتماع بالذكاء الاصطناعي…</p>';
     $('endActions').hidden = true;
   }
@@ -641,11 +644,11 @@
     return out.join('');
   }
   function showSummary({ summaries = {}, reason }) {
-    const lang = (translateTo || speakLang()).startsWith('ar') ? 'ar' : 'en';
+    const lang = window.I18N && I18N.lang !== 'ar' ? 'en' : (translateTo || speakLang()).startsWith('ar') ? 'ar' : 'en';
     summaryText = summaries[lang] || summaries.ar || Object.values(summaries)[0] || '';
     const note = [];
     if (summaryText) {
-      $('endSummary').innerHTML = `<div class="summary" dir="${lang === 'ar' || !summaries.en ? 'rtl' : 'ltr'}">${renderSummaryHtml(summaryText)}</div>`;
+      $('endSummary').innerHTML = `<div class="summary" translate="no" dir="${lang === 'ar' || !summaries.en ? 'rtl' : 'ltr'}">${renderSummaryHtml(summaryText)}</div>`;
     } else {
       const why = { ai_off: 'الملخص الذكي مش مفعّل على الخادم.', empty: 'مفيش كلام اتكتب أو اتقال في المحادثة علشان يتلخّص. (فعّلوا "تحويل الكلام لنص" المرة الجاية.)', ai_error: 'حصلت مشكلة في تجهيز الملخص.' }[reason] || '';
       $('endSummary').innerHTML = `<p class="muted">${why}</p>`;
@@ -855,7 +858,7 @@
       $('captions').append(el);
       captionEls.set(from, el);
     }
-    el.innerHTML = `<b>${esc(name)}:</b>${esc(text)}${corrected ? ' <span class="fixed" title="اتصحّح بالذكاء الاصطناعي">✨</span>' : ''}`;
+    el.innerHTML = `<b translate="no">${esc(name)}:</b><span translate="no">${esc(text)}</span>${corrected ? ' <span class="fixed" title="اتصحّح بالذكاء الاصطناعي">✨</span>' : ''}`;
     const seq = (el._seq = (el._seq || 0) + 1);
     const expire = (ms) => {
       clearTimeout(el._t);
@@ -917,7 +920,7 @@
     if (!question || aiBusy) return;
     if (!aiOn) { toast('المساعد الذكي غير مفعّل على الخادم.'); return; }
     const voice = !!opts.voice;
-    aiBubble('mine', 'أنت', (voice ? '🎙️ ' : '') + esc(question));
+    aiBubble('mine', 'أنت', `<span translate="no">${voice ? '🎙️ ' : ''}${esc(question)}</span>`);
     if (voice) secState('think');
     const pending = aiBubble('ai pending', '✨ المساعد الذكي', '<span class="dots">بيفكر</span>');
     setAiBusy(true);
@@ -929,7 +932,7 @@
       if (voice) secState('');
       if (res?.answer) {
         pending.className = 'ai';
-        pending.querySelector('.bubble').innerHTML = `${mdLite(res.answer)}<br><button class="speak-btn">🔊 اسمعه</button>${me.host ? '<button class="say-all">📢 اسمعه للكل</button>' : ''}<button class="share-ai">↗ شارك الرد في المحادثة</button>`;
+        pending.querySelector('.bubble').innerHTML = `<div translate="no">${mdLite(res.answer)}</div><button class="speak-btn">🔊 اسمعه</button>${me.host ? '<button class="say-all">📢 اسمعه للكل</button>' : ''}<button class="share-ai">↗ شارك الرد في المحادثة</button>`;
         pending.querySelector('.speak-btn').onclick = () => secSpeak(res.answer);
         const sa = pending.querySelector('.say-all');
         if (sa) sa.onclick = () => { socket.emit('ai-say', res.answer); sa.remove(); toast('📢 السكرتير بيقرأ الرد للكل'); };
@@ -1041,7 +1044,7 @@
     document.querySelector('.ai-say-banner')?.remove();
     const b = document.createElement('div');
     b.className = 'ai-say-banner';
-    b.innerHTML = `<div class="sec-orb speak"><i></i><i></i><i></i></div><p><b>السكرتير الذكي</b> (بطلب ${esc(by)}): ${esc(text)}</p>`;
+    b.innerHTML = `<div class="sec-orb speak"><i></i><i></i><i></i></div><p><b>السكرتير الذكي</b> · <span translate="no">${esc(by)}: ${esc(text)}</span></p>`;
     b.onclick = () => { syn?.cancel(); b.remove(); };
     document.body.append(b);
     if (voiceOn) secSpeak(text);
@@ -1050,7 +1053,7 @@
 
   $('aiForm').onsubmit = (e) => { e.preventDefault(); aiAsk($('aiInput').value); $('aiInput').value = ''; };
   $('aiQuick').onclick = (e) => { const b = e.target.closest('button[data-q]'); if (b) aiAsk(b.dataset.q); };
-  $('aiSummary').onclick = () => { openPanel('assistant'); aiAsk('اكتب ملخصًا منظمًا للاجتماع: أهم النقاط، القرارات، المهام ومسؤول كل مهمة، والخطوات التالية.'); };
+  $('aiSummary').onclick = () => { openPanel('assistant'); aiAsk(I18N.t('اكتب ملخصًا منظمًا للاجتماع: أهم النقاط، القرارات، المهام ومسؤول كل مهمة، والخطوات التالية.')); };
 
   // ===================== التفاعلات =====================
   const FX = {
@@ -1193,7 +1196,7 @@
     list.querySelector('.empty')?.remove();
     const li = document.createElement('li');
     if (m.from === me.id) li.className = 'mine';
-    li.innerHTML = `<div class="who">${esc(m.from === me.id ? 'أنت' : m.name)} · ${fmtClock(m.ts)}</div><div class="bubble">${esc(m.text)}</div>`;
+    li.innerHTML = `<div class="who">${m.from === me.id ? 'أنت' : `<span translate="no">${esc(m.name)}</span>`} · ${fmtClock(m.ts)}</div><div class="bubble" translate="no">${esc(m.text)}</div>`;
     list.append(li);
     list.scrollTop = list.scrollHeight;
     addMinute('chat', m.text, m.name, m.ts);
@@ -1225,12 +1228,12 @@
   }
   $('downloadMinutes').onclick = () => {
     const lines = [
-      `محضر اجتماع: ${meetingTitle}`,
-      `التاريخ: ${new Date(startedAt).toLocaleString('ar-EG')}`,
-      `كود الاجتماع: ${roomId}`,
-      `الحاضرون حاليًا: ${[me.name, ...[...peers.values()].map((p) => p.name)].join('، ')}`,
+      T(`محضر اجتماع: ${meetingTitle}`),
+      T(`التاريخ: ${new Date(startedAt).toLocaleString(window.I18N?.locale || 'ar-EG')}`),
+      T(`كود الاجتماع: ${roomId}`),
+      T(`الحاضرون حاليًا: ${[me.name, ...[...peers.values()].map((p) => p.name)].join('، ')}`),
       '----------------------------------------',
-      ...minutes.map((m) => `[${fmtClock(m.ts)}] ${m.type === 'chat' ? '(محادثة) ' : m.type === 'speech' ? '(كلام) ' : ''}${m.who ? `${m.who}: ` : ''}${m.text}`),
+      ...minutes.map((m) => `[${fmtClock(m.ts)}] ${m.type === 'chat' ? `${T('(محادثة)')} ` : m.type === 'speech' ? `${T('(كلام)')} ` : ''}${m.who ? `${m.who}: ` : ''}${m.text}`),
     ];
     download(new Blob(['﻿' + lines.join('\n')], { type: 'text/plain;charset=utf-8' }), `minutes-${roomId}.txt`);
   };

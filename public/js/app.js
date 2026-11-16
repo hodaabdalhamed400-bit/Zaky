@@ -1,6 +1,7 @@
 // لوحة التحكم: الاجتماعات والجدولة والفريق والحساب
 (() => {
   'use strict';
+  const T = (s) => (window.I18N ? I18N.t(s) : s);
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = { get: (k) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
@@ -44,25 +45,25 @@
   });
 
   // ---------- الاجتماعات ----------
-  const fmtDay = (t) => new Date(t).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
-  const fmtTime = (t) => new Date(t).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' });
+  const fmtDay = (t) => new Date(t).toLocaleDateString(window.I18N?.locale || 'ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+  const fmtTime = (t) => new Date(t).toLocaleTimeString(window.I18N?.locale || 'ar-EG', { hour: 'numeric', minute: '2-digit' });
   const durTxt = (m) => (m >= 60 ? `${m / 60 === Math.floor(m / 60) ? m / 60 : (m / 60).toFixed(1)} ساعة` : `${m} دقيقة`);
   function gcal(m) {
     const f = (t) => new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    const p = new URLSearchParams({ action: 'TEMPLATE', text: m.title, dates: `${f(m.startAt)}/${f(m.startAt + m.duration * 60000)}`, details: `${m.notes ? `${m.notes}\n\n` : ''}رابط الاجتماع: ${link(m.id)}` });
+    const p = new URLSearchParams({ action: 'TEMPLATE', text: m.title, dates: `${f(m.startAt)}/${f(m.startAt + m.duration * 60000)}`, details: `${m.notes ? `${m.notes}\n\n` : ''}${T(`رابط الاجتماع: ${link(m.id)}`)}` });
     return `https://calendar.google.com/calendar/render?${p}`;
   }
   function waText(m) {
     const when = m.startAt ? `\n🗓️ ${fmtDay(m.startAt)} — ${fmtTime(m.startAt)} (${durTxt(m.duration)})` : '';
-    return `https://wa.me/?text=${encodeURIComponent(`دعوة لاجتماع: ${m.title}${when}\n🔗 ${link(m.id)}`)}`;
+    return `https://wa.me/?text=${encodeURIComponent(`${T(`دعوة لاجتماع: ${m.title}`)}${when}\n🔗 ${link(m.id)}`)}`;
   }
   function item(m, i, past) {
     const t = Date.now();
     const live = m.startAt && t >= m.startAt - 10 * 60000 && t <= m.startAt + m.duration * 60000;
     const d = m.startAt ? new Date(m.startAt) : null;
     return `<li class="mi ${live ? 'live' : ''}" style="animation-delay:${i * 50}ms">
-      <div class="mi-date">${d ? `<small>${d.toLocaleDateString('ar-EG', { month: 'short' })}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString('ar-EG', { weekday: 'short' })}</small>` : '<b>⚡</b><small>فوري</small>'}</div>
-      <div class="mi-body"><h3>${esc(m.title)}</h3>
+      <div class="mi-date">${d ? `<small>${d.toLocaleDateString(window.I18N?.locale || 'ar-EG', { month: 'short' })}</small><b>${d.getDate()}</b><small>${d.toLocaleDateString(window.I18N?.locale || 'ar-EG', { weekday: 'short' })}</small>` : '<b>⚡</b><small>فوري</small>'}</div>
+      <div class="mi-body"><h3 translate="no">${esc(m.title)}</h3>
         <div class="mi-meta">${live ? '<span class="now">● شغّال دلوقتي</span>' : ''}${m.startAt ? `<span>🕒 ${fmtTime(m.startAt)}</span><span>⏱️ ${durTxt(m.duration)}</span>` : ''}${m.creator ? `<span>👤 ${esc(m.creator)}</span>` : ''}</div>
         ${m.notes ? `<div class="mi-meta">📝 ${esc(m.notes.slice(0, 120))}</div>` : ''}</div>
       <div class="mi-actions">
@@ -145,7 +146,7 @@
       const canRole = me.role === 'owner' && !self;
       const canManage = !self && m.role !== 'owner' && (me.role === 'owner' || (me.role === 'admin' && m.role === 'member'));
       return `<li class="pr"><span class="av" style="background:${colorFor(m.id)}">${esc(initial(m.name))}</span>
-        <span class="nm"><b>${esc(m.name)}${self ? ' <span class="muted small">(أنت)</span>' : ''}</b><small>${esc(m.email)}</small></span>
+        <span class="nm"><b><span translate="no">${esc(m.name)}</span>${self ? ' <span class="muted small">(أنت)</span>' : ''}</b><small>${esc(m.email)}</small></span>
         ${canRole ? `<select data-role="${m.id}">${['owner', 'admin', 'member'].map((r) => `<option value="${r}" ${r === m.role ? 'selected' : ''}>${ROLE[r]}</option>`).join('')}</select>` : `<span class="role ${m.role}">${ROLE[m.role]}</span>`}
         ${canManage ? `<button class="chipb" data-reset="${m.id}">كلمة مرور مؤقتة</button><button class="chipb del" data-rm="${m.id}">إزالة</button>` : ''}</li>`;
     }).join('');
@@ -170,7 +171,7 @@
     if (!d.ok) return toast('غير مسموح');
     const url = `${location.origin}/invite/${d.token}`;
     $('invLink').textContent = url; $('invOut').hidden = false;
-    $('invWa').href = `https://wa.me/?text=${encodeURIComponent(`انضم لفريق ${me.workspace.name} على smart Meet:\n${url}`)}`;
+    $('invWa').href = `https://wa.me/?text=${encodeURIComponent(`${T(`انضم لفريق ${me.workspace.name} على smart Meet:`)}\n${url}`)}`;
   };
   $('invCopy').onclick = async () => { try { await navigator.clipboard.writeText($('invLink').textContent); toast('اتنسخ ✔'); } catch { prompt('انسخ:', $('invLink').textContent); } };
   $('wsSave').onclick = async () => { const d = await api('/api/workspace', { method: 'PATCH', body: { name: $('wsName').value } }); if (d.ok) { toast('اتحفظ ✔'); boot(); } };
@@ -187,6 +188,9 @@
 
   async function boot() {
     const r = await fetch('/api/me', { cache: 'no-store' }); me = await r.json();
+    // لغة الحساب تمشي معاك على أي جهاز (لو الجهاز ده لسه ما اختارش لغة)
+    let picked = null; try { picked = localStorage.getItem('meet:ui'); } catch { /* ignore */ }
+    if (window.I18N && me.user?.lang && !picked && me.user.lang !== I18N.lang) { I18N.set(me.user.lang); return; }
     if (!me.user) { location.href = '/signin?next=/app'; return; }
     if (me.user.name) store.set('meet:name', me.user.name);
     $('dash').hidden = false;

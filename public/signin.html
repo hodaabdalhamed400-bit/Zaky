@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#07111f">
   <title>تسجيل الدخول | smart Meet</title>
@@ -42,6 +43,7 @@
         <div id="gbtn"></div>
       </div>
       <p class="msg" id="msg" role="alert"></p>
+      <div class="auth-lang" data-lang-picker></div>
       <p class="auth-foot"><a href="/">← الرجوع للرئيسية</a> · <a href="/terms">الشروط</a> · <a href="/privacy">الخصوصية</a></p>
     </section>
   </main>
@@ -70,7 +72,7 @@
     document.querySelectorAll('#seg button').forEach((b) => b.onclick = () => setMode(b.dataset.m));
 
     async function post(url, body) {
-      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, lang: window.I18N?.lang }) });
       let d = {}; try { d = await r.json(); } catch {}
       return { ok: r.ok, ...d };
     }

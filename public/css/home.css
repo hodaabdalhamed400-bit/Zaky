@@ -303,3 +303,6 @@ body.hp { min-height: 100dvh; overflow-x: hidden; background: #050d19; }
 /* المحتوى يستنى لحد ما الشاشة الافتتاحية تخلص */
 html.splashing .reveal { animation-play-state: paused; }
 a.hp-tag { text-decoration: none; }
+/* اللغات اللاتينية/الصينية: عنوان أصغر شوية علشان الكلمات الأطول */
+html[dir="ltr"] .hp-hero h1 { font-size: clamp(1.9rem, 5vw, 3rem); }
+html[dir="ltr"] .hp-hero h1 .rot { white-space: nowrap; }
