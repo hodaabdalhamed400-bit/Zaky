@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Cairo } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 
-const arabic = IBM_Plex_Sans_Arabic({
+const arabic = Cairo({
   subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-arabic",
