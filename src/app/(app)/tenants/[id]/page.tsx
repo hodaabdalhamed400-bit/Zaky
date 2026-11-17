@@ -12,7 +12,10 @@ import { Alert, Badge, Card, CardHeader, EmptyState, LinkButton, PageHeader, Tab
 import { StatCard } from "@/components/ui/stat-card";
 import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { ContactForm, InteractionForm, RemoveContactButton, SmallActionForm } from "../forms";
-import { addContactAction, addInteractionAction, archiveTenantAction, removeContactAction } from "../actions";
+import { addContactAction, addInteractionAction, archiveTenantAction, createShareLinkAction, removeContactAction, revokeShareLinksAction } from "../actions";
+import { listShareLinks } from "@/services/tenant-share.service";
+import { toWhatsAppNumber } from "@/services/reminders.service";
+import { SharePanel } from "./share-panel";
 
 export const metadata: Metadata = { title: "ملف العميل" };
 
@@ -26,6 +29,7 @@ export default async function TenantPage({ params, searchParams }: { params: Pro
     throw e;
   });
   const manage = actor.permissions.has("tenants.manage") && !t.archivedAt;
+  const shareLinks = t.archivedAt ? null : await listShareLinks(prisma, actor, id);
   const path = `/tenants/${id}`;
   const row = (label: string, value: React.ReactNode) => (
     <div><dt className="text-gray-500">{label}</dt><dd className="mt-1">{value ?? "—"}</dd></div>
@@ -138,6 +142,19 @@ export default async function TenantPage({ params, searchParams }: { params: Pro
           </div>
         </Card>
       </div>
+
+      {shareLinks && (
+        <Card className="mt-6">
+          <CardHeader title="صفحة المستأجر (رابط للعميل)" />
+          <SharePanel
+            tenantName={t.name}
+            whatsapp={toWhatsAppNumber(t.mobile)}
+            links={shareLinks.map((l) => ({ id: l.id, createdAt: l.createdAt.toISOString(), expiresAt: l.expiresAt.toISOString(), viewCount: l.viewCount, lastViewedAt: l.lastViewedAt?.toISOString() ?? null, by: l.createdBy.name }))}
+            create={createShareLinkAction.bind(null, id)}
+            revoke={revokeShareLinksAction.bind(null, id)}
+          />
+        </Card>
+      )}
 
       {actor.permissions.has("tenants.manage") && (
         <Card className="mt-6">
