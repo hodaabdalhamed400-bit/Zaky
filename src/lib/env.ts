@@ -24,6 +24,14 @@ const schema = z.object({
     .enum(["true", "false"])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
+  // رابط النظام العام (يُستخدم في روابط الإيميل)، مثال https://erp.smartcompany.sa
+  APP_URL: z.string().url().optional(),
+  // إرسال الإيميل عبر SMTP من صندوق بريد موجود (بدون اشتراك). بدونها تُعطَّل الإيميلات بهدوء.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(465),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  MAIL_FROM: z.string().email().optional(),
 });
 
 let cached: z.infer<typeof schema> | null = null;
