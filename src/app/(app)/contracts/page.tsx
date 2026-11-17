@@ -35,7 +35,7 @@ function ContractCard({ c, today }: { c: Contract; today: number }) {
   return (
     <li
       data-contract-card
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-accent-500/40 hover:shadow-[0_18px_36px_-16px_rgb(19_46_75/0.3)]"
+      className="group relative flex flex-col prism overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_36px_-16px_rgb(19_46_75/0.3)]"
     >
       <div className={cx("h-1.5 bg-gradient-to-l", BAR[c.status])} aria-hidden="true" />
       <div className="flex flex-1 flex-col gap-4 p-5">
