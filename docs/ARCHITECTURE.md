@@ -48,7 +48,7 @@ scripts/create-admin.ts         إنشاء مسؤول النظام الأول م
 src/
   middleware.ts
   app/
-    layout.tsx, globals.css     عربي RTL + خط IBM Plex Sans Arabic (مستضاف ذاتيًا عند البناء)
+    layout.tsx, globals.css     عربي RTL + خط Cairo (مستضاف ذاتيًا عند البناء)
     login/                      صفحة الدخول + Server Action
     (app)/layout.tsx            الهيكل: القائمة الجانبية حسب الصلاحيات
     (app)/page.tsx              لوحة التحكم (أرقام حقيقية من القاعدة)
