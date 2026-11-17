@@ -46,7 +46,7 @@ export const UNIT_TYPES = [
 ];
 
 export const DEFAULT_SETTINGS = [
-  { key: "contract.expiry_alert_days", value: [30, 15, 7], description: "أيام التنبيه قبل انتهاء العقد" },
+  { key: "contract.expiry_alert_days", value: [60, 30, 15, 7], description: "أيام التنبيه قبل انتهاء العقد" },
   { key: "finance.vat_rate", value: "0.15", description: "نسبة ضريبة القيمة المضافة — الإيجار خاضع للضريبة (معتمد)" },
   { key: "finance.prices_include_vat", value: true, description: "الأسعار والإيجارات المدخلة شاملة الضريبة (معتمد)" },
   { key: "finance.grace_days", value: 0, description: "لا توجد مهلة سماح: القسط غير المسدد بنهاية يوم استحقاقه متأخر (معتمد)" },

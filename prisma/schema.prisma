@@ -223,12 +223,14 @@ model User {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  role          Role               @relation(fields: [roleId], references: [id])
-  createdBy     User?              @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdUsers  User[]             @relation("UserCreatedBy")
+  role          Role                 @relation(fields: [roleId], references: [id])
+  createdBy     User?                @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdUsers  User[]               @relation("UserCreatedBy")
   branchAccess  UserBranchAccess[]
   sessions      Session[]
   mfaChallenges MfaChallenge[]
+  resetTokens   PasswordResetToken[]
+  shareLinks    TenantShareLink[]
   notifications Notification[]
   auditLogs     AuditLog[]
 
@@ -258,11 +260,29 @@ model Session {
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
   ip         String?
   userAgent  String?   @map("user_agent")
+  // «تذكّرني»: مدة أطول ومهلة خمول أطول (اختيار صريح من المستخدم)
+  persistent Boolean   @default(false)
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("sessions")
+}
+
+// استعادة كلمة المرور: رابط لمرة واحدة (SHA-256 فقط) صالح 30 دقيقة
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  ip        String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("password_reset_tokens")
 }
 
 // مرحلة الدخول الثانية: بعد كلمة المرور الصحيحة وقبل إنشاء الجلسة
@@ -272,6 +292,7 @@ model MfaChallenge {
   userId     String    @map("user_id") @db.Uuid
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
   attempts   Int       @default(0)
+  persistent Boolean   @default(false)
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
   ip         String?
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -413,6 +434,7 @@ model Tenant {
   refunds       Refund[]
   documents     Document[]
   bookings      RoomBooking[]
+  shareLinks    TenantShareLink[]
 
   @@index([name])
   @@index([mobile])
@@ -888,4 +910,22 @@ model PurchaseInvoice {
   @@index([branchId, invoiceDate])
   @@index([status])
   @@map("purchase_invoices")
+}
+
+// رابط صفحة المستأجر: عرض فقط لعقوده وأقساطه ودفعاته، بلا حساب. قابل للإلغاء وله انتهاء.
+model TenantShareLink {
+  id           String    @id @default(uuid()) @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  tenantId     String    @map("tenant_id") @db.Uuid
+  createdById  String    @map("created_by_id") @db.Uuid
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  lastViewedAt DateTime? @map("last_viewed_at") @db.Timestamptz(3)
+  viewCount    Int       @default(0) @map("view_count")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy    User      @relation(fields: [createdById], references: [id])
+
+  @@index([tenantId])
+  @@map("tenant_share_links")
 }
