@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getRequestMeta, requireActionActor, type FormState } from "@/lib/auth/server";
 import { AppError, toSafeMessage } from "@/lib/errors";
 import { addContact, addInteraction, createTenant, removeContact, setTenantArchived, updateTenant } from "@/services/tenants.service";
+import { createShareLink, revokeShareLinks } from "@/services/tenant-share.service";
 
 export type TenantFormState = FormState & { duplicateSuspect?: boolean };
 
@@ -94,4 +95,28 @@ export async function addInteractionAction(tenantId: string, _p: FormState, fd: 
   }
   revalidatePath(`/tenants/${tenantId}`);
   return { success: "تم تسجيل التواصل" };
+}
+
+export type ShareState = { error?: string; url?: string; expiresAt?: string };
+
+export async function createShareLinkAction(tenantId: string, _p: ShareState, fd: FormData): Promise<ShareState> {
+  const actor = await requireActionActor();
+  try {
+    const r = await createShareLink(prisma, actor, tenantId, { days: fd.get("days") }, await getRequestMeta());
+    revalidatePath(`/tenants/${tenantId}`);
+    return { url: r.url, expiresAt: r.expiresAt.toISOString() };
+  } catch (e) {
+    return { error: toSafeMessage(e) };
+  }
+}
+
+export async function revokeShareLinksAction(tenantId: string, _p: FormState): Promise<FormState> {
+  const actor = await requireActionActor();
+  try {
+    const n = await revokeShareLinks(prisma, actor, tenantId, await getRequestMeta());
+    revalidatePath(`/tenants/${tenantId}`);
+    return { success: n ? `تم إلغاء ${n} رابط.` : "ما فيه روابط فعّالة." };
+  } catch (e) {
+    return { error: toSafeMessage(e) };
+  }
 }
