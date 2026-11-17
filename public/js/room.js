@@ -59,6 +59,21 @@
     setTimeout(() => el.remove(), ms);
   }
 
+  // ===================== دخول الـ VIP 👑 =====================
+  function vipEntrance(name) {
+    document.querySelector('.vip-entrance')?.remove();
+    const el = document.createElement('div');
+    el.className = 'vip-entrance';
+    const sparks = Array.from({ length: 26 }, (_, i) => {
+      const a = (i / 26) * Math.PI * 2, d = 140 + Math.random() * 220;
+      return `<i class="spark" style="--x:${Math.round(Math.cos(a) * d)}px;--y:${Math.round(Math.sin(a) * d)}px;--r:${Math.round(Math.random() * 540)}deg;animation-delay:${(.15 + Math.random() * .35).toFixed(2)}s"></i>`;
+    }).join('');
+    el.innerHTML = `<div class="rays"></div>${sparks}<div class="card"><div class="crown">👑</div><div class="who" translate="no">${esc(name)}</div><div class="sub">${T('وصل الاجتماع')} · VIP</div></div>`;
+    document.body.append(el);
+    setTimeout(() => el.remove(), 4300);
+  }
+  let lobbyVip = false;
+
   // ===================== الوسائط =====================
   async function getTrack(kind, deviceId) {
     const constraints = kind === 'audio'
@@ -197,7 +212,7 @@
     el.innerHTML = `
       <video autoplay playsinline muted></video>${isMe ? '' : '<audio autoplay></audio>'}
       <div class="avatar"></div>
-      <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span><span class="host" hidden>منظّم</span></div>
+      <div class="badges"><span class="mic-off" hidden>${icon('micOff', 18)}</span><span class="hand" hidden>${icon('hand', 18)}</span><span class="host" hidden>منظّم</span><span class="vip-badge">👑 VIP</span></div>
       <div class="label"><span class="nm"></span></div>`;
     $('grid').append(el);
     updateTile(el, { name, isMe, key: isMe ? me.id || 'me' : id });
@@ -235,6 +250,7 @@
     updateTile(el, { name: me.name, isMe: true, state: me, key: me.id, stream: me.screen ? null : localStream });
     // اللي بيشارك شاشته ما بيشوفهاش جوه الصفحة (عرضها تقيل جدًا على الجهاز)
     el.classList.toggle('self-sharing', me.screen);
+    el.classList.toggle('vip', !!me.vip);
     if (me.screen) {
       el.classList.remove('spotlight', 'video-on');
       el.querySelector('video').srcObject = null;
@@ -273,7 +289,7 @@
   }
 
   function renderPeople() {
-    const all = [{ id: me.id, name: me.name, state: me, isMe: true }, ...[...peers.values()].map((p) => ({ ...p, isMe: false }))];
+    const all = [{ id: me.id, name: me.name, state: me, isMe: true, vip: me.vip }, ...[...peers.values()].map((p) => ({ ...p, isMe: false }))];
     const hostTools = me.host ? `
       <div class="host-box">
         <p class="section-title">أدوات المنظّم</p>
@@ -295,7 +311,7 @@
     $('people').innerHTML = all.map((p) => `
       <li>
         <span class="av" style="--avatar:${colorFor(p.id || p.name)}">${esc(initial(p.name))}</span>
-        <span class="nm"><span translate="no">${esc(p.name)}</span>${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}${p.state.host ? ' <span class="host-tag">منظّم</span>' : ''}</span>
+        <span class="nm"><span translate="no">${esc(p.name)}</span>${p.isMe ? ' <span class="muted small">(أنت)</span>' : ''}${p.state.host ? ' <span class="host-tag">منظّم</span>' : ''}${p.vip ? ' <span class="vip-tag">👑 VIP</span>' : ''}</span>
         <span class="ic">
           ${p.state.hand ? `<span title="رافع يده" style="color:var(--warn)">${icon('hand', 18)}</span>` : ''}
           ${p.state.screen ? `<span title="يشارك الشاشة">${icon('screen', 18)}</span>` : ''}
@@ -337,7 +353,7 @@
   // ===================== WebRTC =====================
   function createPeer(info, initiator) {
     const p = {
-      id: info.id, name: info.name, state: { ...info.state, host: !!info.host }, initiator,
+      id: info.id, name: info.name, vip: !!info.vip, state: { ...info.state, host: !!info.host }, initiator,
       stream: new MediaStream(), pending: [], audioSender: null, videoSender: null,
     };
     const pc = new RTCPeerConnection({ iceServers });
@@ -373,6 +389,7 @@
     };
 
     p.tile = makeTile(p.id, p.name, false);
+    p.tile.classList.toggle('vip', p.vip);
     updateTile(p.tile, { state: p.state });
     peers.set(p.id, p);
     layout();
@@ -454,6 +471,8 @@
         if (res?.error) { alert('رابط الاجتماع غير صحيح أو منتهي. اطلب الرابط تاني من منظّم الاجتماع.'); location.href = '/'; return; }
         me.id = res.selfId;
         me.host = !!res.host;
+        me.vip = !!res.vip;
+        if (me.vip && !joinedOnce) setTimeout(() => vipEntrance(me.name), 600);
         roomSettings = res.settings || roomSettings;
         if (me.host && !joinedOnce) toast('أنت منظّم الاجتماع — أدواتك في قائمة الحضور 👥', 4500);
         startedAt = res.startedAt;
@@ -510,7 +529,7 @@
 
     socket.on('peer-joined', (info) => {
       createPeer(info, false);
-      toast(`${info.name} انضم للاجتماع`);
+      if (info.vip) vipEntrance(info.name); else toast(`${info.name} انضم للاجتماع`);
       addMinute('sys', `${info.name} انضم`);
     });
     socket.on('peer-left', ({ id }) => {
@@ -1438,7 +1457,8 @@
     $('previewAvatar').textContent = initial(nm || '؟');
     $('previewAvatar').style.setProperty('--avatar', colorFor(nm || 'x'));
     $('lbYou').textContent = nm ? `${nm} · أنت` : '';
-    $('lbHello').textContent = nm ? `أهلًا يا ${nm.split(' ')[0]} 👋` : 'أهلًا بيك 👋';
+    $('lbHello').textContent = (lobbyVip ? '👑 ' : '') + (nm ? `أهلًا يا ${nm.split(' ')[0]} 👋` : 'أهلًا بيك 👋');
+    $('lbHello').classList.toggle('vip', lobbyVip);
     $('chkCam').className = `lb-check ${me.cam && camTrack ? 'ok' : 'off'}`;
     $('chkMic').className = `lb-check ${me.mic && micTrack ? 'ok' : 'off'}`;
     $('pMic').classList.toggle('off', !me.mic);
@@ -1525,6 +1545,7 @@
       if (cfg.iceServers?.length) iceServers = cfg.iceServers;
       aiOn = !!cfg.ai;
       aiFix = !!cfg.captionCorrection;
+      fetch('/api/vip', { cache: 'no-store' }).then((r) => r.json()).then((v) => { lobbyVip = !!v.vip; refreshPreview(); }).catch(() => {});
       const info = await (await fetch(`/api/rooms/${encodeURIComponent(roomId)}`)).json();
       if (info.title) meetingTitle = info.title;
       $('lobbyTitle').textContent = meetingTitle;

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <script src="/js/i18n.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="robots" content="noindex">
+  <title>VIP | smart Meet</title>
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/home.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .vip-card { border-color: rgba(255, 215, 106, .45); box-shadow: 0 30px 70px rgba(0, 0, 0, .45), 0 0 50px rgba(245, 197, 66, .15); }
+    .vip-crown { font-size: 3.4rem; text-align: center; line-height: 1; filter: drop-shadow(0 6px 18px rgba(245, 197, 66, .6)); animation: vipCrown 1.2s ease-out; }
+    .vip-card h1 { background: linear-gradient(90deg, #fff3c4, #f5c542, #fff3c4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .vip-card .btn-main { background: linear-gradient(135deg, #f5c542, #c9971c); color: #2b1d00; box-shadow: 0 12px 30px rgba(245, 197, 66, .35); }
+    .vip-on { display: grid; gap: .8rem; justify-items: center; text-align: center; }
+    .vip-on p { margin: 0; color: #e8eef7; line-height: 1.8; }
+    .vip-off-btn { border: 0; background: none; color: var(--muted); text-decoration: underline; font-size: .85rem; }
+  </style>
+</head>
+<body class="hp">
+  <div class="hp-bg" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="grid-lines"></span></div>
+  <main class="auth-wrap">
+    <div class="auth-card vip-card">
+      <div class="vip-crown">👑</div>
+      <h1>عضوية VIP</h1>
+      <p class="auth-sub" id="sub">اكتب كود الـ VIP مرة واحدة على جهازك، وهتاخد شارة ذهبية وإطار مميز ودخول بحركة خاصة في كل اجتماع.</p>
+
+      <form id="form" class="f" autocomplete="off">
+        <label class="f"><span>كود الـ VIP</span><input id="code" type="password" dir="ltr" required></label>
+        <button class="btn-main" id="go">تفعيل الـ VIP 👑</button>
+      </form>
+
+      <div class="vip-on" id="on" hidden>
+        <p><b>👑 جهازك ده عليه VIP</b><br>أي اجتماع تدخله من الجهاز ده، الكل هيشوف دخولك المميز.</p>
+        <a class="btn-main" href="/" style="text-align:center;text-decoration:none">يلا على الاجتماعات</a>
+        <button class="vip-off-btn" id="off">إلغاء الـ VIP من الجهاز ده</button>
+      </div>
+
+      <p class="msg" id="msg"></p>
+      <div class="auth-lang" data-lang-picker></div>
+      <p class="auth-foot"><a href="/">← الرجوع للرئيسية</a></p>
+    </div>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const show = (vip) => { $('form').hidden = vip; $('on').hidden = !vip; $('sub').hidden = vip; };
+    fetch('/api/vip', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+      if (!d.enabled) { $('form').hidden = true; $('msg').textContent = 'الـ VIP مش متفعّل على الخادم لسه (محتاج VIP_CODE).'; return; }
+      show(d.vip);
+    }).catch(() => {});
+    $('form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('msg').textContent = '';
+      $('go').disabled = true;
+      const r = await fetch('/api/vip', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: $('code').value }) }).catch(() => null);
+      $('go').disabled = false;
+      const d = r ? await r.json().catch(() => ({})) : {};
+      if (d.ok) { show(true); $('msg').className = 'msg ok'; $('msg').textContent = 'تم التفعيل 🎉'; return; }
+      $('msg').className = 'msg';
+      $('msg').textContent = d.error === 'too_many' ? 'محاولات كتير — استنى ربع ساعة وحاول تاني.' : d.error === 'bad_code' ? 'الكود غلط.' : 'حصلت مشكلة، حاول تاني.';
+    };
+    $('off').onclick = async () => {
+      if (!confirm('إلغاء الـ VIP من الجهاز ده؟')) return;
+      await fetch('/api/vip', { method: 'DELETE' });
+      show(false); $('msg').textContent = '';
+    };
+  </script>
+</body>
+</html>

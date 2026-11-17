@@ -24,6 +24,8 @@ services:
         sync: false
       - key: ACCESS_CODE
         sync: false
+      - key: VIP_CODE
+        sync: false
       - key: TURN_URL
         sync: false
       - key: TURN_USERNAME

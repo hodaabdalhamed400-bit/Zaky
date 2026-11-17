@@ -704,3 +704,43 @@ body.in-meeting { overflow: hidden; height: 100dvh; }
   .lobby-head .lang-pick { padding: .35rem .65rem; font-size: .78rem; }
 }
 .lb-home { display: inline-block; margin-top: .5rem; color: var(--brand-2); font-weight: 700; }
+
+/* ===================== VIP 👑 ===================== */
+.tile.vip { border-color: transparent; box-shadow: 0 0 26px rgba(245, 197, 66, .28); }
+.tile.vip::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 3px; pointer-events: none; z-index: 3;
+  background: conic-gradient(from var(--ang, 0deg), #f5c542, #fff3c4, #b8860b, #ffd76a, #f5c542);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: spinBorder 4s linear infinite; }
+.tile.vip .avatar { box-shadow: 0 0 0 4px rgba(245, 197, 66, .55), 0 0 30px rgba(245, 197, 66, .35); }
+.tile.vip .label .nm { color: #ffe08a; }
+.vip-badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; letter-spacing: .04em; color: #3b2a00;
+  background: linear-gradient(135deg, #fff1b8, #f5c542 45%, #c9971c); box-shadow: 0 2px 12px rgba(245, 197, 66, .5); position: relative; overflow: hidden; }
+.vip-badge::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .8) 50%, transparent 70%); transform: translateX(-120%); animation: vipShine 3s ease-in-out infinite; }
+@keyframes vipShine { 60%, 100% { transform: translateX(120%); } }
+.tile:not(.vip) .vip-badge { display: none; }
+.vip-tag { font-size: .7rem; font-weight: 800; padding: 1px 7px; border-radius: 999px; color: #3b2a00; background: linear-gradient(135deg, #fff1b8, #f5c542); margin-inline-start: 4px; }
+.lb-hello.vip { color: #ffd76a; }
+.meeting.screen-on .tile.vip::before { animation: none; }
+
+/* دخول الـ VIP: يظهر لكل الحضور */
+.vip-entrance { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; pointer-events: none; overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(245, 197, 66, .25), rgba(7, 17, 31, .55) 55%, transparent 80%); animation: vipFade 4.2s ease forwards; }
+.vip-entrance .rays { position: absolute; width: 140vmax; height: 140vmax; background: repeating-conic-gradient(from 0deg, rgba(255, 215, 106, .16) 0 8deg, transparent 8deg 20deg);
+  animation: vipRays 4.2s linear forwards; -webkit-mask: radial-gradient(circle, #000 0, transparent 55%); mask: radial-gradient(circle, #000 0, transparent 55%); }
+.vip-entrance .card { position: relative; display: grid; justify-items: center; gap: .35rem; text-align: center; padding: 1.4rem 2rem; border-radius: 28px;
+  background: linear-gradient(160deg, rgba(40, 30, 5, .85), rgba(13, 27, 46, .9)); border: 1.5px solid rgba(255, 215, 106, .7);
+  box-shadow: 0 0 60px rgba(245, 197, 66, .45), inset 0 0 30px rgba(245, 197, 66, .12); animation: vipPop 4.2s cubic-bezier(.34, 1.5, .64, 1) forwards; }
+.vip-entrance .crown { font-size: 4rem; line-height: 1; filter: drop-shadow(0 6px 18px rgba(245, 197, 66, .7)); animation: vipCrown 1.2s ease-out; }
+.vip-entrance .who { font-size: clamp(1.3rem, 5vw, 1.9rem); font-weight: 800;
+  background: linear-gradient(90deg, #fff3c4, #f5c542, #fff3c4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.vip-entrance .sub { color: #ffe9a8; font-weight: 600; font-size: .95rem; }
+.vip-entrance .spark { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border-radius: 2px; background: #ffd76a;
+  box-shadow: 0 0 10px #ffd76a; animation: vipSpark 1.8s ease-out forwards; }
+@keyframes vipFade { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes vipRays { to { transform: rotate(60deg); } }
+@keyframes vipPop { 0% { transform: scale(.4) translateY(30px); opacity: 0; } 14% { transform: scale(1.05); opacity: 1; } 22%, 82% { transform: scale(1); opacity: 1; } 100% { transform: scale(.9) translateY(-20px); opacity: 0; } }
+@keyframes vipCrown { 0% { transform: translateY(-60px) rotate(-20deg); opacity: 0; } 60% { transform: translateY(6px) rotate(6deg); opacity: 1; } 100% { transform: none; } }
+@keyframes vipSpark { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)) scale(.3); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .vip-entrance, .vip-entrance * { animation-duration: .01s !important; } .tile.vip::before { animation: none; } }
+.tile .badges > .vip-badge { width: auto; height: 32px; padding: 0 .7rem; border-radius: 999px; display: inline-flex; background: linear-gradient(135deg, #fff1b8, #f5c542 45%, #c9971c); backdrop-filter: none; }
+.tile:not(.vip) .badges > .vip-badge { display: none; }

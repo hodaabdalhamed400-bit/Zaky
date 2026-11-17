@@ -76,6 +76,27 @@ function isValidHostKey(id, key) {
   return crypto.timingSafeEqual(Buffer.from(key), Buffer.from(hostKeyFor(id)));
 }
 
+// ---------- VIP 👑 ----------
+// كود سري بيتحط في Render باسم VIP_CODE — اللي يكتبه مرة على جهازه بياخد شارة ودخول مميز.
+// الجهاز بيتحفظ عليه كوكي موقّع (لو الكود اتغيّر، كل الأجهزة القديمة بتفقد الـ VIP).
+const VIP_CODE = (process.env.VIP_CODE || '').trim();
+const vipToken = () => crypto.createHmac('sha256', HOST_SECRET).update(`vip:${VIP_CODE}`).digest('hex');
+function cookieVal(header, name) {
+  const m = String(header || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return m ? decodeURIComponent(m[1]) : '';
+}
+function isVip(cookieHeader) {
+  if (!VIP_CODE) return false;
+  const v = cookieVal(cookieHeader, 'sm_vip');
+  const t = vipToken();
+  return v.length === t.length && crypto.timingSafeEqual(Buffer.from(v), Buffer.from(t));
+}
+function vipCodeMatches(code) {
+  const a = crypto.createHash('sha256').update(String(code ?? '').trim()).digest();
+  const b = crypto.createHash('sha256').update(VIP_CODE).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 function newRoomId() {
   const part = (n) => Array.from(crypto.randomBytes(n), (b) => CHARS[b % CHARS.length]).join('');
   let id;
@@ -136,6 +157,17 @@ app.post('/api/new', (req, res) => {
 app.get('/api/config', (_req, res) => res.json({
   iceServers: iceServers(), maxParticipants: MAX_PARTICIPANTS, ai: ai.enabled, captionCorrection: ai.correctionEnabled, accessCode: !!ACCESS_CODE, languages: Object.keys(ai.LANGS),
 }));
+app.get('/api/vip', (req, res) => { res.set('Cache-Control', 'no-store'); res.json({ enabled: !!VIP_CODE, vip: isVip(req.headers.cookie) }); });
+app.post('/api/vip', (req, res) => {
+  const ip = req.ip;
+  if (!VIP_CODE) return res.status(400).json({ error: 'disabled' });
+  if (tooManyFailures(ip)) return res.status(429).json({ error: 'too_many' });
+  if (!vipCodeMatches(req.body?.code)) { recordFailure(ip); return res.status(403).json({ error: 'bad_code' }); }
+  res.cookie('sm_vip', vipToken(), { httpOnly: true, sameSite: 'lax', secure: req.secure || req.headers['x-forwarded-proto'] === 'https', maxAge: 365 * 24 * 3600_000, path: '/' });
+  res.json({ ok: true });
+});
+app.delete('/api/vip', (_req, res) => { res.clearCookie('sm_vip', { path: '/' }); res.json({ ok: true }); });
+app.get('/vip', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'vip.html')));
 app.get('/api/rooms/:id', (req, res) => {
   const room = rooms.get(req.params.id);
   res.json({
@@ -180,7 +212,7 @@ async function finishMeeting(room, id) {
   return room.finishResult;
 }
 
-const publicPeer = (p) => ({ id: p.id, name: p.name, state: p.state, host: !!p.host });
+const publicPeer = (p) => ({ id: p.id, name: p.name, state: p.state, host: !!p.host, vip: !!p.vip });
 const hasHost = (room) => [...room.peers.values()].some((p) => p.host);
 const waitlistOf = (room) => [...room.waitlist.values()].map((w) => ({ id: w.id, name: w.name }));
 function notifyHosts(room) {
@@ -230,6 +262,7 @@ io.on('connection', (socket) => {
     const isHost = isValidHostKey(id, payload.hostKey) || room.coHosts.has(clientId)
       || (sess && room.createdBy === sess.user.id) || wsRole === 'owner' || wsRole === 'admin';
     const name = clean(payload.name, 40) || sess?.user.name || 'ضيف';
+    const vip = isVip(socket.handshake.headers.cookie);
     if (room.banned.has(clientId) && !isHost) return ack?.({ error: 'removed' });
     if (room.locked && !isHost) return ack?.({ error: 'locked' });
     if (room.peers.size >= MAX_PARTICIPANTS) return ack?.({ error: 'full', max: MAX_PARTICIPANTS });
@@ -241,7 +274,7 @@ io.on('connection', (socket) => {
       if (room.peers.size >= MAX_PARTICIPANTS) return reply({ error: 'full', max: MAX_PARTICIPANTS });
       const s = payload.state || {};
       const info = {
-        id: socket.id, name, clientId, host: isHost,
+        id: socket.id, name, clientId, host: isHost, vip,
         state: { mic: !!s.mic, cam: !!s.cam, hand: false, screen: false, rec: false },
       };
       roomId = id;
@@ -254,7 +287,7 @@ io.on('connection', (socket) => {
       logEvent(room, { type: 'join', name });
       reply({
         selfId: socket.id, title: room.title, startedAt: room.startedAt, peers: others,
-        host: isHost, settings: { locked: room.locked, waiting: room.waiting },
+        host: isHost, vip, settings: { locked: room.locked, waiting: room.waiting },
       });
       socket.to(id).emit('peer-joined', publicPeer(info));
       if (isHost) socket.emit('waitlist', waitlistOf(room));
