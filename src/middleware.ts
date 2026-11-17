@@ -6,7 +6,7 @@ import { SESSION_COOKIE_DEV, SESSION_COOKIE_SECURE } from "@/lib/auth/cookie-nam
  * 2) سياسة أمان المحتوى (CSP) بـ nonce عشوائي لكل طلب: لا تُنفذ إلا سكربتات Next الموقّعة،
  *    فيُمنع تنفيذ أي سكربت محقون (XSS) حتى لو وصل إلى الصفحة.
  */
-const PUBLIC = ["/login", "/api/health", "/api/cron"]; // /login يشمل /login/mfa؛ /api/cron محمي بسر خاص
+const PUBLIC = ["/login", "/t", "/api/health", "/api/cron"]; // /t/<token>: صفحة المستأجر برابط سري؛ /login يشمل /login/mfa؛ /api/cron محمي بسر خاص
 
 function csp(nonce: string) {
   const dev = process.env.NODE_ENV === "development";
