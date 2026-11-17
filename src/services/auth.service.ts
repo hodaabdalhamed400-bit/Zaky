@@ -62,6 +62,8 @@ export async function login(db: Db, raw: { email: unknown; password: unknown; re
         : []),
     ]);
     if (user) await writeAudit(db, { actorId: user.id, action: "auth.login_failed", entityType: "user", entityId: user.id, meta });
+    // نشاط مشبوه: الحساب وصل لحد القفل المؤقت → تنبيه فوري لمسؤولي المستخدمين
+    if (user && emailFailures + 1 === LOGIN_LIMITS.maxFailuresPerEmail) await alertAccountLocked(db, user, meta);
     return { ok: false, error: GENERIC_FAIL };
   }
 
@@ -129,4 +131,31 @@ export async function changeOwnPassword(db: Db, actor: Actor, raw: unknown, meta
     await writeAudit(tx, { actorId: actor.id, action: "auth.password_changed", entityType: "user", entityId: actor.id, meta });
     return { token: s.token };
   });
+}
+
+/** تنبيه داخلي للمسؤولين عند قفل حساب مؤقتًا بسبب محاولات فاشلة متكررة. لا يفشل الدخول أبدًا. */
+async function alertAccountLocked(db: Db, user: { id: string; email: string; name: string }, meta: RequestMeta) {
+  try {
+    await writeAudit(db, { actorId: user.id, action: "auth.account_locked", entityType: "user", entityId: user.id, meta });
+    const admins = await db.user.findMany({
+      where: { isActive: true, role: { permissions: { some: { permission: { key: "users.manage" } } } } },
+      select: { id: true },
+    });
+    if (!admins.length) return;
+    await db.notification.createMany({
+      data: admins.map((a) => ({
+        userId: a.id,
+        type: "SYSTEM" as const,
+        title: `قفل مؤقت لحساب ${user.name} بعد ${LOGIN_LIMITS.maxFailuresPerEmail} محاولات دخول فاشلة`,
+        body: `${user.email}${meta.ip ? ` — من IP ${meta.ip}` : ""}. لو ما كانت محاولات الموظف نفسه، راجع سجل التدقيق.`,
+        link: "/audit",
+        entityType: "user",
+        entityId: user.id,
+        dedupeKey: `ACCOUNT_LOCKED:${user.id}:${new Date().toISOString().slice(0, 13)}`,
+      })),
+      skipDuplicates: true,
+    });
+  } catch (e) {
+    console.error("[account-locked-alert]", e instanceof Error ? e.message : e);
+  }
 }

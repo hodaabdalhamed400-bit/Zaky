@@ -6,6 +6,7 @@ import { generateSessionToken, hashToken } from "@/lib/auth/tokens";
 import { hashPassword, validatePasswordPolicy, verifyPassword } from "@/lib/auth/password";
 import { revokeAllUserSessions } from "@/lib/auth/session";
 import { appUrl, brandedEmail, mailConfigured, sendMail } from "@/lib/mail";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * «نسيت كلمة المرور»:
@@ -29,6 +30,9 @@ export async function requestPasswordReset(db: Db, rawEmail: unknown, meta: Requ
   const email = parsed.data;
   const hourAgo = new Date(Date.now() - 3600_000);
 
+  // حد عام لكل IP (يشمل البريد غير الموجود، الذي لا يُنشئ رموزًا في قاعدة البيانات)
+  if (meta.ip && !rateLimit(`reset:${meta.ip}`, RESET_LIMITS.perIpPerHour, 3600_000))
+    return { ok: false, error: "طلبات كثيرة. حاول مرة أخرى بعد ساعة." };
   if (meta.ip) {
     const byIp = await db.passwordResetToken.count({ where: { ip: meta.ip.slice(0, 64), createdAt: { gte: hourAgo } } });
     if (byIp >= RESET_LIMITS.perIpPerHour) return { ok: false, error: "طلبات كثيرة. حاول مرة أخرى بعد ساعة." };
