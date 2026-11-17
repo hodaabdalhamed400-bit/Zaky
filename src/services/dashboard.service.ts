@@ -27,6 +27,8 @@ export type DashboardStats = {
   expiringContracts: number;
   dueAmount: string;
   collectedThisMonth: string;
+  /** المحصّل في نفس الفترة من الشهر الماضي (من أوله لنفس اليوم) — للمقارنة */
+  collectedLastMonthSamePeriod: string;
   overdueAmount: string;
   expiringWithinDays: number;
 };
@@ -39,6 +41,11 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
   const today = todayInRiyadh();
   const expiringWithinDays = 30;
   const monthStart = `${today.slice(0, 7)}-01`;
+  const [cy, cm] = today.split("-").map(Number) as [number, number];
+  const lastMonth = cm === 1 ? `${cy - 1}-12` : `${cy}-${String(cm - 1).padStart(2, "0")}`;
+  const lastMonthStart = `${lastMonth}-01`;
+  const lastMonthDays = new Date(Date.UTC(Number(lastMonth.slice(0, 4)), Number(lastMonth.slice(5, 7)), 0)).getUTCDate();
+  const lastMonthSameDay = `${lastMonth}-${String(Math.min(Number(today.slice(8, 10)), lastMonthDays)).padStart(2, "0")}`;
 
   // تقييد الفروع داخل SQL الخام عبر معاملات آمنة (لا يوجد دمج نصي لمدخلات المستخدم)
   const branchCond = (col: string) =>
@@ -72,7 +79,7 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
         ...scoped,
       },
     }),
-    db.$queryRaw<{ due: Prisma.Decimal | null; overdue: Prisma.Decimal | null; collected: Prisma.Decimal | null }[]>`
+    db.$queryRaw<{ due: Prisma.Decimal | null; overdue: Prisma.Decimal | null; collected: Prisma.Decimal | null; collected_prev: Prisma.Decimal | null }[]>`
       SELECT
         (SELECT COALESCE(SUM(s.amount_due - s.amount_paid - s.amount_adjusted), 0)
            FROM payment_schedules s JOIN contracts c ON c.id = s.contract_id
@@ -85,7 +92,11 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
         (SELECT COALESCE(SUM(p.amount), 0) FROM payments p
           WHERE p.status = 'APPROVED' AND p.paid_on >= ${dateOnly(monthStart)}::date
             AND p.paid_on <= ${dateOnly(today)}::date
-            AND ${branchCond("p.branch_id")}) AS collected`,
+            AND ${branchCond("p.branch_id")}) AS collected,
+        (SELECT COALESCE(SUM(p.amount), 0) FROM payments p
+          WHERE p.status = 'APPROVED' AND p.paid_on >= ${dateOnly(lastMonthStart)}::date
+            AND p.paid_on <= ${dateOnly(lastMonthSameDay)}::date
+            AND ${branchCond("p.branch_id")}) AS collected_prev`,
   ]);
 
   const m = money[0];
@@ -103,6 +114,7 @@ export async function getDashboardStats(db: Db, actor: Actor, opts: { branchId?:
     dueAmount: new Prisma.Decimal(m?.due ?? 0).toFixed(2),
     overdueAmount: new Prisma.Decimal(m?.overdue ?? 0).toFixed(2),
     collectedThisMonth: new Prisma.Decimal(m?.collected ?? 0).toFixed(2),
+    collectedLastMonthSamePeriod: new Prisma.Decimal(m?.collected_prev ?? 0).toFixed(2),
     expiringWithinDays,
   };
 }

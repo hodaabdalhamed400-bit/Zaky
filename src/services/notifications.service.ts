@@ -123,7 +123,7 @@ export async function markAllRead(db: Db, actor: Actor) {
 async function alertDays(db: Db): Promise<number[]> {
   const s = await db.systemSetting.findUnique({ where: { key: "contract.expiry_alert_days" } });
   const v = Array.isArray(s?.value) ? s.value.filter((x): x is number => typeof x === "number" && x > 0 && x <= 365) : [];
-  return (v.length ? v : [30, 15, 7]).sort((a, b) => a - b);
+  return (v.length ? v : [60, 30, 15, 7]).sort((a, b) => a - b);
 }
 
 /**

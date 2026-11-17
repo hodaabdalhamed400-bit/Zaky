@@ -130,15 +130,15 @@ export async function resetUserMfa(db: Db, actor: Actor, userId: string, meta: R
 // ───── الدخول بالمرحلتين ─────
 
 /** يُستدعى بعد نجاح كلمة المرور لمستخدم مفعّل لديه التحقق الثنائي. */
-export async function createChallenge(db: Db, userId: string, meta: RequestMeta = {}) {
+export async function createChallenge(db: Db, userId: string, meta: RequestMeta = {}, persistent = false) {
   const token = generateSessionToken();
   await db.mfaChallenge.create({
-    data: { tokenHash: hashToken(token), userId, expiresAt: new Date(Date.now() + CHALLENGE_MINUTES * 60_000), ip: meta.ip?.slice(0, 64) ?? null },
+    data: { tokenHash: hashToken(token), userId, expiresAt: new Date(Date.now() + CHALLENGE_MINUTES * 60_000), ip: meta.ip?.slice(0, 64) ?? null, persistent },
   });
   return token;
 }
 
-export type MfaResult = { ok: true; token: string; usedRecovery: boolean; remainingRecovery: number } | { ok: false; error: string; restart?: boolean };
+export type MfaResult = { ok: true; token: string; usedRecovery: boolean; remainingRecovery: number; persistent: boolean; userId: string } | { ok: false; error: string; restart?: boolean };
 
 export async function verifyChallenge(db: Db, challengeToken: string | undefined, code: string, meta: RequestMeta = {}): Promise<MfaResult> {
   if (!challengeToken) return { ok: false, error: "انتهت مهلة التحقق. سجّل الدخول من جديد.", restart: true };
@@ -182,9 +182,9 @@ export async function verifyChallenge(db: Db, challengeToken: string | undefined
       data: { lastLoginAt: new Date(), failedLoginCount: 0, ...(step !== null ? { mfaLastStep: step } : {}), ...(usedRecovery ? { mfaRecoveryHashes: remaining } : {}) },
     });
     await tx.loginAttempt.create({ data: { email: u.email, ip: meta.ip ?? null, success: true } });
-    const s = await createSession(tx, u.id, meta);
+    const s = await createSession(tx, u.id, meta, new Date(), ch.persistent);
     await writeAudit(tx, { actorId: u.id, action: usedRecovery ? "auth.login_recovery_code" : "auth.login", entityType: "user", entityId: u.id, after: { mfa: true }, meta });
     return s;
   });
-  return { ok: true, token, usedRecovery, remainingRecovery: remaining.length };
+  return { ok: true, token, usedRecovery, remainingRecovery: remaining.length, persistent: ch.persistent, userId: u.id };
 }

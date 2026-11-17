@@ -17,20 +17,21 @@ export const LOGIN_LIMITS = {
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("البريد الإلكتروني غير صحيح").max(200),
   password: z.string().min(1, "أدخل كلمة المرور").max(200),
+  remember: z.preprocess((v) => v === true || v === "1" || v === "on", z.boolean()).default(false),
 });
 
 export type LoginResult =
-  | { ok: true; token: string; userId: string; mustChangePassword: boolean }
+  | { ok: true; token: string; userId: string; mustChangePassword: boolean; persistent: boolean }
   | { ok: "mfa"; challengeToken: string }
   | { ok: false; error: string };
 
 const GENERIC_FAIL = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
 const RATE_LIMITED = `محاولات كثيرة غير ناجحة. حاول مرة أخرى بعد ${LOGIN_LIMITS.windowMinutes} دقيقة.`;
 
-export async function login(db: Db, raw: { email: unknown; password: unknown }, meta: RequestMeta = {}): Promise<LoginResult> {
+export async function login(db: Db, raw: { email: unknown; password: unknown; remember?: unknown }, meta: RequestMeta = {}): Promise<LoginResult> {
   const parsed = loginSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? GENERIC_FAIL };
-  const { email, password } = parsed.data;
+  const { email, password, remember } = parsed.data;
   const since = new Date(Date.now() - LOGIN_LIMITS.windowMinutes * 60_000);
 
   // ── تحديد المعدل: حسب البريد (منذ آخر دخول ناجح) وحسب عنوان IP ──
@@ -70,7 +71,7 @@ export async function login(db: Db, raw: { email: unknown; password: unknown }, 
   }
 
   // المرحلة الثانية: كلمة المرور صحيحة لكن الجلسة لا تُنشأ إلا بعد رمز التحقق الثنائي
-  if (user.mfaEnabled) return { ok: "mfa", challengeToken: await createChallenge(db, user.id, meta) };
+  if (user.mfaEnabled) return { ok: "mfa", challengeToken: await createChallenge(db, user.id, meta, remember) };
 
   const { token } = await db.$transaction(async (tx) => {
     await tx.loginAttempt.create({ data: { email, ip: meta.ip ?? null, success: true } });
@@ -78,12 +79,12 @@ export async function login(db: Db, raw: { email: unknown; password: unknown }, 
       where: { id: user.id },
       data: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() },
     });
-    const s = await createSession(tx, user.id, meta);
-    await writeAudit(tx, { actorId: user.id, action: "auth.login", entityType: "user", entityId: user.id, meta });
+    const s = await createSession(tx, user.id, meta, new Date(), remember);
+    await writeAudit(tx, { actorId: user.id, action: "auth.login", entityType: "user", entityId: user.id, after: remember ? { remember: true } : undefined, meta });
     return s;
   });
 
-  return { ok: true, token, userId: user.id, mustChangePassword: user.mustChangePassword };
+  return { ok: true, token, userId: user.id, mustChangePassword: user.mustChangePassword, persistent: remember };
 }
 
 export async function logout(db: Db, actor: Actor | null, meta: RequestMeta = {}) {
