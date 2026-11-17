@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/primitives";
 import { CONTRACT_STATUS_COLOR, CONTRACT_STATUS_LABELS } from "@/services/contracts.service";
 import { PAYMENT_METHOD_LABELS } from "@/services/payments.service";
 import { SHARE_SCHEDULE_LABELS, getSharedTenantView } from "@/services/tenant-share.service";
+import { getRequestMeta } from "@/lib/auth/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const metadata: Metadata = { title: "حسابي لدى ذكي", referrer: "no-referrer", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -15,7 +17,9 @@ const SCHEDULE_COLOR = { PENDING: "amber", PARTIAL: "blue", PAID: "green", WAIVE
 /** صفحة المستأجر العامة (برابط سري، عرض فقط). */
 export default async function TenantSharePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const v = await getSharedTenantView(prisma, token);
+  // حد 60 فتحة بالدقيقة لكل IP (يمنع تخمين الروابط وإغراق قاعدة البيانات)
+  const { ip } = await getRequestMeta();
+  const v = rateLimit(`share:${ip ?? "unknown"}`, 60, 60_000) ? await getSharedTenantView(prisma, token) : null;
   const today = dateOnly(todayInRiyadh());
 
   return (
