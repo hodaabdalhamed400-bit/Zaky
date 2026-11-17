@@ -220,8 +220,8 @@
     }
     if (state) {
       el.classList.toggle('video-on', !!(state.cam || state.screen));
+      if (state.screen && !el.classList.contains('screen')) el.dataset.shareAt = String(Date.now());
       el.classList.toggle('screen', !!state.screen);
-      el.classList.toggle('spotlight', !!state.screen);
       el.classList.toggle('mirror', !!isMe && !state.screen);
       el.querySelector('.mic-off').hidden = !!state.mic;
       el.querySelector('.hand').hidden = !state.hand;
@@ -249,9 +249,17 @@
       const v = el.querySelector('video');
       if (v.srcObject !== localStream) { v.srcObject = localStream; v.play().catch(() => {}); }
     }
+    pickSpotlight();
   }
 
+  // شاشة واحدة بس تتعرض كبيرة (آخر واحد بدأ يشارك) — الباقي مربعات عادية
+  function pickSpotlight() {
+    const shares = [...document.querySelectorAll('#grid .tile.screen:not(.self-sharing)')];
+    const top = shares.sort((a, b) => Number(b.dataset.shareAt || 0) - Number(a.dataset.shareAt || 0))[0];
+    document.querySelectorAll('#grid .tile').forEach((t) => t.classList.toggle('spotlight', t === top));
+  }
   function layout() {
+    pickSpotlight();
     const grid = $('grid');
     const n = grid.children.length;
     grid.dataset.count = String(Math.min(n, 7));
@@ -724,6 +732,8 @@
   }
 
   // ===================== مشاركة الشاشة =====================
+  // الموبايلات (آيفون وأندرويد) مش بتدعم مشاركة الشاشة من المتصفح — نخفي الزرار بدل رسالة خطأ
+  if (!navigator.mediaDevices?.getDisplayMedia) document.querySelectorAll('[data-action="screen"]').forEach((b) => { b.style.display = 'none'; });
   async function toggleScreen() {
     if (me.screen) return stopScreen();
     if (!navigator.mediaDevices.getDisplayMedia) { toast('مشاركة الشاشة غير مدعومة على هذا الجهاز.'); return; }
@@ -1527,9 +1537,12 @@
       $('chkNet').className = 'lb-check ok';
       if (info.participants >= cfg.maxParticipants) $('lobbyErr').textContent = 'الاجتماع ممتلئ حاليًا.';
       if (info.valid === false) {
-        $('lobbyInfo').textContent = '';
-        $('lobbyErr').textContent = 'رابط الاجتماع غير صحيح. اطلب الرابط تاني من منظّم الاجتماع.';
+        // رابط غلط: رسالة واضحة فوق، ومن غير ما نشغّل الكاميرا والمايك
+        $('lobbyTitle').textContent = 'الرابط ده مش شغال';
+        $('lobbyInfo').innerHTML = 'رابط الاجتماع غير صحيح. اطلب الرابط تاني من منظّم الاجتماع.<br><a href="/" class="lb-home">← الرجوع للرئيسية</a>';
+        $('lobbyErr').textContent = '';
         $('joinBtn').disabled = true;
+        me.mic = false; me.cam = false;
       }
     } catch { $('lobbyInfo').textContent = ''; $('chkNet').className = 'lb-check off'; }
 
@@ -1550,7 +1563,7 @@
       : 'الترجمة للغات أخرى تحتاج تفعيل الذكاء الاصطناعي على الخادم. تحويل الكلام لنص شغال عادي.';
     refreshPreview();
     lobbyMeter();
-    if (!$('lobbyName').value) $('lobbyName').focus();
+    if (!$('lobbyName').value && !$('joinBtn').disabled) $('lobbyName').focus();
   }
 
   $('joinBtn').onclick = () => {

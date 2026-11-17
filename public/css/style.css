@@ -695,3 +695,12 @@ body.in-meeting { overflow: hidden; height: 100dvh; }
 .lang-pick.block { width: 100%; padding: .7rem .95rem; border-radius: 14px; }
 .nav-right, .lb-right { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
 .auth-lang { display: flex; justify-content: center; }
+
+/* رأس صالة الانتظار على الموبايل: اللغة والكود في صف واحد من غير ما يتقصّوا */
+.lobby-head { align-items: flex-start; }
+.lb-right { gap: .4rem; }
+@media (max-width: 520px) {
+  .lobby-head .lb-right { flex-direction: column; align-items: flex-end; }
+  .lobby-head .lang-pick { padding: .35rem .65rem; font-size: .78rem; }
+}
+.lb-home { display: inline-block; margin-top: .5rem; color: var(--brand-2); font-weight: 700; }

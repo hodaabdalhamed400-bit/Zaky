@@ -154,6 +154,12 @@ app.get('/m/:id', (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'room.html'));
 });
 
+// أي رابط مش موجود → صفحة 404 بهوية ذكي (بدل "Cannot GET")
+app.use((req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'not_found' });
+  res.status(404).sendFile(path.join(PUBLIC_DIR, '404.html'));
+});
+
 // ---------- نهاية الاجتماع: ملخص ذكي يظهر على الشاشة للحضور بس ----------
 async function finishMeeting(room, id) {
   if (room.finished) return room.finishResult || { summaries: {} };
