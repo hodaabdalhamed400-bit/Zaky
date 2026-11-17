@@ -131,7 +131,9 @@ export function SidebarNav({ sections, footer, topAction }: { sections: Section[
           <div className="bg-grid absolute inset-0 [mask-image:linear-gradient(to_bottom,black,transparent_45%)]" />
           <div className="absolute -top-24 -end-24 size-64 animate-drift rounded-full bg-accent-500/20 blur-3xl" />
           <div className="absolute bottom-10 -start-20 size-56 animate-drift-slow rounded-full bg-[#2a78d6]/15 blur-3xl" />
+          <div className="absolute top-1/3 -end-16 size-40 animate-drift rounded-full bg-[#7c5cff]/15 blur-3xl [animation-duration:24s]" />
         </div>
+        <span className="prism-line-y pointer-events-none absolute inset-y-0 end-0 w-px" aria-hidden="true" />
         <div className="relative">{brand}</div>
         <div className="relative mt-5 flex-1 px-3">
           <NavLinks sections={sections} />
