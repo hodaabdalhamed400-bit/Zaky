@@ -14,11 +14,12 @@ function greeting() {
   return "مساء الخير";
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ reset?: string }> }) {
   if (await getActor()) redirect("/");
+  const { reset } = await searchParams;
   return (
     <AuthShell greeting={greeting()} title="هلا والله، حيّاك" subtitle="سجّل دخولك عشان تتابع الفروع والعقود والتحصيل في ZAKI Smart ERP.">
-      <LoginForm />
+      <LoginForm notice={reset === "1" ? "تم تغيير كلمة المرور. سجّل دخولك بالكلمة الجديدة." : undefined} />
     </AuthShell>
   );
 }
