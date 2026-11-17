@@ -138,6 +138,7 @@ body {
 .auth-field > *:nth-child(2) { animation-delay: 460ms; }
 .auth-field > *:nth-child(3) { animation-delay: 540ms; }
 .auth-field > *:nth-child(4) { animation-delay: 620ms; }
+.auth-field > *:nth-child(n + 5) { animation-delay: 700ms; }
 
 /* ظهور متتابع لعناصر الشبكات والقوائم */
 .stagger > * {
@@ -214,3 +215,67 @@ body {
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
 }
+
+/* ============================================================
+ * الوضع الليلي — يُطبَّق على منطقة المحتوى فقط (الشريط الجانبي كحلي أصلًا).
+ * يقلب درجات الرمادي والألوان الفاتحة عبر متغيرات Tailwind، ويعالج
+ * الأبيض والكحلي كنص بقواعد مباشرة (لأنهما يُستخدمان أيضًا للأزرار).
+ * ============================================================ */
+.theme-dark {
+  color-scheme: dark;
+  background: #0b1522;
+  color: #eef3f9;
+  --color-gray-50: #15243a;
+  --color-gray-100: #1b2c44;
+  --color-gray-200: #253852;
+  --color-gray-300: #33496a;
+  --color-gray-400: #6b7f9c;
+  --color-gray-500: #8a9bb5;
+  --color-gray-600: #a9b7cb;
+  --color-gray-700: #c3cedd;
+  --color-gray-800: #dbe3ee;
+  --color-gray-900: #eef3f9;
+  --color-gray-950: #f8fafc;
+  --color-red-50: #3a1620;
+  --color-red-100: #4a1a25;
+  --color-red-200: #6b2433;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-emerald-50: #0f2e27;
+  --color-emerald-100: #12392f;
+  --color-emerald-200: #1a5243;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+  --color-amber-50: #33260f;
+  --color-amber-100: #3f2f12;
+  --color-amber-200: #5c4519;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-sky-50: #0f2a3d;
+  --color-sky-100: #12344b;
+  --color-sky-200: #1b4a68;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+  --color-sky-900: #e0f2fe;
+  --color-accent-50: #0f2f37;
+  --color-accent-100: #134049;
+  --color-accent-700: #6fcfdc;
+  --color-brand-50: #13243a;
+  --color-brand-100: #1a2f4a;
+  --color-brand-200: #2a4566;
+}
+.theme-dark .bg-white,
+.theme-dark .focus\:bg-white:focus { background-color: #111f31; }
+.theme-dark .bg-white\/75 { background-color: rgb(17 31 49 / 0.75); }
+.theme-dark .bg-white\/60 { background-color: rgb(17 31 49 / 0.6); }
+.theme-dark .text-brand-900,
+.theme-dark .hover\:text-brand-900:hover,
+.theme-dark .group:hover .group-hover\:text-brand-900 { color: #e6eef7; }
+.theme-dark .text-brand-800 { color: #d6e1ec; }
+.theme-dark .text-brand-700 { color: #8fd9e4; }
+.theme-dark .bg-dots { background-image: radial-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px); }
+.theme-dark .skeleton { background: linear-gradient(90deg, #15243a 0%, #1d304a 40%, #15243a 80%); background-size: 200% 100%; }
+.theme-dark .shadow-xs, .theme-dark .shadow-sm { --tw-shadow-color: rgb(0 0 0 / 0.4); }
