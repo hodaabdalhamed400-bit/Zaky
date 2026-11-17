@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
 import { getDashboardCharts, getDashboardStats } from "@/services/dashboard.service";
 import { payerName } from "@/services/payments.service";
+import { overdueReport } from "@/services/finance.service";
 import { ContractsFlowChart, MoneyChart, OccupancyByBranchChart, OccupancyTrendChart } from "@/components/charts/charts";
 import { formatSAR } from "@/lib/money";
 import { addDays, dateOnly, formatDate, formatDateTime, todayInRiyadh } from "@/lib/dates";
@@ -57,6 +58,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       })
     : [];
 
+  const topOverdue = actor.permissions.has("payments.view")
+    ? (await overdueReport(prisma, actor, branchId ? { branchId } : {})).sort((a, b) => Number(b.overdue) - Number(a.overdue)).slice(0, 5)
+    : [];
+
+  // مقارنة التحصيل بنفس الفترة من الشهر الماضي
+  const cur = Number(s.collectedThisMonth);
+  const prev = Number(s.collectedLastMonthSamePeriod);
+  const collectedHint =
+    prev > 0
+      ? `${cur >= prev ? "▲" : "▼"} ${Math.abs(Math.round(((cur - prev) / prev) * 100))}% عن نفس الفترة الشهر الماضي`
+      : cur > 0
+        ? "الشهر الماضي ما كان فيه تحصيل بنفس الفترة"
+        : "دفعات معتمدة فقط";
+
   const noBranches = !actor.allBranches && actor.branchIds.length === 0;
 
   return (
@@ -108,7 +123,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <StatCard label="العقود النشطة" value={String(s.activeContracts)} icon="contracts" />
         <StatCard label="عقود تنتهي قريبًا" value={String(s.expiringContracts)} hint={`خلال ${s.expiringWithinDays} يومًا`} icon="contracts" tone="warn" />
         <StatCard label="المستحق حتى اليوم" value={formatSAR(s.dueAmount)} hint="غير مسدد" icon="finance" />
-        <StatCard label="المحصّل هذا الشهر" value={formatSAR(s.collectedThisMonth)} hint="دفعات معتمدة فقط" icon="finance" tone="good" />
+        <StatCard label="المحصّل هذا الشهر" value={formatSAR(s.collectedThisMonth)} hint={collectedHint} icon="finance" tone="good" />
         <StatCard label="المبالغ المتأخرة" value={formatSAR(s.overdueAmount)} hint="تجاوزت تاريخ الاستحقاق" icon="alert" tone="bad" />
       </div>
 
@@ -172,6 +187,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </ul>
           )}
         </Card>
+        {actor.permissions.has("payments.view") && (
+          <Card className="lg:col-span-2">
+            <CardHeader title="أكبر المتأخرين" action={<Link href="/finance/overdue" className="text-sm text-brand-700 hover:underline">كل المتأخرات</Link>} />
+            {topOverdue.length === 0 ? (
+              <EmptyState icon="check" title="ما فيه متأخرات" />
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {topOverdue.map((r, i) => (
+                  <li key={r.contractId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+                    <span className="flex items-center gap-3">
+                      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-red-50 text-xs font-bold text-red-700">{i + 1}</span>
+                      <span>
+                        <Link href={`/tenants/${r.tenantId}`} className="font-medium text-brand-700 hover:underline">{r.tenant}</Link>
+                        <span className="block text-xs text-gray-400">{r.branch} · <span dir="ltr">{r.contractNo}</span> · {r.installments} قسط</span>
+                      </span>
+                    </span>
+                    <span className="text-end">
+                      <span className="tabular block font-semibold text-red-700">{formatSAR(r.overdue)}</span>
+                      <span className="text-xs text-gray-400">متأخر {r.daysLate} يوم</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
         {actor.permissions.has("audit.view") && (
           <Card className="lg:col-span-2">
             <CardHeader title="آخر الأنشطة" action={<Link href="/audit" className="text-sm text-brand-700 hover:underline">عرض السجل</Link>} />

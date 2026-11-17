@@ -9,6 +9,8 @@ import { Icon } from "@/components/ui/icons";
 import { logoutAction } from "../actions";
 import { prisma } from "@/lib/db";
 import { unreadCount } from "@/services/notifications.service";
+import { cookies } from "next/headers";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const actor = await getActor();
@@ -20,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 
   const unread = await unreadCount(prisma, actor);
+  const theme = (await cookies()).get("theme")?.value === "dark" ? "dark" : "light";
   const today = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
     weekday: "long",
     day: "numeric",
@@ -75,8 +78,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense fallback={null}>
         <NavProgress />
       </Suspense>
-      <SidebarNav sections={sections} footer={footer} topAction={bell(true)} />
-      <main id="main" className="relative lg:ps-64">
+      <SidebarNav sections={sections} footer={footer} topAction={<span className="flex items-center gap-1"><ThemeToggle initial={theme} dark />{bell(true)}</span>} />
+      <main id="main" className={`relative min-h-dvh lg:ps-64${theme === "dark" ? " theme-dark" : ""}`}>
         <div className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-72 [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true" />
         <div className="sticky top-0 z-20 hidden items-center justify-between gap-4 border-b border-gray-200/70 bg-white/75 px-8 py-2.5 backdrop-blur-xl lg:flex">
           <p className="flex items-center gap-2 text-sm text-gray-500">
@@ -84,6 +87,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="tabular">{today}</span>
           </p>
           <div className="flex items-center gap-3">
+            <ThemeToggle initial={theme} />
             {bell(false)}
             <Link href="/account" className="flex items-center gap-2.5 rounded-xl py-1 ps-1 pe-3 text-sm ring-1 ring-gray-200 transition-colors hover:bg-accent-50 hover:ring-accent-500/40">
               <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-brand-700 to-brand-900 text-xs font-bold text-white">{actor.name.trim().charAt(0)}</span>
