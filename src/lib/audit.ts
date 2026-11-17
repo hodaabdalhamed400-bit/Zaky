@@ -48,6 +48,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "auth.logout": "تسجيل خروج",
   "auth.password_changed": "تغيير كلمة المرور",
   "auth.password_reset_requested": "طلب استعادة كلمة المرور",
+  "auth.account_locked": "قفل مؤقت للحساب بعد محاولات فاشلة",
   "auth.password_reset_completed": "تعيين كلمة مرور عبر رابط الاستعادة",
   "tenant.share_link_created": "إنشاء رابط صفحة المستأجر",
   "tenant.share_links_revoked": "إلغاء روابط صفحة المستأجر",
