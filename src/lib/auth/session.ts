@@ -3,9 +3,16 @@ import { env } from "@/lib/env";
 import { generateSessionToken, hashToken } from "./tokens";
 import type { Actor, RequestMeta } from "./actor";
 
-export async function createSession(db: Db | Tx, userId: string, meta: RequestMeta = {}, now = new Date()) {
+/** «تذكّرني»: الجلسة تبقى 7 أيام ومهلة الخمول 7 أيام. بدونها: الإعدادات العادية. */
+export const PERSISTENT_HOURS = 168;
+
+export function sessionMaxAgeHours(persistent: boolean) {
+  return persistent ? PERSISTENT_HOURS : env().SESSION_MAX_AGE_HOURS;
+}
+
+export async function createSession(db: Db | Tx, userId: string, meta: RequestMeta = {}, now = new Date(), persistent = false) {
   const token = generateSessionToken();
-  const expiresAt = new Date(now.getTime() + env().SESSION_MAX_AGE_HOURS * 3600_000);
+  const expiresAt = new Date(now.getTime() + sessionMaxAgeHours(persistent) * 3600_000);
   const session = await db.session.create({
     data: {
       tokenHash: hashToken(token),
@@ -15,6 +22,7 @@ export async function createSession(db: Db | Tx, userId: string, meta: RequestMe
       lastSeenAt: now,
       ip: meta.ip?.slice(0, 64) ?? null,
       userAgent: meta.userAgent?.slice(0, 300) ?? null,
+      persistent,
     },
   });
   return { token, session };
@@ -38,7 +46,7 @@ export async function validateSession(db: Db, token: string | null | undefined, 
     },
   });
   if (!session || session.revokedAt) return null;
-  const idleMs = env().SESSION_IDLE_TIMEOUT_MINUTES * 60_000;
+  const idleMs = session.persistent ? PERSISTENT_HOURS * 3600_000 : env().SESSION_IDLE_TIMEOUT_MINUTES * 60_000;
   const user = session.user;
   const expired =
     session.expiresAt <= now ||

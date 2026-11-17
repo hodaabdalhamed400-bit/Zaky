@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { cookieSecure, env } from "@/lib/env";
 import type { PermissionKey } from "@/lib/rbac/permissions";
-import { validateSession } from "./session";
+import { sessionMaxAgeHours, validateSession } from "./session";
 import { mustEnrollMfa } from "@/services/mfa.service";
 import type { Actor, RequestMeta } from "./actor";
 
@@ -27,13 +27,13 @@ export async function getRequestMeta(): Promise<RequestMeta> {
   return { ip, userAgent: h.get("user-agent") };
 }
 
-export async function setSessionCookie(token: string) {
+export async function setSessionCookie(token: string, persistent = false) {
   (await cookies()).set(SESSION_COOKIE(), token, {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite: "lax",
     path: "/",
-    maxAge: env().SESSION_MAX_AGE_HOURS * 3600,
+    maxAge: sessionMaxAgeHours(persistent) * 3600,
   });
 }
 
