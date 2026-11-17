@@ -40,7 +40,7 @@ export function LinkButton({
 }
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <section className={cx("animate-fade-up rounded-2xl border border-gray-200/80 bg-white shadow-[0_1px_2px_rgb(16_24_40/0.04),0_4px_16px_-6px_rgb(19_46_75/0.08)] transition-shadow duration-300 hover:shadow-[0_2px_4px_rgb(16_24_40/0.05),0_12px_28px_-10px_rgb(19_46_75/0.16)]", className)}>{children}</section>;
+  return <section className={cx("prism animate-fade-up rounded-2xl transition-shadow duration-300 hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.9),0_14px_32px_-12px_rgb(19_46_75/0.22)]", className)}>{children}</section>;
 }
 
 export function CardHeader({ title, action }: { title: string; action?: React.ReactNode }) {

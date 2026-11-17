@@ -24,7 +24,7 @@ export function StatCard({
 }) {
   const t = TONE[tone];
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-gray-200/80 bg-white p-4 shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-accent-500/30 hover:shadow-[0_14px_30px_-12px_rgb(19_46_75/0.25)]">
+    <div className="prism group relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_14px_30px_-12px_rgb(19_46_75/0.25)]">
       <div className={cx("pointer-events-none absolute -top-10 -start-10 size-28 rounded-full blur-2xl transition-transform duration-500 group-hover:scale-150", t.glow)} aria-hidden="true" />
       <div className="relative flex items-start justify-between gap-3">
         <p className="text-sm font-medium text-gray-500">{label}</p>
