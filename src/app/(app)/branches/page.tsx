@@ -22,7 +22,7 @@ function BranchCard({ b }: { b: Branch }) {
     <Link
       href={`/branches/${b.id}`}
       data-branch-card
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_1px_2px_rgb(16_24_40/0.04)] transition-all duration-300 hover:-translate-y-1.5 hover:border-accent-500/40 hover:shadow-[0_22px_40px_-18px_rgb(19_46_75/0.35)] focus-visible:-translate-y-1.5"
+      className="group relative flex flex-col prism overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_22px_40px_-18px_rgb(19_46_75/0.35)] focus-visible:-translate-y-1.5"
     >
       {/* رأس البطاقة */}
       <div
