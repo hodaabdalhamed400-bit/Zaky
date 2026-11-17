@@ -79,7 +79,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <NavProgress />
       </Suspense>
       <SidebarNav sections={sections} footer={footer} topAction={<span className="flex items-center gap-1"><ThemeToggle initial={theme} dark />{bell(true)}</span>} />
-      <main id="main" className={`relative min-h-dvh lg:ps-64${theme === "dark" ? " theme-dark" : ""}`}>
+      <main id="main" className={theme === "dark" ? "relative min-h-dvh lg:ps-64 theme-dark" : "relative min-h-dvh lg:ps-64"}>
         <div className="bg-dots pointer-events-none absolute inset-x-0 top-0 h-72 [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true" />
         <div className="sticky top-0 z-20 hidden items-center justify-between gap-4 border-b border-gray-200/70 bg-white/75 px-8 py-2.5 backdrop-blur-xl lg:flex">
           <p className="flex items-center gap-2 text-sm text-gray-500">

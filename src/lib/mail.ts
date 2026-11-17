@@ -1,4 +1,4 @@
-import "server-only";
+// ملاحظة: بدون "server-only" لأن المهمة اليومية (scripts/daily.ts على Render Cron) تستورد هذا الملف خارج Next.js
 import net from "node:net";
 import tls from "node:tls";
 import { randomBytes } from "node:crypto";
