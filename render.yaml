@@ -40,6 +40,19 @@ services:
       # مفتاح تشفير أسرار التحقق الثنائي — لا تغيّره بعد التشغيل (يُبطل التحقق الثنائي لكل المستخدمين)
       - key: MFA_ENCRYPTION_KEY
         generateValue: true
+      # الإيميل (اختياري — بدونه تشتغل «نسيت كلمة المرور» بتنبيه داخلي للمسؤول)
+      - key: APP_URL
+        value: https://erp.smartcompany.sa
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
   # المهمة اليومية: انتهاء العقود + مسودات التجديد التلقائية (00:15 بتوقيت الرياض = 21:15 UTC)
   - type: cron
@@ -57,6 +70,19 @@ services:
         fromDatabase:
           name: zaki-erp-db
           property: connectionString
+      # الإيميل (اختياري — للملخص الأسبوعي)
+      - key: APP_URL
+        value: https://erp.smartcompany.sa
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
 databases:
   - name: zaki-erp-db
