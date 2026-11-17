@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { cookieSecure, env } from "@/lib/env";
 import type { PermissionKey } from "@/lib/rbac/permissions";
 import { sessionMaxAgeHours, validateSession } from "./session";
+import { resolveClientIp } from "@/lib/client-ip";
 import { mustEnrollMfa } from "@/services/mfa.service";
 import type { Actor, RequestMeta } from "./actor";
 
@@ -16,14 +17,10 @@ const MFA_COOKIE = () => mfaCookieName(cookieSecure());
 
 export async function getRequestMeta(): Promise<RequestMeta> {
   const h = await headers();
-  const xff = h.get("x-forwarded-for");
-  let ip: string | null = null;
-  if (xff) {
-    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
-    const hops = env().TRUSTED_PROXY_HOPS;
-    ip = hops > 0 ? (parts[Math.max(0, parts.length - hops)] ?? null) : null;
-  }
-  ip ??= h.get("x-real-ip");
+  const ip = resolveClientIp(
+    { xff: h.get("x-forwarded-for"), realIp: h.get("x-real-ip"), cfConnectingIp: h.get("cf-connecting-ip") },
+    env().TRUSTED_PROXY_HOPS,
+  );
   return { ip, userAgent: h.get("user-agent") };
 }
 
