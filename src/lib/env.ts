@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+/**
+ * إعدادات اختيارية (الإيميل): الخانة الفارغة = غير مُعدّة، والقيمة غير الصالحة تُتجاهل
+ * بدل إيقاف النظام كله — فخطأ في إعداد البريد يعطّل الإيميلات فقط.
+ */
+const optional = <T extends z.ZodTypeAny>(t: T) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), t.optional().catch(undefined));
+
 const schema = z.object({
   DATABASE_URL: z.string().min(1),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -25,13 +32,14 @@ const schema = z.object({
     .optional()
     .transform((v) => (v === undefined ? undefined : v === "true")),
   // رابط النظام العام (يُستخدم في روابط الإيميل)، مثال https://erp.smartcompany.sa
-  APP_URL: z.string().url().optional(),
+  APP_URL: optional(z.string().url()),
   // إرسال الإيميل عبر SMTP من صندوق بريد موجود (بدون اشتراك). بدونها تُعطَّل الإيميلات بهدوء.
-  SMTP_HOST: z.string().min(1).optional(),
-  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(465),
-  SMTP_USER: z.string().min(1).optional(),
-  SMTP_PASS: z.string().min(1).optional(),
-  MAIL_FROM: z.string().email().optional(),
+  SMTP_HOST: optional(z.string().min(1)),
+  SMTP_PORT: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(1).max(65535).catch(465).default(465)),
+  SMTP_USER: optional(z.string().min(1)),
+  SMTP_PASS: optional(z.string().min(1)),
+  // يُتحقق من صيغته عند الإرسال فقط (mail.ts) — صيغة خاطئة تعطّل الإيميل ولا توقف النظام
+  MAIL_FROM: optional(z.string().min(3)),
 });
 
 let cached: z.infer<typeof schema> | null = null;
