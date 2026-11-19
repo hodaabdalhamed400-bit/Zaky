@@ -29,8 +29,9 @@ export type ImportIssue = {
   row: number | null;
   level: Level;
   message: string;
+  blocking?: boolean;
 };
-type Action = "create" | "exists";
+type Action = "create" | "exists" | "skip";
 
 export type ImportPreview = {
   branch: { id: string; name: string; code: string };
@@ -72,6 +73,10 @@ export type ImportPreview = {
   issues: ImportIssue[];
   errors: number;
   warnings: number;
+  /** أخطاء تمنع أي استيراد (مثل ملف فرع آخر) */
+  blocking: number;
+  /** ما سيُضاف عند «استيراد السليم فقط» */
+  ready: { units: number; tenants: number; contracts: number };
 };
 
 // ───── قراءة الخلايا ─────
@@ -268,6 +273,7 @@ type UnitPlan = {
   rented: boolean;
   notes: string | null;
   existingId: string | null;
+  invalid: boolean;
 };
 type TenantPlan = {
   row: number;
@@ -283,6 +289,7 @@ type TenantPlan = {
   status: TenantStatus;
   notes: string | null;
   existingId: string | null;
+  invalid: boolean;
 };
 type ContractPlan = {
   ref: string;
@@ -301,6 +308,7 @@ type ContractPlan = {
   paid: Prisma.Decimal;
   paidOn: string | null;
   existing: boolean;
+  invalid: boolean;
 };
 
 async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array) {
@@ -322,7 +330,8 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   // الفرع المكتوب في الملف يجب أن يطابق الفرع المختار — يمنع رفع ملف فرع على فرع آخر
   const branchNames = new Set([book.units, book.tenants, book.contracts].flatMap((s) => s?.rows.map((r) => r.branch).filter((b): b is string => !!b) ?? []).map(normName));
   const foreign = [...branchNames].filter((b) => b !== normName(branch.nameAr));
-  if (foreign.length) err("الملف", null, `الملف خاص بفرع «${foreign.join("، ")}» وأنت تستورد إلى فرع «${branch.nameAr}». اختر الفرع الصحيح.`);
+  if (foreign.length)
+    issues.push({ sheet: "الملف", row: null, level: "error", blocking: true, message: `الملف خاص بفرع «${foreign.join("، ")}» وأنت تستورد إلى فرع «${branch.nameAr}». اختر الفرع الصحيح.` });
 
   const [types, existingUnits, floors, tenantsAll] = await Promise.all([
     db.unitType.findMany({ where: { isActive: true } }),
@@ -344,7 +353,9 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   // ── الوحدات ──
   const units = new Map<string, UnitPlan>();
   const S1 = SHEETS.units;
+  const errCount = () => issues.reduce((n, i) => n + (i.level === "error" ? 1 : 0), 0);
   for (const r of book.units?.rows ?? []) {
+    const before = errCount();
     const code = text(r.get(/^رقم الوحده/));
     if (!code) {
       err(S1, r.n, "رقم الوحدة فارغ");
@@ -353,6 +364,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
     if (!/^[\p{L}\p{N}\s\-_/.]{1,30}$/u.test(code)) err(S1, r.n, `رقم الوحدة «${code}» يحتوي رموزًا غير مسموحة`);
     if (units.has(code)) {
       err(S1, r.n, `رقم الوحدة ${code} مكرر في الشيت`);
+      units.get(code)!.invalid = true; // لا نعرف أي السطرين هو الصحيح
       continue;
     }
     const typeTxt = text(r.get(/^نوع الوحده/));
@@ -393,6 +405,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
       rented: normName(stTxt) === "مؤجره",
       notes: text(r.get(/^ملاحظات/)),
       existingId: existing?.id ?? null,
+      invalid: errCount() > before,
     });
   }
   const unitByCode = (code: string) => {
@@ -419,7 +432,9 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   const S2 = SHEETS.tenants;
   const seenCr = new Map<string, string>();
   const seenVat = new Map<string, string>();
+  const seenKey = new Map<string, string>(); // الرقم ← مفتاح أول عميل
   for (const r of book.tenants?.rows ?? []) {
+    const before = errCount();
     const name = text(r.get(/^اسم العميل/));
     if (!name || name.length < 2) {
       err(S2, r.n, "اسم العميل فارغ");
@@ -428,6 +443,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
     const key = normName(name);
     if (tenants.has(key)) {
       err(S2, r.n, `العميل «${name}» مكرر في الشيت (كل عميل مرة واحدة)`);
+      tenants.get(key)!.invalid = true;
       continue;
     }
     const typeTxt = text(r.get(/^نوع العميل/));
@@ -454,8 +470,14 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
     ] as const) {
       if (!val) continue;
       const other = seen.get(val);
-      if (other) err(S2, r.n, `${label} ${val} مكرر بين «${other}» و«${name}» — لا يتكرر لعميلين`);
-      else seen.set(val, name);
+      if (other) {
+        err(S2, r.n, `${label} ${val} مكرر بين «${other}» و«${name}» — لا يتكرر لعميلين (لن يُستورد أيٌّ منهما حتى التصحيح)`);
+        const firstT = tenants.get(seenKey.get(label + val) ?? "");
+        if (firstT) firstT.invalid = true;
+      } else {
+        seen.set(val, name);
+        seenKey.set(label + val, key);
+      }
     }
     const existing = tenantsAll.find((t) => normName(t.name) === key);
     if (existing) warn(S2, r.n, `العميل «${name}» مسجل في النظام مسبقًا — سيُربط بعقوده دون تعديل بياناته`);
@@ -482,14 +504,15 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
       status: status ?? "PROSPECT",
       notes: text(r.get(/^ملاحظات/)),
       existingId: existing?.id ?? null,
+      invalid: errCount() > before,
     });
   }
   const tenantByName = (name: string) => {
     const key = normName(name);
     const t = tenants.get(key);
-    if (t) return { key, name: t.name, existingId: t.existingId };
+    if (t) return { key, name: t.name, existingId: t.existingId, plan: t };
     const e = tenantsAll.find((x) => normName(x.name) === key);
-    return e ? { key, name: e.name, existingId: e.id } : null;
+    return e ? { key, name: e.name, existingId: e.id, plan: null } : null;
   };
 
   // ── العقود ──
@@ -527,7 +550,8 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
     const tenant = clientTxt ? tenantByName(clientTxt) : null;
     if (!clientTxt) fail(first.n, `${label}: اسم العميل فارغ`);
     else if (!tenant) fail(first.n, `${label}: العميل «${clientTxt}» غير موجود في شيت العملاء — اكتب الاسم مطابقًا تمامًا`);
-    else if (tenant.name !== clientTxt) warn(S3, first.n, `${label}: «${clientTxt}» اعتُبر نفسه العميل «${tenant.name}» (اختلاف كتابة بسيط)`);
+    else if (tenant.plan?.invalid && !tenant.existingId) fail(first.n, `${label}: بيانات العميل «${tenant.name}» فيها أخطاء في شيت العملاء — يُستورد العقد بعد تصحيحها`);
+    if (tenant && clientTxt && tenant.name !== clientTxt) warn(S3, first.n, `${label}: «${clientTxt}» اعتُبر نفسه العميل «${tenant.name}» (اختلاف كتابة بسيط)`);
     if (start === null) fail(first.n, `${label}: تاريخ بداية العقد فارغ`);
     else if (start === "bad") fail(first.n, `${label}: تاريخ البداية غير صحيح (اكتبه بصيغة يوم/شهر/سنة)`);
     if (months === null) fail(first.n, `${label}: مدة العقد (بالأشهر) فارغة`);
@@ -553,6 +577,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
       if (!u) fail(r.n, `${label}: الوحدة ${code} غير موجودة في شيت الوحدات ولا في النظام`);
       else if (u.status === "INACTIVE") fail(r.n, `${label}: الوحدة ${code} حالتها «غير نشطة» ولا يمكن تأجيرها`);
       else if (u.leaseMode !== "LEASE") fail(r.n, `${label}: الوحدة ${code} تُدار بالحجوزات وليس بالعقود`);
+      else if ("invalid" in u && u.invalid && !u.existingId) fail(r.n, `${label}: الوحدة ${code} فيها أخطاء في شيت الوحدات — يُستورد العقد بعد تصحيحها`);
       if (monthly === null) fail(r.n, `${label}: الإيجار الشهري للوحدة ${code} فارغ`);
       else if (monthly === "bad" || monthly <= 0) fail(r.n, `${label}: الإيجار الشهري للوحدة ${code} غير صحيح`);
       const prev = usedUnits.get(code);
@@ -583,7 +608,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
           vatRate: rate,
         });
       } catch (e) {
-        err(S3, first.n, `${label}: ${toSafeMessage(e)}`);
+        fail(first.n, `${label}: ${toSafeMessage(e)}`);
       }
       if (calc && calc.endDate < today) warn(S3, first.n, `${label}: انتهى في ${calc.endDate} — سيُسجل ثم يُغلق تلقائيًا كعقد منتهٍ`);
       if (start && typeof start === "string" && start > today) warn(S3, first.n, `${label}: يبدأ مستقبلًا (${start})`);
@@ -610,6 +635,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
       paid: new Prisma.Decimal(0),
       paidOn: null,
       existing: false,
+      invalid: !ok,
     });
   }
 
@@ -637,7 +663,10 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
         if (normName(hit.contract.tenant.name) === c.tenantKey) {
           c.existing = true;
           warn(S3, c.rows[0]!, `الوحدة ${l.unitCode} عليها عقد مسجل مسبقًا (${hit.contract.contractNo}) لنفس العميل — سيُتجاوز`);
-        } else err(S3, c.rows[0]!, `الوحدة ${l.unitCode} مؤجرة في النظام للعميل «${hit.contract.tenant.name}» بالعقد ${hit.contract.contractNo}`);
+        } else {
+          c.invalid = true;
+          err(S3, c.rows[0]!, `الوحدة ${l.unitCode} مؤجرة في النظام للعميل «${hit.contract.tenant.name}» بالعقد ${hit.contract.contractNo}`);
+        }
       }
     }
   }
@@ -667,6 +696,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
       continue;
     }
     paidRefs.add(ref);
+    const n0 = errCount();
     if (paid === null) err(S4, r.n, `العقد ${ref}: إجمالي المسدد فارغ (اكتب 0 إن لم يدفع)`);
     else if (paid === "bad" || paid < 0) err(S4, r.n, `العقد ${ref}: المبلغ المسدد غير صحيح`);
     else if (c.installments.length && money(paid).gt(c.total)) err(S4, r.n, `العقد ${ref}: المسدد (${paid}) أكبر من إجمالي العقد (${c.total.toFixed(2)})`);
@@ -681,6 +711,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
         if (computed.minus(overdue).abs().gt(1)) warn(S4, r.n, `العقد ${ref}: المتأخر المكتوب ${overdue} ر.س، وحسب الأقساط والمسدد يكون ${computed.toFixed(2)} ر.س`);
       }
     }
+    if (errCount() > n0) c.invalid = true; // لا نسجل عقدًا برصيد غير مؤكد
   }
   for (const c of contracts)
     if (!paidRefs.has(c.ref) && !c.existing && c.installments.length)
@@ -688,7 +719,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
 
   // الأدوار الجديدة
   const floorNames = new Set(floors.map((f) => normName(f.name)));
-  const newFloors = [...new Set([...units.values()].filter((u) => !u.existingId && u.floor && !floorNames.has(normName(u.floor))).map((u) => u.floor!))].filter(
+  const newFloors = [...new Set([...units.values()].filter((u) => !u.existingId && !u.invalid && u.floor && !floorNames.has(normName(u.floor))).map((u) => u.floor!))].filter(
     (f, i, a) => a.findIndex((x) => normName(x) === normName(f)) === i,
   );
 
@@ -722,7 +753,7 @@ function toPreview(a: Awaited<ReturnType<typeof analyze>>): ImportPreview {
       price: u.price,
       cycle: cyc[u.cycle],
       status: u.rented ? "مؤجرة" : st[u.status],
-      action: u.existingId ? "exists" : "create",
+      action: u.existingId ? "exists" : u.invalid ? "skip" : "create",
     })),
     floors: a.newFloors,
     tenants: [...a.tenants.values()].map((t) => ({
@@ -731,7 +762,7 @@ function toPreview(a: Awaited<ReturnType<typeof analyze>>): ImportPreview {
       type: t.type === "COMPANY" ? "منشأة" : "فرد",
       mobile: t.mobile,
       status: tst[t.status],
-      action: t.existingId ? "exists" : "create",
+      action: t.existingId ? "exists" : t.invalid ? "skip" : "create",
     })),
     contracts: a.contracts.map((c) => ({
       ref: c.ref,
@@ -746,11 +777,17 @@ function toPreview(a: Awaited<ReturnType<typeof analyze>>): ImportPreview {
       total: c.installments.length ? c.total.toFixed(2) : null,
       paid: c.paid.toFixed(2),
       installments: c.installments.length,
-      action: c.existing ? "exists" : "create",
+      action: c.existing ? "exists" : c.invalid ? "skip" : "create",
     })),
     issues: sorted,
     errors: a.issues.filter((i) => i.level === "error").length,
     warnings: a.issues.filter((i) => i.level === "warning").length,
+    blocking: a.issues.filter((i) => i.blocking).length,
+    ready: {
+      units: [...a.units.values()].filter((u) => !u.existingId && !u.invalid).length,
+      tenants: [...a.tenants.values()].filter((t) => !t.existingId && !t.invalid).length,
+      contracts: a.contracts.filter((c) => !c.existing && !c.invalid).length,
+    },
   };
 }
 
@@ -768,11 +805,17 @@ export type ImportResult = {
   failed: { ref: string; message: string }[];
 };
 
-/** التنفيذ: يعيد التحقق ويرفض عند وجود أخطاء. الوحدات والعملاء في معاملة واحدة، ثم كل عقد بمساره المعتاد. */
-export async function commitBranchImport(db: Db, actor: Actor, branchId: string, bytes: Uint8Array, meta: RequestMeta = {}): Promise<ImportResult> {
+/**
+ * التنفيذ: يعيد التحقق. عند وجود أخطاء يُرفض، إلا إذا طُلب «استيراد السليم فقط» (partial):
+ * فتُضاف السطور السليمة وتُترك التي فيها أخطاء — وعند رفع الملف بعد تصحيحه يُضاف الناقص فقط.
+ * الوحدات والعملاء في معاملة واحدة، ثم كل عقد بمساره المعتاد.
+ */
+export async function commitBranchImport(db: Db, actor: Actor, branchId: string, bytes: Uint8Array, meta: RequestMeta = {}, opts: { partial?: boolean } = {}): Promise<ImportResult> {
   const a = await analyze(db, actor, branchId, bytes);
+  const blocking = a.issues.filter((i) => i.blocking);
+  if (blocking.length) throw new AppError("VALIDATION", blocking[0]!.message);
   const errors = a.issues.filter((i) => i.level === "error").length;
-  if (errors) throw new AppError("VALIDATION", `في الملف ${errors} خطأ — صححها وأعد المعاينة قبل الاستيراد`);
+  if (errors && !opts.partial) throw new AppError("VALIDATION", `في الملف ${errors} خطأ — صححها وأعد المعاينة، أو اختر «استيراد السليم فقط»`);
   const source = { source: "excel_import" };
 
   const base = await db.$transaction(async (tx) => {
@@ -795,7 +838,7 @@ export async function commitBranchImport(db: Db, actor: Actor, branchId: string,
     }
     let unitsN = 0;
     for (const u of a.units.values()) {
-      if (u.existingId) continue;
+      if (u.existingId || u.invalid) continue;
       const created = await tx.unit.create({
         data: {
           branchId,
@@ -835,6 +878,7 @@ export async function commitBranchImport(db: Db, actor: Actor, branchId: string,
         tenantIds.set(key, t.existingId);
         continue;
       }
+      if (t.invalid) continue;
       const created = await tx.tenant.create({
         data: {
           type: t.type,
@@ -884,7 +928,7 @@ export async function commitBranchImport(db: Db, actor: Actor, branchId: string,
   let paymentsN = 0;
   const failed: ImportResult["failed"] = [];
   for (const c of a.contracts) {
-    if (c.existing) continue;
+    if (c.existing || c.invalid) continue;
     try {
       const tid = tenantId(c.tenantKey) ?? allTenants.find((t) => normName(t.name) === c.tenantKey)?.id;
       if (!tid) throw new AppError("VALIDATION", "العميل غير موجود");

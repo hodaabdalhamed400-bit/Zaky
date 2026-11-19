@@ -71,6 +71,21 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
             {pending ? "جارٍ الاستيراد…" : "استيراد الآن"}
           </button>
         )}
+        {fresh && p.errors > 0 && p.blocking === 0 && !r && p.ready.units + p.ready.tenants + p.ready.contracts > 0 && (
+          <button
+            type="submit"
+            name="intent"
+            value="partial"
+            disabled={pending}
+            className={buttonClass("primary")}
+            onClick={(e) => {
+              if (!confirm(`سيتم تسجيل السطور السليمة فقط: ${p.ready.units} وحدة، ${p.ready.tenants} عميل، ${p.ready.contracts} عقد.\nالسطور التي فيها أخطاء تُترك، وتُضاف عند رفع الملف بعد تصحيحه. متابعة؟`)) e.preventDefault();
+            }}
+            data-import-partial
+          >
+            {pending ? "جارٍ الاستيراد…" : `استيراد السليم فقط (${p.ready.units} وحدة · ${p.ready.tenants} عميل · ${p.ready.contracts} عقد)`}
+          </button>
+        )}
       </div>
 
       {r && (
@@ -100,9 +115,11 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
       {p && !r && (
         <div className="animate-fade-up space-y-5" data-import-preview>
           {!fresh && <Alert kind="info">اخترت ملفًا جديدًا — اضغط «إعادة المعاينة» قبل الاستيراد.</Alert>}
-          {p.errors > 0 ? (
-            <Alert kind="error">
-              في الملف <b>{p.errors}</b> خطأ يجب تصحيحه قبل الاستيراد{p.warnings ? ` و${p.warnings} تنبيه للمراجعة` : ""}. صحح الشيت وارفعه مرة أخرى.
+          {p.blocking > 0 ? (
+            <Alert kind="error">{p.issues.find((i) => i.blocking)?.message}</Alert>
+          ) : p.errors > 0 ? (
+            <Alert kind="warning">
+              في الملف <b>{p.errors}</b> خطأ{p.warnings ? ` و${p.warnings} تنبيه` : ""}. يمكنك <b>استيراد السليم فقط</b> الآن (المؤجَّل يظهر بعلامة «مؤجل» بالأسفل)، ثم رفع الملف نفسه بعد تصحيحه لاحقًا: يُضاف الناقص فقط دون تكرار.
             </Alert>
           ) : (
             <Alert kind="success">الملف سليم{p.warnings ? ` — مع ${p.warnings} تنبيه راجعها قبل الاستيراد` : ""}. اضغط «استيراد الآن».</Alert>
@@ -110,18 +127,18 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
 
           <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
-              ["الوحدات", p.units.filter((u) => u.action === "create").length, p.units.length, "units"],
-              ["العملاء", p.tenants.filter((t) => t.action === "create").length, p.tenants.length, "tenants"],
-              ["العقود", p.contracts.filter((c) => c.action === "create").length, p.contracts.length, "contracts"],
-              ["أدوار جديدة", p.floors.length, p.floors.length, "branches"],
-            ].map(([label, n, total, icon]) => (
+              ["الوحدات", p.ready.units, p.units.filter((u) => u.action === "skip").length, "units"],
+              ["العملاء", p.ready.tenants, p.tenants.filter((t) => t.action === "skip").length, "tenants"],
+              ["العقود", p.ready.contracts, p.contracts.filter((c) => c.action === "skip").length, "contracts"],
+              ["أدوار جديدة", p.floors.length, 0, "branches"],
+            ].map(([label, n, skipped, icon]) => (
               <div key={label as string} className="rounded-xl bg-white p-4 ring-1 ring-gray-200">
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   {label}
                   <Icon name={icon as "units"} className="size-4 text-brand-600" />
                 </div>
                 <p className="tabular mt-1 text-2xl font-bold text-brand-900">{n as number}</p>
-                <p className="text-[11px] text-gray-400">{n === total ? "جديدة" : `جديدة من ${total} (الباقي مسجل مسبقًا)`}</p>
+                <p className="text-[11px] text-gray-400">جاهزة للإضافة{(skipped as number) > 0 ? ` · ${skipped} مؤجلة لوجود أخطاء` : ""}</p>
               </div>
             ))}
           </div>
@@ -192,7 +209,7 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
                         <td className="tabular px-3 py-2">{fmt(c.monthly)}</td>
                         <td className="tabular px-3 py-2">{fmt(c.total)}</td>
                         <td className="tabular px-3 py-2">{fmt(c.paid)}</td>
-                        <td className="px-3 py-2">{c.action === "exists" ? <Badge>مسجل مسبقًا</Badge> : c.total ? <Badge color="green">جديد</Badge> : <Badge color="red">ناقص</Badge>}</td>
+                        <td className="px-3 py-2">{c.action === "exists" ? <Badge>مسجل مسبقًا</Badge> : c.action === "skip" ? <Badge color="amber">مؤجل</Badge> : <Badge color="green">جديد</Badge>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -210,7 +227,7 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
                     <span>
                       <b>{u.code}</b> <span className="text-gray-500">· {u.type}{u.floor ? ` · ${u.floor}` : ""} · {u.status}</span>
                     </span>
-                    <span className="tabular text-xs text-gray-600">{fmt(u.price)} / {u.cycle}{u.action === "exists" && " · مسجلة"}</span>
+                    <span className="tabular text-xs text-gray-600">{u.action === "skip" ? <Badge color="amber">مؤجلة</Badge> : <>{fmt(u.price)} / {u.cycle}{u.action === "exists" && " · مسجلة"}</>}</span>
                   </li>
                 ))}
               </ul>
@@ -220,7 +237,7 @@ export function ImportForm({ action, branchId, branchName }: { action: (p: Impor
                     <span>
                       <b>{t.name}</b> <span className="text-gray-500">· {t.type} · {t.status}</span>
                     </span>
-                    <span className="tabular text-xs text-gray-600" dir="ltr">{t.mobile ?? "—"}{t.action === "exists" && " · مسجل"}</span>
+                    <span className="tabular text-xs text-gray-600" dir="ltr">{t.action === "skip" ? <Badge color="amber">مؤجل</Badge> : <>{t.mobile ?? "—"}{t.action === "exists" && " · مسجل"}</>}</span>
                   </li>
                 ))}
               </ul>

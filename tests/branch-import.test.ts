@@ -246,6 +246,57 @@ describe("استيراد بيانات الفرع من Excel", () => {
     expect(await prisma.contract.count({ where: { branchId: branch.id } })).toBe(2);
   });
 
+  it("استيراد السليم فقط ثم إكمال الناقص بعد تصحيح الملف", async () => {
+    const { branch, actor } = await setup();
+    const n = branch.nameAr;
+    const dup = cr();
+    const rows = (fixed: boolean): Rows => ({
+      units: [
+        [n, "1", "مكتب خاص", "الثاني", 7.5, 2, 1725, "شهري", "مؤجرة"],
+        [n, "2", "مكتب خاص", "الثاني", 7.5, fixed ? 2 : null, 1725, "شهري", "مؤجرة"], // ناقص السعة
+        [n, "3", "مكتب خاص", "الثاني", 7.5, 2, 1500, "شهري", "متاحة"],
+      ],
+      tenants: [
+        ["عميل سليم", "منشأة", n, null, "0500000011", null, null, null, null, null, "نشط"],
+        ["عميل أ", "منشأة", n, null, "0500000012", null, dup, null, null, null, "نشط"],
+        ["عميل ب", "منشأة", n, null, "0500000013", null, fixed ? cr() : dup, null, null, null, "نشط"], // سجل مكرر
+        ["عميل بلا جوال", "فرد", n, null, fixed ? "0500000014" : null, null, null, null, null, null, "نشط"],
+      ],
+      contracts: [
+        [1, null, "عميل سليم", n, "1", null, 1725, START, 6, null, "شهري"],
+        [2, null, "عميل أ", n, "2", null, 1725, START, 6, null, "شهري"], // وحدته وعميله فيهما أخطاء
+        [3, null, "عميل بلا جوال", n, "3", null, 1500, fixed ? START : null, 6, null, "شهري"], // بلا تاريخ
+      ],
+      payments: [[1, null, null, 1725], [2, null, null, 0], [3, null, null, 0]],
+    });
+    const first = await book(rows(false));
+    const p = await previewBranchImport(prisma, actor, branch.id, first);
+    expect(p.errors).toBeGreaterThan(0);
+    expect(p.blocking).toBe(0);
+    expect(p.ready).toEqual({ units: 2, tenants: 1, contracts: 1 });
+    expect(p.contracts.map((c) => c.action)).toEqual(["create", "skip", "skip"]);
+    await expect(commitBranchImport(prisma, actor, branch.id, first)).rejects.toThrow(/استيراد السليم فقط/);
+    const r1 = await commitBranchImport(prisma, actor, branch.id, first, {}, { partial: true });
+    expect(r1).toMatchObject({ units: 2, tenants: 1, contracts: 1, payments: 1, failed: [] });
+    expect((await prisma.unit.findMany({ where: { branchId: branch.id } })).map((u) => u.code).sort()).toEqual(["1", "3"]);
+
+    // بعد التصحيح: يُضاف الناقص فقط
+    const second = await book(rows(true));
+    const p2 = await previewBranchImport(prisma, actor, branch.id, second);
+    expect(p2.errors).toBe(0);
+    expect(p2.ready).toEqual({ units: 1, tenants: 3, contracts: 2 });
+    const r2 = await commitBranchImport(prisma, actor, branch.id, second);
+    expect(r2).toMatchObject({ units: 1, tenants: 3, contracts: 2, failed: [] });
+    expect(await prisma.contract.count({ where: { branchId: branch.id, status: "ACTIVE" } })).toBe(3);
+    expect(await prisma.payment.count({ where: { branchId: branch.id } })).toBe(1);
+  });
+
+  it("ملف فرع آخر لا يُستورد حتى جزئيًا", async () => {
+    const { branch, actor } = await setup();
+    const bytes = await book({ units: [["فرع غريب", "1", "مكتب خاص", null, null, 2, 1000, "شهري", "متاحة"]] });
+    await expect(commitBranchImport(prisma, actor, branch.id, bytes, {}, { partial: true })).rejects.toThrow(/الملف خاص بفرع/);
+  });
+
   it("يتطلب صلاحيات الإدارة الكاملة", async () => {
     const { branch, staff } = await setup();
     await expect(previewBranchImport(prisma, staff, branch.id, await book({}))).rejects.toThrow();

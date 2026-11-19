@@ -15,8 +15,9 @@ export async function importAction(branchId: string, _p: ImportState, fd: FormDa
   if (!/\.xlsx$/i.test(f.name)) return { error: "الملف يجب أن يكون Excel بصيغة ‎.xlsx‎" };
   const bytes = new Uint8Array(await f.arrayBuffer());
   try {
-    if (fd.get("intent") === "commit") {
-      const result = await commitBranchImport(prisma, actor, branchId, bytes, await getRequestMeta());
+    const intent = fd.get("intent");
+    if (intent === "commit" || intent === "partial") {
+      const result = await commitBranchImport(prisma, actor, branchId, bytes, await getRequestMeta(), { partial: intent === "partial" });
       for (const p of [`/branches/${branchId}`, "/units", "/tenants", "/contracts", "/finance", "/"]) revalidatePath(p);
       return { result, fileName: f.name };
     }
