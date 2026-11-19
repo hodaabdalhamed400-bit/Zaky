@@ -26,7 +26,9 @@ export default async function LayoutPage({ params }: { params: Promise<{ id: str
         actions={<LinkButton href={`/branches/${id}/3d`} variant="secondary" icon="cube">المجسم 3D</LinkButton>}
       />
       {scene.total === 0 ? (
-        <Card className="p-8 text-center text-sm text-gray-600">لا توجد وحدات في هذا الفرع بعد.</Card>
+        <Card className="p-8 text-center text-sm text-gray-600">
+          لا توجد وحدات مسجلة في هذا الفرع بعد.{scene.hasPlan ? " المخطط المعماري للفرع جاهز — سجّل الوحدات بأرقام المخطط وستأخذ أماكنها تلقائيًا." : ""}
+        </Card>
       ) : (
         <LayoutEditor branchId={id} floors={scene.floors} saveAction={saveLayoutAction.bind(null, id)} resetAction={resetLayoutAction.bind(null, id)} />
       )}

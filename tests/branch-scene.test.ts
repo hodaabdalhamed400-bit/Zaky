@@ -64,6 +64,26 @@ describe("مجسم الفرع ثلاثي الأبعاد ومخططه", () => {
     expect(await prisma.auditLog.count({ where: { action: { in: ["unit.layout_update", "unit.layout_reset"] }, entityId: branch.id } })).toBe(2);
   });
 
+  it("المخطط الجاهز لفرع السويدي: الوحدة المسجلة تأخذ مكانها، والغرف غير المسجلة والمرافق تظهر", async () => {
+    const { admin } = await setup();
+    const swd = await prisma.branch.findUniqueOrThrow({ where: { code: "SWD" } });
+    const type = await prisma.unitType.findUniqueOrThrow({ where: { key: "PRIVATE_OFFICE" } });
+    const code = "113";
+    await prisma.unit.deleteMany({ where: { branchId: swd.id, code } });
+    await createUnit(prisma, admin, { branchId: swd.id, unitTypeId: type.id, code, capacity: "1", basePrice: "1500", pricingCycle: "MONTH", status: "AVAILABLE" });
+    const s = await getBranchScene(prisma, admin, swd.id);
+    const all = s.floors.flatMap((f) => f.units);
+    const { BRANCH_PLANS } = await import("@/lib/branch-plans");
+    const planRoom = BRANCH_PLANS.SWD!.find((p) => p.code === code)!;
+    const u = all.find((x) => x.code === code && x.kind === "unit")!;
+    expect(s.hasPlan).toBe(true);
+    expect(u).toMatchObject({ placed: true, saved: false, x: planRoom.x, y: planRoom.y });
+    expect(all.some((x) => x.kind === "plan" && x.code === code)).toBe(false);
+    expect(all.some((x) => x.kind === "facility")).toBe(true);
+    expect(s.unregisteredCodes.length).toBe(BRANCH_PLANS.SWD!.filter((p) => p.type !== "FACILITY").length - s.planUnits);
+    await prisma.unit.deleteMany({ where: { branchId: swd.id, code } });
+  });
+
   it("الصلاحيات: العرض لمن يرى الفرع، والتعديل لمن يدير الوحدات", async () => {
     const { branch, units } = await setup();
     const { actor: viewer } = await makeActor("READ_ONLY", { branchCodes: [branch.code] });

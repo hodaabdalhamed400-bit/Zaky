@@ -9,5 +9,7 @@ export const TONE: Record<SceneTone, { color: string; label: string }> = {
   reserved: { color: "#eab308", label: "محجوزة" },
   maintenance: { color: "#ef4444", label: "صيانة" },
   inactive: { color: "#94a3b8", label: "غير نشطة" },
+  unregistered: { color: "#a8b3c2", label: "غير مسجلة في النظام" },
+  facility: { color: "#7c8a9c", label: "مرافق" },
 };
 

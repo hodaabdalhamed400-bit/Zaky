@@ -132,7 +132,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       };
 
       // ── بناء الطوابق ──
-      type Built = { group: InstanceType<typeof THREE.Group>; unit: SceneUnit; tile: InstanceType<typeof THREE.Mesh>; beacon: InstanceType<typeof THREE.Mesh>; delay: number; lift: number };
+      type Built = { label: InstanceType<typeof CSS2DObject>; group: InstanceType<typeof THREE.Group>; unit: SceneUnit; tile: InstanceType<typeof THREE.Mesh>; beacon: InstanceType<typeof THREE.Mesh>; delay: number; lift: number };
       const built: Built[] = [];
       const floorGroups: InstanceType<typeof THREE.Group>[] = [];
       const walkers: { mesh: InstanceType<typeof THREE.Group>; from: number; to: number; z: number; speed: number; phase: number }[] = [];
@@ -188,7 +188,8 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           pickables.push(tile);
 
           // جدران زجاجية مع فتحة باب في الواجهة
-          const glass = new THREE.MeshStandardMaterial({ color: tone, transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.2, depthWrite: false });
+          const ghost = u.kind !== "unit";
+          const glass = new THREE.MeshStandardMaterial({ color: tone, transparent: true, opacity: ghost ? 0.08 : 0.16, roughness: 0.05, metalness: 0.2, depthWrite: false });
           const t = 0.06;
           const door = Math.min(1.1, u.w * 0.35);
           const walls: [number, number, number, number][] = [
@@ -205,14 +206,25 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
             g.add(wall);
             pickables.push(wall);
           }
-          const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(u.w, WALL_H, u.d)), new THREE.LineBasicMaterial({ color: tone, transparent: true, opacity: 0.9 }));
+          const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(u.w, WALL_H, u.d)), new THREE.LineBasicMaterial({ color: tone, transparent: true, opacity: ghost ? 0.45 : 0.9 }));
           frame.position.y = WALL_H / 2;
           g.add(frame);
 
           // الأثاث حسب النوع والسعة
           const rented = u.tone === "rented" || u.tone === "expiring" || u.tone === "partial";
           const seatMat = new THREE.MeshStandardMaterial({ color: tone, roughness: 0.7 });
-          if (u.typeKey === "MEETING_ROOM") {
+          if (u.kind === "facility") {
+            // دورات المياه: حجيرات بسيطة
+            const n = Math.max(2, Math.floor(u.w / 1.1));
+            for (let i = 0; i < n; i++) {
+              const stall = box(0.06, 1.8, Math.min(1.6, u.d * 0.4), mat.pot);
+              stall.position.set(-u.w / 2 + (u.w / n) * i + 0.05, 0.9, u.d / 2 - Math.min(1.6, u.d * 0.4) / 2 - 0.1);
+              g.add(stall);
+            }
+            const sinks = box(Math.min(u.w * 0.7, 6), 0.85, 0.5, mat.pot);
+            sinks.position.set(0, 0.43, -u.d / 2 + 0.4);
+            g.add(sinks);
+          } else if (u.typeKey === "MEETING_ROOM") {
             const tw = Math.max(1.6, u.w * 0.6);
             const td = Math.max(0.9, u.d * 0.35);
             const table = box(tw, 0.06, td, mat.wood);
@@ -275,6 +287,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           // علامة الحالة الطائرة
           const beacon = new THREE.Mesh(new THREE.OctahedronGeometry(0.26), new THREE.MeshStandardMaterial({ color: tone, emissive: tone, emissiveIntensity: 0.9, roughness: 0.3 }));
           beacon.position.y = WALL_H + 0.8;
+          beacon.visible = u.kind === "unit";
           g.add(beacon);
 
           // اسم الوحدة والمستأجر
@@ -284,7 +297,12 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           code.textContent = u.code;
           code.style.color = TONE[u.tone].color;
           tag.appendChild(code);
-          if (u.tenants[0]) {
+          if (u.kind === "plan") {
+            const sub = document.createElement("span");
+            sub.className = "block text-[10px] text-gray-500";
+            sub.textContent = "غير مسجلة";
+            tag.appendChild(sub);
+          } else if (u.tenants[0]) {
             const sub = document.createElement("span");
             sub.className = "block max-w-36 truncate text-[10px] text-gray-600";
             sub.textContent = u.tenants[0];
@@ -292,13 +310,28 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           }
           const lbl = new CSS2DObject(tag);
           lbl.position.y = WALL_H + 1.5;
+          // أسماء الغرف غير المسجلة تظهر عند المرور فقط حتى لا يزدحم المجسم
+          lbl.visible = u.kind !== "plan";
           g.add(lbl);
 
-          built.push({ group: g, unit: u, tile, beacon, delay: reduce ? 0 : 0.35 + ui * 0.07 + fi * 0.4, lift: 0 });
+          built.push({ label: lbl, group: g, unit: u, tile, beacon, delay: reduce ? 0 : 0.35 + ui * 0.07 + fi * 0.4, lift: 0 });
         });
 
-        // أشخاص يتحركون في الممر الأمامي (لمسة حياة)
-        const people = reduce ? 0 : Math.min(5, Math.max(2, Math.round(floor.units.length / 3)));
+        // أشخاص يتحركون في الممرات (لمسة حياة): نختار الشرائح الأقل امتلاءً بالغرف كممرات داخلية
+        const people = reduce ? 0 : Math.min(8, Math.max(2, Math.round(floor.units.length / 4)));
+        const lanes: number[] = [];
+        {
+          const cands: { y: number; cover: number }[] = [];
+          for (let y = 0.6; y < maxD - 0.6; y += 0.25) {
+            const cover = floor.units.filter((u) => y > u.y - 0.05 && y < u.y + u.d + 0.05).reduce((sum, u) => sum + u.w, 0);
+            cands.push({ y, cover });
+          }
+          for (const c of cands.sort((a, b) => a.cover - b.cover)) {
+            if (c.cover > maxW * 0.35 || lanes.length >= 2) break;
+            if (lanes.every((l) => Math.abs(l - c.y) > 2)) lanes.push(c.y);
+          }
+          if (!lanes.length) lanes.push(maxD + 0.8);
+        }
         for (let p = 0; p < people; p++) {
           const m = new THREE.Group();
           const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.75, 4, 10), mat.person);
@@ -309,7 +342,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           head.castShadow = true;
           m.add(body, head);
           fg.add(m);
-          const z = maxD / 2 + 0.8 + (p % 2) * 0.7;
+          const z = oz + lanes[p % lanes.length]! + ((p >> 1) % 2 ? 0.35 : -0.35);
           walkers.push({ mesh: m, from: -maxW / 2, to: maxW / 2, z, speed: 0.06 + Math.random() * 0.05, phase: Math.random() });
         }
       });
@@ -330,9 +363,14 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       let visibleFloors = floorGroups.length;
       const goal = new THREE.Vector3();
       const placeCamera = (instant: boolean) => {
-        const r = span * 0.85 + 5 + (visibleFloors > 1 ? (visibleFloors - 1) * 4 : 0);
+        // المسافة من نصف قطر المبنى، والنظر إلى الضلع الأطول من الأمام
+        const radius = Math.hypot(maxW, maxD) / 2;
+        const r = radius * 1.6 + 6 + (visibleFloors > 1 ? (visibleFloors - 1) * 4 : 0);
         const multi = visibleFloors > 1;
-        goal.set(r * 0.8, focusY + (multi ? (visibleFloors - 1) * FLOOR_GAP * 0.55 + r * 0.42 : r * 0.72), r * 1.0);
+        const wide = maxW >= maxD;
+        const h = focusY + (multi ? (visibleFloors - 1) * FLOOR_GAP * 0.55 + r * 0.42 : r * 0.62);
+        if (wide) goal.set(r * 0.3, h, r * 0.95);
+        else goal.set(r * 0.95, h, r * 0.3);
         controls.target.set(0, focusY + (visibleFloors > 1 ? (visibleFloors - 1) * FLOOR_GAP * 0.4 : 0), 0);
         if (instant) camera.position.copy(goal);
       };
@@ -345,6 +383,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
         focusY = 0;
         placeCamera(false);
         intro = reduce ? 1 : 0;
+        introStart = clock.elapsedTime;
         startPos.copy(camera.position);
       };
 
@@ -360,11 +399,13 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       accent.position.set(-span * 0.6, 8, span * 0.6);
 
       let intro = reduce ? 1 : 0;
+      let introStart = 0;
       api.current = {
         showFloor,
         reset: () => {
           controls.autoRotate = !reduce;
           intro = reduce ? 1 : 0;
+          introStart = clock.elapsedTime;
           startPos.copy(camera.position);
         },
       };
@@ -384,8 +425,10 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       const onMove = (ev: PointerEvent) => {
         const { found, r } = pick(ev);
         if (found !== hovered) {
+          if (hovered?.unit.kind === "plan") hovered.label.visible = false;
           hovered = found;
-          renderer.domElement.style.cursor = found ? "pointer" : "grab";
+          if (found?.unit.kind === "plan") found.label.visible = true;
+          renderer.domElement.style.cursor = found?.unit.kind === "unit" ? "pointer" : "grab";
         }
         setHover(found ? { unit: found.unit, x: ev.clientX - r.left, y: ev.clientY - r.top } : null);
       };
@@ -394,7 +437,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       const onUp = (ev: PointerEvent) => {
         if (performance.now() - downAt > 250) return; // سحب وليس ضغطة
         const { found } = pick(ev);
-        if (found) router.push(`/units/${found.unit.id}`);
+        if (found && found.unit.kind === "unit") router.push(`/units/${found.unit.id}`);
       };
       const onLeave = () => {
         hovered = null;
@@ -422,7 +465,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
         const dt = Math.min(0.05, clock.getDelta());
         const t = clock.elapsedTime;
         if (intro < 1) {
-          intro = Math.min(1, intro + dt / 2.4);
+          intro = Math.min(1, (t - introStart) / 2.4); // بالوقت الفعلي: نفس المدة على الأجهزة البطيئة
           camera.position.lerpVectors(startPos, goal, ease(intro));
         }
         for (const b of built) {
@@ -522,11 +565,12 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
             <p className="text-sm font-bold text-brand-900">{u.code}</p>
             <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white" style={{ background: TONE[u.tone].color }}>{u.statusLabel}</span>
           </div>
-          <p className="mt-0.5 text-gray-500">{u.typeName} · السعة {u.capacity}{u.areaSqm ? ` · ${u.areaSqm} م²` : ""}</p>
+          <p className="mt-0.5 text-gray-500">{u.typeName}{u.kind !== "facility" ? ` · السعة ${u.capacity}` : ""}{u.areaSqm ? ` · ${u.areaSqm} م²` : ""}</p>
+          {u.kind === "plan" && <p className="mt-1.5 text-gray-700">من مخطط الفرع — سجّلها في «المكاتب والوحدات» بالرقم <b>{u.code}</b> لتظهر حالتها.</p>}
           {u.tenants.length > 0 && <p className="mt-1.5 font-medium text-gray-900">{u.tenants.join("، ")}</p>}
           {u.until && <p className="text-gray-500">حتى {u.until}{u.daysLeft !== null && u.daysLeft <= 30 ? ` — متبقٍ ${u.daysLeft} يومًا` : ""}</p>}
           {u.bookedNow && <p className="mt-1 font-semibold text-amber-700">محجوزة الآن</p>}
-          <p className="tabular mt-1.5 font-semibold text-brand-900">{Number(u.price).toLocaleString("en", { minimumFractionDigits: 2 })} ر.س / {u.cycle}</p>
+          {u.kind === "unit" && <p className="tabular mt-1.5 font-semibold text-brand-900">{Number(u.price).toLocaleString("en", { minimumFractionDigits: 2 })} ر.س / {u.cycle}</p>}
         </div>
       )}
     </div>

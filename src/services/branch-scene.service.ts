@@ -8,13 +8,14 @@ import { dateOnly, todayInRiyadh } from "@/lib/dates";
 import { parseInput } from "@/lib/validation";
 import { IN_FORCE_STATUSES, unitOccupancyToday } from "./occupancy.service";
 import { PRICING_CYCLE_LABELS, effectiveUnitStatus } from "./units.service";
+import { BRANCH_PLANS } from "@/lib/branch-plans";
 
 /**
  * مشهد الفرع ثلاثي الأبعاد: مكان كل وحدة (بالأمتار) + حالتها الحية.
  * الوحدة بلا مكان محفوظ تُرتب تلقائيًا بجانب الموضوعة، فيعمل المجسم من أول يوم.
  */
 
-export type SceneTone = "available" | "rented" | "partial" | "expiring" | "reserved" | "maintenance" | "inactive";
+export type SceneTone = "available" | "rented" | "partial" | "expiring" | "reserved" | "maintenance" | "inactive" | "unregistered" | "facility";
 
 export type SceneUnit = {
   id: string;
@@ -26,7 +27,12 @@ export type SceneUnit = {
   y: number;
   w: number;
   d: number;
+  /** له مكان (محفوظ، أو من المخطط الجاهز، أو مرتب تلقائيًا بعد autoLayout) */
   placed: boolean;
+  /** المكان محفوظ يدويًا من محرر المخطط */
+  saved: boolean;
+  /** unit = وحدة مسجلة، plan = غرفة في المخطط الجاهز غير مسجلة بعد، facility = مرافق */
+  kind: "unit" | "plan" | "facility";
   tone: SceneTone;
   statusLabel: string;
   capacity: number;
@@ -43,6 +49,7 @@ export type SceneUnit = {
 export type SceneFloor = { id: string | null; name: string; level: number; units: SceneUnit[] };
 
 const EXPIRING_DAYS = 30;
+const PLAN_TYPE_NAMES: Record<string, string> = { PRIVATE_OFFICE: "مكتب خاص", SHARED_OFFICE: "مكتب مشترك", MEETING_ROOM: "قاعة اجتماعات", ADMIN_SPACE: "مساحة إدارية", FACILITY: "مرافق" };
 const ROW_WIDTH = 30; // عرض صف الترتيب التلقائي بالأمتار
 const GAP = 1.5;
 
@@ -122,6 +129,9 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
     }),
   ]);
   const bookedNow = new Set(booked.map((b) => b.unitId));
+  // المخطط الجاهز للفرع (إن وُجد): يحدد أماكن الوحدات غير المرسومة، ويعرض الغرف غير المسجلة بعد
+  const plan = BRANCH_PLANS[branch.code] ?? [];
+  const usedPlan = new Set<string>();
   const todayMs = T.getTime();
 
   const sceneUnits: SceneUnit[] = units.map((u) => {
@@ -145,19 +155,24 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
                 ? "maintenance"
                 : "inactive";
     const area = u.areaSqm ? Number(u.areaSqm) : null;
-    const placed = u.layoutX !== null && u.layoutY !== null && u.layoutW !== null && u.layoutD !== null;
-    const size = placed ? { w: Number(u.layoutW), d: Number(u.layoutD) } : defaultSize({ typeKey: u.unitType.key, capacity: u.capacity, areaSqm: area });
+    const saved = u.layoutX !== null && u.layoutY !== null && u.layoutW !== null && u.layoutD !== null;
+    const fromPlan = !saved ? plan.find((p) => p.code === u.code && p.type !== "FACILITY") : undefined;
+    if (fromPlan) usedPlan.add(fromPlan.code);
+    const placed = saved || !!fromPlan;
+    const size = saved ? { w: Number(u.layoutW), d: Number(u.layoutD) } : fromPlan ? { w: fromPlan.w, d: fromPlan.d } : defaultSize({ typeKey: u.unitType.key, capacity: u.capacity, areaSqm: area });
     return {
       id: u.id,
       code: u.code,
       typeKey: u.unitType.key,
       typeName: u.unitType.nameAr,
       floorId: u.floorId,
-      x: placed ? Number(u.layoutX) : 0,
-      y: placed ? Number(u.layoutY) : 0,
+      x: saved ? Number(u.layoutX) : (fromPlan?.x ?? 0),
+      y: saved ? Number(u.layoutY) : (fromPlan?.y ?? 0),
       w: size.w,
       d: size.d,
       placed,
+      saved,
+      kind: "unit",
       tone,
       statusLabel: st.label,
       capacity: u.capacity,
@@ -172,19 +187,65 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
     };
   });
 
+  const registeredCodes = new Set(units.map((u) => u.code));
+  const ghosts: SceneUnit[] = plan
+    .filter((p) => p.type === "FACILITY" || !registeredCodes.has(p.code))
+    .map((p) => ({
+      id: `plan:${p.code}`,
+      code: p.type === "FACILITY" ? (p.label ?? p.code) : p.code,
+      typeKey: p.type,
+      typeName: PLAN_TYPE_NAMES[p.type] ?? p.type,
+      floorId: null,
+      x: p.x,
+      y: p.y,
+      w: p.w,
+      d: p.d,
+      placed: true,
+      saved: false,
+      kind: p.type === "FACILITY" ? "facility" : "plan",
+      tone: p.type === "FACILITY" ? "facility" : "unregistered",
+      statusLabel: p.type === "FACILITY" ? "مرافق" : "غير مسجلة في النظام",
+      capacity: p.capacity,
+      occupiedSeats: 0,
+      tenants: [],
+      until: null,
+      daysLeft: null,
+      price: "0.00",
+      cycle: "",
+      bookedNow: false,
+      areaSqm: Math.round(p.w * p.d * 10) / 10,
+    }));
+  // الغرف غير المسجلة تُعرض في الدور الذي فيه أغلب وحدات المخطط (أو «الفرع» إن لم توجد أدوار)
+  const planFloorId = (() => {
+    const tally = new Map<string | null, number>();
+    for (const su of sceneUnits) if (usedPlan.has(su.code)) tally.set(su.floorId, (tally.get(su.floorId) ?? 0) + 1);
+    return [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  })();
+  for (const g of ghosts) g.floorId = planFloorId;
+
   // الطوابق: المعرّفة + «بدون دور» للوحدات غير المرتبطة بدور
   const groups: SceneFloor[] = floors.map((f) => ({ id: f.id, name: f.name, level: f.level, units: [] }));
   const loose: SceneFloor = { id: null, name: floors.length ? "بدون دور محدد" : "الفرع", level: floors.length ? (floors.at(-1)!.level + 1) : 0, units: [] };
-  for (const su of sceneUnits) (groups.find((g) => g.id === su.floorId) ?? loose).units.push(su);
+  for (const su of [...sceneUnits, ...ghosts]) (groups.find((g) => g.id === su.floorId) ?? loose).units.push(su);
   const all = [...groups, ...(loose.units.length ? [loose] : [])]
     .filter((g) => g.units.length > 0 || groups.length === 0)
     .map((g) => ({ ...g, units: autoLayout(g.units) }));
 
   const counts = sceneUnits.reduce<Record<SceneTone, number>>(
     (a, u) => ({ ...a, [u.tone]: a[u.tone] + 1 }),
-    { available: 0, rented: 0, partial: 0, expiring: 0, reserved: 0, maintenance: 0, inactive: 0 },
+    { available: 0, rented: 0, partial: 0, expiring: 0, reserved: 0, maintenance: 0, inactive: 0, unregistered: 0, facility: 0 },
   );
-  return { branch, floors: all, counts, total: sceneUnits.length, placedCount: sceneUnits.filter((u) => u.placed).length };
+  counts.unregistered = ghosts.filter((g) => g.kind === "plan").length;
+  return {
+    branch,
+    floors: all,
+    counts,
+    total: sceneUnits.length,
+    placedCount: sceneUnits.filter((u) => u.saved).length,
+    hasPlan: plan.length > 0,
+    planUnits: usedPlan.size,
+    unregisteredCodes: ghosts.filter((g) => g.kind === "plan").map((g) => g.code),
+  };
 }
 
 const num = (min: number, max: number) => z.coerce.number().finite().min(min).max(max).transform((v) => Math.round(v * 100) / 100);

@@ -45,8 +45,10 @@ export function LayoutEditor({
   resetAction: (p: FormState, fd: FormData) => Promise<FormState>;
 }) {
   const [boxes, setBoxes] = useState<Box[]>(() =>
-    floors.flatMap((f, fi) => f.units.map((u) => ({ id: u.id, code: u.code, floor: fi, x: u.x, y: u.y, w: u.w, d: u.d, tone: u.tone, typeName: u.typeName }))),
+    floors.flatMap((f, fi) => f.units.filter((u) => u.kind === "unit").map((u) => ({ id: u.id, code: u.code, floor: fi, x: u.x, y: u.y, w: u.w, d: u.d, tone: u.tone, typeName: u.typeName }))),
   );
+  // غرف المخطط الجاهز غير المسجلة والمرافق: تظهر مرجعًا رماديًا ولا تُحرَّك
+  const refs = floors.flatMap((f, fi) => f.units.filter((u) => u.kind !== "unit").map((u) => ({ ...u, floor: fi })));
   const [floor, setFloor] = useState(0);
   const [sel, setSel] = useState<string | null>(null);
   const [bg, setBg] = useState<{ url: string; width: number; opacity: number } | null>(null);
@@ -61,8 +63,9 @@ export function LayoutEditor({
   const [resetState, onReset, resetting] = useActionForm(resetAction, {});
 
   const here = boxes.filter((b) => b.floor === floor);
-  const W = Math.max(36, ...here.map((b) => b.x + b.w + 6), bg ? bg.width + 2 : 0);
-  const D = Math.max(22, ...here.map((b) => b.y + b.d + 6));
+  const hereRefs = refs.filter((r) => r.floor === floor);
+  const W = Math.max(36, ...here.map((b) => b.x + b.w + 6), ...hereRefs.map((r) => r.x + r.w + 2), bg ? bg.width + 2 : 0);
+  const D = Math.max(22, ...here.map((b) => b.y + b.d + 6), ...hereRefs.map((r) => r.y + r.d + 2));
   const bad = useMemo(() => new Set(here.flatMap((a) => (here.some((b) => b !== a && overlap(a, b)) ? [a.id] : []))), [here]);
   const selected = boxes.find((b) => b.id === sel) ?? null;
 
@@ -175,6 +178,12 @@ export function LayoutEditor({
             {bg && <image href={bg.url} x={0} y={0} width={bg.width} opacity={bg.opacity} preserveAspectRatio="xMinYMin meet" />}
             {Array.from({ length: Math.floor(W / 5) + 1 }, (_, i) => (
               <text key={i} x={i * 5} y={-0.25} fontSize={0.6} fill="#94a3b8">{i * 5} م</text>
+            ))}
+            {hereRefs.map((r) => (
+              <g key={r.id} opacity={0.7} pointerEvents="none">
+                <rect x={r.x} y={r.y} width={r.w} height={r.d} rx={0.15} fill="#e2e8f0" stroke="#94a3b8" strokeWidth={0.06} strokeDasharray="0.25 0.18" />
+                <text x={r.x + r.w / 2} y={r.y + r.d / 2} fontSize={Math.min(0.8, r.w / 4)} textAnchor="middle" dominantBaseline="middle" fill="#64748b">{r.code}</text>
+              </g>
             ))}
             {here.map((b) => {
               const c = TONE[b.tone].color;
