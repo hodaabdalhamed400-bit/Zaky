@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/dates";
 import { BRANCH_STATUS_COLOR as STATUS_COLOR, BRANCH_STATUS_LABELS, getBranch } from "@/services/branches.service";
 import { UNIT_STATUS_LABELS } from "@/services/units.service";
 import { getDashboardStats } from "@/services/dashboard.service";
+import { IMPORT_PERMISSIONS } from "@/services/branch-import.service";
 import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader } from "@/components/ui/primitives";
 import { StatCard } from "@/components/ui/stat-card";
 import { OccupancyBreakdown } from "@/components/ui/occupancy";
@@ -29,6 +30,7 @@ export default async function BranchPage({ params, searchParams }: { params: Pro
   const { branch, occupancy, activeContracts, activeContractsValue, unitsByStatus } = data;
   const money = actor.permissions.has("payments.view") ? await getDashboardStats(prisma, actor, { branchId: id }) : null;
   const canEdit = actor.permissions.has("branches.manage");
+  const canImport = IMPORT_PERMISSIONS.every((p) => actor.permissions.has(p)) && branch.status !== "INACTIVE";
   const canFloors = actor.permissions.has("units.manage") && branch.status !== "INACTIVE";
 
   return (
@@ -40,6 +42,7 @@ export default async function BranchPage({ params, searchParams }: { params: Pro
           <>
             <LinkButton href={`/branches/${branch.id}/3d`} icon="cube">المجسم 3D</LinkButton>
             <LinkButton href={`/units?branchId=${branch.id}`} variant="secondary" icon="units">وحدات الفرع</LinkButton>
+            {canImport && <LinkButton href={`/branches/${branch.id}/import`} variant="secondary" icon="receipt">استيراد من Excel</LinkButton>}
             {canEdit && <LinkButton href={`/branches/${branch.id}/edit`}>تعديل</LinkButton>}
           </>
         }
