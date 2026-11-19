@@ -38,6 +38,7 @@ export default async function BranchPage({ params, searchParams }: { params: Pro
         description={[branch.city, branch.address].filter(Boolean).join(" — ") || "العنوان غير مسجل"}
         actions={
           <>
+            <LinkButton href={`/branches/${branch.id}/3d`} icon="cube">المجسم 3D</LinkButton>
             <LinkButton href={`/units?branchId=${branch.id}`} variant="secondary" icon="units">وحدات الفرع</LinkButton>
             {canEdit && <LinkButton href={`/branches/${branch.id}/edit`}>تعديل</LinkButton>}
           </>

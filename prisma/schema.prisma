@@ -388,6 +388,11 @@ model Unit {
   description   String?
   status        UnitStatus    @default(AVAILABLE)
   archivedAt    DateTime?     @map("archived_at") @db.Timestamptz(3)
+  // مكان الوحدة في مخطط الفرع (بالأمتار) — للمجسم ثلاثي الأبعاد؛ فارغ = ترتيب تلقائي
+  layoutX       Decimal?      @map("layout_x") @db.Decimal(7, 2)
+  layoutY       Decimal?      @map("layout_y") @db.Decimal(7, 2)
+  layoutW       Decimal?      @map("layout_w") @db.Decimal(7, 2)
+  layoutD       Decimal?      @map("layout_d") @db.Decimal(7, 2)
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 

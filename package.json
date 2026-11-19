@@ -30,7 +30,8 @@
     "backup:verify": "tsx scripts/verify-restore.ts",
     "admin:reset-password": "tsx scripts/reset-password.ts",
     "test:e2e:bookings": "node tests/e2e/bookings.mjs",
-    "test:e2e:purchases": "node tests/e2e/purchases.mjs"
+    "test:e2e:purchases": "node tests/e2e/purchases.mjs",
+    "test:e2e:branch3d": "node tests/e2e/branch3d.mjs"
   },
   "dependencies": {
     "@node-rs/argon2": "2.0.2",
@@ -42,6 +43,7 @@
     "react-dom": "19.1.1",
     "recharts": "^2.15.4",
     "server-only": "^0.0.1",
+    "three": "0.186.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -50,6 +52,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9",
+    "@types/three": "0.186.0",
     "dotenv": "17.2.2",
     "prisma": "6.19.3",
     "tailwindcss": "4.1.13",

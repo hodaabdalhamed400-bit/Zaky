@@ -67,6 +67,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "unit.update": "تعديل وحدة",
   "unit.status_change": "تغيير حالة وحدة",
   "unit.archive": "أرشفة وحدة",
+  "unit.layout_update": "تعديل مخطط الفرع",
+  "unit.layout_reset": "إعادة المخطط للترتيب التلقائي",
   "unit.restore": "استعادة وحدة",
   "unit_type.create": "إضافة نوع وحدة",
   "unit_type.activate": "تفعيل نوع وحدة",
