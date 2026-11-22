@@ -9,7 +9,7 @@ export type PlanRoom = {
   capacity: number;
   label?: string;
   /** نوع المرفق للمجسم: دورات مياه (الافتراضي) أو ركن قهوة */
-  facility?: "wc" | "coffee";
+  facility?: "wc" | "coffee" | "parking";
   /** اسم الدور في المباني متعددة الأدوار (الأرضي، الأول…) — يُطابَق مع أدوار الفرع المسجلة بالاسم */
   floor?: string;
 };

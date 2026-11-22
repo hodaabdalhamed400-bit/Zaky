@@ -2,7 +2,7 @@
 type Three = typeof import("three");
 type Tex = InstanceType<Three["CanvasTexture"]>;
 
-export type BadgeIcon = "desk" | "people" | "meeting" | "admin" | "water" | "coffee" | "plan" | "hub";
+export type BadgeIcon = "desk" | "people" | "meeting" | "admin" | "water" | "coffee" | "car" | "plan" | "hub";
 
 function canvas(size: number) {
   const c = document.createElement("canvas");
@@ -109,6 +109,11 @@ export function createTextures(THREE: Three) {
         x.beginPath(); x.moveTo(84, 112); x.lineTo(156, 112); x.lineTo(148, 168); x.quadraticCurveTo(146, 176, 136, 176); x.lineTo(104, 176); x.quadraticCurveTo(94, 176, 92, 168); x.closePath(); x.stroke();
         x.beginPath(); x.arc(162, 134, 14, -Math.PI / 2, Math.PI / 2); x.stroke();
         for (const sx of [106, 126]) { x.beginPath(); x.moveTo(sx, 98); x.quadraticCurveTo(sx - 8, 88, sx, 78); x.stroke(); }
+        break;
+      case "car": // سيارة
+        x.beginPath(); x.moveTo(78, 150); x.lineTo(84, 124); x.lineTo(104, 100); x.lineTo(152, 100); x.lineTo(172, 124); x.lineTo(178, 150); x.closePath(); x.stroke();
+        x.beginPath(); x.moveTo(72, 150); x.lineTo(184, 150); x.stroke();
+        for (const cx of [100, 156]) { x.beginPath(); x.arc(cx, 156, 12, 0, Math.PI * 2); x.fill(); }
         break;
       case "water": // قطرة
         x.beginPath();

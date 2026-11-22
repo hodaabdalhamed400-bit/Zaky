@@ -27,7 +27,7 @@ const ROOM_LIGHT: Record<SceneTone, [number, number] | null> = {
 };
 
 const iconFor = (u: SceneUnit): BadgeIcon =>
-  u.kind === "facility" ? (u.typeKey === "COFFEE" ? "coffee" : "water") : u.kind === "plan" ? "plan" : u.typeKey === "MEETING_ROOM" ? "meeting" : u.typeKey === "SHARED_OFFICE" ? "people" : u.typeKey === "ADMIN_SPACE" ? "admin" : "desk";
+  u.kind === "facility" ? (u.typeKey === "COFFEE" ? "coffee" : u.typeKey === "PARKING" ? "car" : "water") : u.kind === "plan" ? "plan" : u.typeKey === "MEETING_ROOM" ? "meeting" : u.typeKey === "SHARED_OFFICE" ? "people" : u.typeKey === "ADMIN_SPACE" ? "admin" : "desk";
 
 const OUTFITS: Outfit[] = ["thobe", "abaya", "thobe", "casual", "abaya", "thobe", "abaya", "casual"];
 
@@ -336,6 +336,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           // أرضية الغرفة: خشب دافئ للمكاتب، داكنة للغرف غير المسجلة
           const floorMat =
             ghost ? new THREE.MeshStandardMaterial({ color: day ? 0xe4dbcf : 0x1a2536, roughness: 0.9, emissive: tone, emissiveIntensity: 0 })
+            : u.typeKey === "PARKING" ? new THREE.MeshStandardMaterial({ color: day ? 0x9a9ca1 : 0x2a2f38, roughness: 0.95, emissive: tone, emissiveIntensity: 0 })
             : u.kind === "facility" ? new THREE.MeshStandardMaterial({ color: day ? 0xe6e4e0 : 0x5d6b7e, roughness: 0.5, emissive: tone, emissiveIntensity: 0 })
             : new THREE.MeshStandardMaterial({ map: day ? tex.woodLight : tex.wood, color: u.typeKey === "MEETING_ROOM" ? (day ? 0xf2e6d6 : 0xd8c2a8) : 0xffffff, roughness: 0.65, emissive: tone, emissiveIntensity: 0 });
           const tile = box(u.w - 0.12, 0.06, u.d - 0.12, floorMat);
@@ -432,7 +433,47 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
             g.add(p.root);
             seated.push(p);
           };
-          if (u.kind === "facility" && u.typeKey === "COFFEE") {
+          if (u.typeKey === "PARKING") {
+            // باركينج: مواقف بخطوط بيضاء على صفّين أو أكثر، وسيارات بألوان مختلفة في أغلبها
+            const bay = 2.6;
+            const deep = 5;
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xf5f5f0 });
+            const rows: { z: number; flip: boolean }[] = [{ z: -u.d / 2 + 0.3 + deep / 2, flip: false }, { z: u.d / 2 - 0.3 - deep / 2, flip: true }];
+            if (u.d > 2 * deep + 6 + 2 * deep) rows.push({ z: -deep / 2 - 0.05, flip: true }, { z: deep / 2 + 0.05, flip: false });
+            let seed = 7;
+            const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+            const carColors = [0xf4f4f2, 0x1f2329, 0x9aa1aa, 0x6b7280, 0xb91c1c, 0x1e3a8a, 0xe7dcc8, 0x0f172a];
+            const carGeo = { body: new THREE.BoxGeometry(1.8, 0.62, 4.3), cabin: new THREE.BoxGeometry(1.6, 0.52, 2.3), wheel: new THREE.CylinderGeometry(0.34, 0.34, 0.22, 14) };
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15, metalness: 0.5 });
+            const tyreMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+            const n = Math.floor((u.w - 1) / bay);
+            for (const row of rows) {
+              for (let i = 0; i <= n; i++) {
+                const x = -u.w / 2 + 0.5 + i * bay;
+                const ln = new THREE.Mesh(new THREE.PlaneGeometry(0.1, deep), lineMat);
+                ln.rotation.x = -Math.PI / 2;
+                ln.position.set(x, 0.07, row.z);
+                g.add(ln);
+                if (i === n || rnd() > 0.78) continue;
+                const car = new THREE.Group();
+                const paint = new THREE.MeshStandardMaterial({ color: carColors[Math.floor(rnd() * carColors.length)]!, roughness: 0.35, metalness: 0.4 });
+                const body = new THREE.Mesh(carGeo.body, paint);
+                body.position.y = 0.58;
+                const cabin = new THREE.Mesh(carGeo.cabin, glassMat);
+                cabin.position.set(0, 1.12, -0.2);
+                car.add(body, cabin);
+                for (const [wx, wz] of [[-0.88, 1.35], [0.88, 1.35], [-0.88, -1.35], [0.88, -1.35]] as const) {
+                  const w = new THREE.Mesh(carGeo.wheel, tyreMat);
+                  w.rotation.z = Math.PI / 2;
+                  w.position.set(wx, 0.34, wz);
+                  car.add(w);
+                }
+                car.position.set(x + bay / 2, 0, row.z);
+                car.rotation.y = row.flip ? Math.PI : 0;
+                g.add(car);
+              }
+            }
+          } else if (u.kind === "facility" && u.typeKey === "COFFEE") {
             // ركن القهوة: كاونتر بماكينة قهوة وأكواب، وطاولة صغيرة بكرسيين
             const along = u.d >= u.w; // الكاونتر على الضلع الأطول
             const len = Math.min(3, (along ? u.d : u.w) - 0.6);
