@@ -18,18 +18,18 @@ export function createTextures(THREE: Three) {
     return t;
   };
 
-  /** بلاط داكن بخطوط رفيعة (2م لكل بلاطة) */
-  const tiles = (() => {
+  /** بلاط بخطوط رفيعة (2م لكل بلاطة): داكن لليلي، رخامي فاتح للنهاري */
+  const makeTiles = (light: boolean) => {
     const [c, x] = canvas(256);
-    x.fillStyle = "#101a28";
+    x.fillStyle = light ? "#e9e1d6" : "#101a28";
     x.fillRect(0, 0, 256, 256);
     for (let i = 0; i < 4; i++)
       for (let j = 0; j < 4; j++) {
-        const v = 16 + ((i * 7 + j * 3) % 5);
-        x.fillStyle = `rgb(${v},${v + 10},${v + 24})`;
+        const v = (i * 7 + j * 3) % 5;
+        x.fillStyle = light ? `rgb(${236 - v * 2},${228 - v * 2},${216 - v * 2})` : `rgb(${16 + v},${26 + v},${40 + v})`;
         x.fillRect(i * 64 + 1, j * 64 + 1, 62, 62);
       }
-    x.strokeStyle = "#1e3048";
+    x.strokeStyle = light ? "#d6cbbc" : "#1e3048";
     x.lineWidth = 2;
     for (let i = 0; i <= 256; i += 64) {
       x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 256); x.stroke();
@@ -38,14 +38,16 @@ export function createTextures(THREE: Three) {
     const t = wrap(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
-  })();
+  };
+  const tiles = makeTiles(false);
+  const tilesLight = makeTiles(true);
 
-  /** أرضية خشبية دافئة */
-  const wood = (() => {
+  /** أرضية خشبية: دافئة لليلي، بلوط فاتح للنهاري */
+  const makeWood = (base: [number, number, number]) => {
     const [c, x] = canvas(256);
     for (let r = 0; r < 16; r++) {
       const shade = 0.82 + ((r * 37) % 11) / 55;
-      x.fillStyle = `rgb(${Math.round(150 * shade)},${Math.round(108 * shade)},${Math.round(74 * shade)})`;
+      x.fillStyle = `rgb(${Math.min(255, Math.round(base[0] * shade))},${Math.min(255, Math.round(base[1] * shade))},${Math.min(255, Math.round(base[2] * shade))})`;
       x.fillRect(0, r * 16, 256, 16);
       x.fillStyle = "rgba(40,24,12,.35)";
       x.fillRect(0, r * 16, 256, 1);
@@ -58,7 +60,9 @@ export function createTextures(THREE: Three) {
     const t = wrap(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     return t;
-  })();
+  };
+  const wood = makeWood([150, 108, 74]);
+  const woodLight = makeWood([226, 196, 158]);
 
   /** بقعة ضوء ناعمة (للإضاءة على الأرض والظلال) */
   const glow = (() => {
@@ -126,18 +130,18 @@ export function createTextures(THREE: Three) {
 
   const badgeCache = new Map<string, Tex>();
   /** شارة دائرية متوهجة بلون الحالة وأيقونة النوع */
-  const badge = (color: string, icon: BadgeIcon) => {
-    const key = color + icon;
+  const badge = (color: string, icon: BadgeIcon, light = false) => {
+    const key = color + icon + light;
     const hit = badgeCache.get(key);
     if (hit) return hit;
     const [c, x] = canvas(256);
     const halo = x.createRadialGradient(128, 128, 60, 128, 128, 128);
-    halo.addColorStop(0, color + "99");
+    halo.addColorStop(0, color + (light ? "40" : "99"));
     halo.addColorStop(1, color + "00");
     x.fillStyle = halo;
     x.fillRect(0, 0, 256, 256);
     x.beginPath(); x.arc(128, 128, 86, 0, Math.PI * 2);
-    x.fillStyle = "rgba(6,14,26,.92)";
+    x.fillStyle = light ? "rgba(255,252,247,.96)" : "rgba(6,14,26,.92)";
     x.fill();
     x.lineWidth = 9;
     x.strokeStyle = color;
@@ -146,11 +150,11 @@ export function createTextures(THREE: Three) {
     x.lineWidth = 2;
     x.strokeStyle = color + "88";
     x.stroke();
-    drawIcon(x, icon, "#ffffff");
+    drawIcon(x, icon, light ? color : "#ffffff");
     const t = wrap(c);
     badgeCache.set(key, t);
     return t;
   };
 
-  return { tiles, wood, glow, badge, all: () => [tiles, wood, glow, ...badgeCache.values()] };
+  return { tiles, tilesLight, wood, woodLight, glow, badge, all: () => [tiles, tilesLight, wood, woodLight, glow, ...badgeCache.values()] };
 }

@@ -48,6 +48,14 @@ try {
   }
   check("المرور على مكتب يعرض بطاقة تفاصيله", tip);
   await page.screenshot({ path: `${OUT}/b3d-scene.png` });
+  check("العرض النهاري افتراضي", (await page.getAttribute("[data-branch-3d]", "data-theme")) === "day");
+  await page.click("[data-theme-toggle]");
+  await page.waitForSelector("[data-branch-3d][data-theme=night] canvas", { timeout: 20000 });
+  await page.waitForTimeout(2500);
+  check("التبديل إلى العرض الليلي يعيد بناء المجسم", (await page.locator("[data-branch-3d] canvas").count()) === 1);
+  await page.screenshot({ path: `${OUT}/b3d-night.png` });
+  await page.click("[data-theme-toggle]");
+  await page.waitForSelector("[data-branch-3d][data-theme=day] canvas", { timeout: 20000 });
 
   await page.click("a:has-text('محرر المخطط')");
   await page.waitForURL(/\/layout$/);

@@ -6,10 +6,10 @@ import { TONE } from "./tones";
 import { createPeopleKit, poseSeated, poseWalk, type Outfit, type Person } from "./people";
 import { createTextures, type BadgeIcon } from "./textures";
 
-const WALL_H = 2.6;
+const WALL_H_NIGHT = 2.6;
 const FLOOR_GAP = 9;
-const NET_Y = WALL_H + 1.05; // ارتفاع شبكة الربط والشارات فوق الغرف
-const BG = 0x050b16;
+const BG_NIGHT = 0x050b16;
+const BG_DAY = 0xefe7dc;
 
 type Hover = { unit: SceneUnit; x: number; y: number } | null;
 
@@ -39,6 +39,21 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
   const [hover, setHover] = useState<Hover>(null);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  // نهاري (الافتراضي، مثل مجسمات التصميم الداخلي) أو ليلي (إضاءة وشبكة متوهجة)
+  const [theme, setTheme] = useState<"day" | "night">("day");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("zaki.b3d.theme") === "night") setTheme("night");
+    } catch {}
+  }, []);
+  const switchTheme = () => {
+    const next = theme === "day" ? "night" : "day";
+    setReady(false);
+    setTheme(next);
+    try {
+      localStorage.setItem("zaki.b3d.theme", next);
+    } catch {}
+  };
   const floorsKey = useMemo(() => JSON.stringify(floors.map((f) => f.units.map((u) => [u.id, u.x, u.y, u.w, u.d, u.tone, u.bookedNow, u.occupiedSeats]))), [floors]);
 
   useEffect(() => {
@@ -54,6 +69,10 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       type Mesh = InstanceType<typeof THREE.Mesh>;
       type Group = InstanceType<typeof THREE.Group>;
       type Material = InstanceType<typeof THREE.Material>;
+      const day = theme === "day";
+      const WALL_H = day ? 1.25 : WALL_H_NIGHT; // النهاري: جدران مقطوعة ليظهر الداخل
+      const NET_Y = WALL_H + 1.05; // ارتفاع الشارات (والشبكة في الليلي) فوق الغرف
+      const BG = day ? BG_DAY : BG_NIGHT;
 
       let renderer: InstanceType<typeof THREE.WebGLRenderer>;
       try {
@@ -68,7 +87,9 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       renderer.setPixelRatio(pr);
       renderer.setSize(W(), H());
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.1;
+      renderer.toneMappingExposure = day ? 1.0 : 1.1;
+      renderer.shadowMap.enabled = day;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.domElement.setAttribute("aria-hidden", "true");
       el.appendChild(renderer.domElement);
 
@@ -88,14 +109,22 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       const camera = new THREE.PerspectiveCamera(40, W() / H(), 0.1, 500);
 
       // ── إضاءة ليلية: سماء زرقاء خافتة + ضوء قمر + أضواء داخلية دافئة ──
-      scene.add(new THREE.HemisphereLight(0x5577aa, 0x0a0f18, 1.0));
-      const moon = new THREE.DirectionalLight(0xa9c4ff, 0.9);
+      scene.add(day ? new THREE.HemisphereLight(0xfff4e6, 0xb89a7a, 1.15) : new THREE.HemisphereLight(0x5577aa, 0x0a0f18, 1.0));
+      // النهاري: شمس دافئة بظلال ناعمة · الليلي: ضوء قمر بارد
+      const moon = day ? new THREE.DirectionalLight(0xffe9cc, 3.2) : new THREE.DirectionalLight(0xa9c4ff, 0.9);
+      if (day) {
+        moon.castShadow = true;
+        moon.shadow.mapSize.set(2048, 2048);
+        moon.shadow.bias = -0.0004;
+        moon.shadow.normalBias = 0.02;
+        moon.shadow.radius = 4;
+      }
       scene.add(moon);
       scene.add(moon.target);
 
       // التوهج (Bloom): إن تعذّر نرسم مباشرة
       let composer: { render: () => void; setSize: (w: number, h: number) => void; dispose?: () => void } | null = null;
-      try {
+      if (!day) try {
         const { EffectComposer } = await import("three/examples/jsm/postprocessing/EffectComposer.js");
         const { RenderPass } = await import("three/examples/jsm/postprocessing/RenderPass.js");
         const { UnrealBloomPass } = await import("three/examples/jsm/postprocessing/UnrealBloomPass.js");
@@ -118,15 +147,21 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
       // ── مواد مشتركة ──
       const mat = {
-        wood: new THREE.MeshStandardMaterial({ color: 0x9a6e4c, roughness: 0.55 }),
-        dark: new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.5, metalness: 0.4 }),
-        chair: new THREE.MeshStandardMaterial({ color: 0x2b3442, roughness: 0.8 }),
-        sofa: new THREE.MeshStandardMaterial({ color: 0x6b4f3a, roughness: 0.9 }),
+        wood: new THREE.MeshStandardMaterial({ color: day ? 0xcfa77c : 0x9a6e4c, roughness: 0.55 }),
+        dark: new THREE.MeshStandardMaterial({ color: day ? 0x8a6a4c : 0x1f2937, roughness: 0.5, metalness: day ? 0.1 : 0.4 }),
+        chair: new THREE.MeshStandardMaterial({ color: day ? 0xeee4d6 : 0x2b3442, roughness: 0.85 }),
+        sofa: new THREE.MeshStandardMaterial({ color: day ? 0xf1e9de : 0x6b4f3a, roughness: 0.9 }),
+        sage: new THREE.MeshStandardMaterial({ color: 0x9aa878, roughness: 0.85 }),
+        rug: new THREE.MeshStandardMaterial({ color: 0xe3d5c1, roughness: 1 }),
+        wallDay: new THREE.MeshStandardMaterial({ color: 0xf7f2ec, roughness: 0.92 }),
+        wallCap: new THREE.MeshStandardMaterial({ color: 0xfffcf8, roughness: 0.8 }),
+        lampGlow: new THREE.MeshBasicMaterial({ color: bright(0xffd49a, 1.4), toneMapped: false }),
+        lampShade: new THREE.MeshStandardMaterial({ color: 0xf8ecd8, roughness: 0.6, emissive: 0xffc77a, emissiveIntensity: 0.6 }),
         leaf: new THREE.MeshStandardMaterial({ color: 0x2f8f5f, roughness: 0.9 }),
         pot: new THREE.MeshStandardMaterial({ color: 0xd9d4cc, roughness: 0.7 }),
-        slab: new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex.tiles, roughness: 0.6, metalness: 0.15 }),
-        slabEdge: new THREE.MeshStandardMaterial({ color: 0x0c1a2c, roughness: 0.6 }),
-        screenOff: new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.3 }),
+        slab: new THREE.MeshStandardMaterial({ color: 0xffffff, map: day ? tex.tilesLight : tex.tiles, roughness: day ? 0.75 : 0.6, metalness: day ? 0 : 0.15 }),
+        slabEdge: new THREE.MeshStandardMaterial({ color: day ? 0xf4eee6 : 0x0c1a2c, roughness: 0.6 }),
+        screenOff: new THREE.MeshStandardMaterial({ color: day ? 0x3a3f47 : 0x0b1220, roughness: 0.3 }),
         screenOn: new THREE.MeshBasicMaterial({ color: bright(0x7dd3fc, 1.6), toneMapped: false }),
         net: new THREE.MeshBasicMaterial({ color: bright(0x22d3ee, 1.35), toneMapped: false, transparent: true, opacity: 0 }),
         netDim: new THREE.MeshBasicMaterial({ color: bright(0x38bdf8, 0.9), toneMapped: false, transparent: true, opacity: 0 }),
@@ -223,22 +258,47 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
         // أرضية بلاط داكنة بحافة متوهجة
         const slab = box(maxW + 4, 0.3, maxD + 4, mat.slab);
-        tex.tiles.repeat.set((maxW + 4) / 8, (maxD + 4) / 8);
+        (day ? tex.tilesLight : tex.tiles).repeat.set((maxW + 4) / 8, (maxD + 4) / 8);
         slab.position.set(0, -0.15, 0);
         fg.add(slab);
         const edge = box(maxW + 4.2, 0.12, maxD + 4.2, mat.slabEdge);
         edge.position.y = -0.33;
         fg.add(edge);
-        fg.add(rect(maxW + 4, maxD + 4, 0.01, mat.edge));
+        if (!day) fg.add(rect(maxW + 4, maxD + 4, 0.01, mat.edge));
+        else {
+          // سور خارجي أبيض بزوايا مستديرة يؤطر المبنى مثل مجسمات التصميم الداخلي
+          const OW = maxW + 4;
+          const OD = maxD + 4;
+          const th = 0.3;
+          const hh = WALL_H * 0.85;
+          for (const [w, d, x, z] of [
+            [OW - 1.2, th, 0, -OD / 2],
+            [OW - 1.2, th, 0, OD / 2],
+            [th, OD - 1.2, -OW / 2, 0],
+            [th, OD - 1.2, OW / 2, 0],
+          ] as const) {
+            const wall = box(w, hh, d, mat.wallDay);
+            wall.position.set(x, hh / 2, z);
+            fg.add(wall);
+          }
+          for (const [x, z, a] of [[-1, -1, Math.PI], [1, -1, Math.PI * 1.5], [1, 1, 0], [-1, 1, Math.PI / 2]] as const) {
+            const corner = new THREE.Mesh(new THREE.CylinderGeometry(0.6 + th / 2, 0.6 + th / 2, hh, 20, 1, true, a, Math.PI / 2), mat.wallDay);
+            corner.position.set(x * (OW / 2 - 0.6), hh / 2, z * (OD / 2 - 0.6));
+            (corner.material as Material).side = THREE.DoubleSide;
+            fg.add(corner);
+          }
+        }
 
-        for (let i = 0; i < lightsPerFloor; i++) {
+        for (let i = 0; i < (day ? 0 : lightsPerFloor); i++) {
           const l = new THREE.PointLight(0xffb36b, 34, Math.max(14, maxW / lightsPerFloor + 6), 1.6);
           l.position.set(ox + (maxW * (i + 0.5)) / lightsPerFloor, 2.3, 0);
           fg.add(l);
         }
 
         const floorLabel = document.createElement("div");
-        floorLabel.className = "rounded-full bg-slate-950/80 px-3 py-1 text-xs font-bold text-cyan-100 shadow-lg ring-1 ring-cyan-300/30 backdrop-blur";
+        floorLabel.className = day
+          ? "rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-[#5b4636] shadow-md ring-1 ring-black/5"
+          : "rounded-full bg-slate-950/80 px-3 py-1 text-xs font-bold text-cyan-100 shadow-lg ring-1 ring-cyan-300/30 backdrop-blur";
         floorLabel.textContent = floor.name;
         const fl = new CSS2DObject(floorLabel);
         fl.position.set(-maxW / 2 - 1, 0.4, maxD / 2 + 1.6);
@@ -275,20 +335,31 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
           // أرضية الغرفة: خشب دافئ للمكاتب، داكنة للغرف غير المسجلة
           const floorMat =
-            ghost ? new THREE.MeshStandardMaterial({ color: 0x1a2536, roughness: 0.9, emissive: tone, emissiveIntensity: 0 })
-            : u.kind === "facility" ? new THREE.MeshStandardMaterial({ color: 0x5d6b7e, roughness: 0.5, emissive: tone, emissiveIntensity: 0 })
-            : new THREE.MeshStandardMaterial({ map: tex.wood, color: u.typeKey === "MEETING_ROOM" ? 0xd8c2a8 : 0xffffff, roughness: 0.65, emissive: tone, emissiveIntensity: 0 });
+            ghost ? new THREE.MeshStandardMaterial({ color: day ? 0xe4dbcf : 0x1a2536, roughness: 0.9, emissive: tone, emissiveIntensity: 0 })
+            : u.kind === "facility" ? new THREE.MeshStandardMaterial({ color: day ? 0xe6e4e0 : 0x5d6b7e, roughness: 0.5, emissive: tone, emissiveIntensity: 0 })
+            : new THREE.MeshStandardMaterial({ map: day ? tex.woodLight : tex.wood, color: u.typeKey === "MEETING_ROOM" ? (day ? 0xf2e6d6 : 0xd8c2a8) : 0xffffff, roughness: 0.65, emissive: tone, emissiveIntensity: 0 });
           const tile = box(u.w - 0.12, 0.06, u.d - 0.12, floorMat);
           tile.position.y = 0.03;
           tile.userData.unitId = u.id;
           g.add(tile);
           pickables.push(tile);
-          // خط الحالة المضيء حول أرضية الغرفة
-          g.add(rect(u.w - 0.2, u.d - 0.2, 0.075, new THREE.LineBasicMaterial({ color: tone.clone().multiplyScalar(ghost ? 0.5 : 1.8), toneMapped: false, transparent: ghost, opacity: ghost ? 0.5 : 1 })));
+          // خط الحالة المضيء حول أرضية الغرفة (الليلي) · سجادة ناعمة تحت الأثاث (النهاري)
+          if (!day) g.add(rect(u.w - 0.2, u.d - 0.2, 0.075, new THREE.LineBasicMaterial({ color: tone.clone().multiplyScalar(ghost ? 0.5 : 1.8), toneMapped: false, transparent: ghost, opacity: ghost ? 0.5 : 1 })));
+          else if (!ghost && u.kind !== "facility" && u.w > 2 && u.d > 2) {
+            const rug = u.typeKey === "MEETING_ROOM" || u.typeKey === "ADMIN_SPACE"
+              ? new THREE.Mesh(new THREE.CircleGeometry(Math.min(u.w, u.d) * 0.38, 40), mat.rug)
+              : new THREE.Mesh(new THREE.PlaneGeometry(u.w * 0.72, u.d * 0.62), mat.rug);
+            rug.rotation.x = -Math.PI / 2;
+            rug.position.y = 0.065;
+            rug.receiveShadow = true;
+            g.add(rug);
+          }
 
           // جدران زجاجية داكنة بحافة علوية مضيئة وفتحة باب في الواجهة
-          const glass = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x1a2b42).lerp(tone, 0.18), transparent: true, opacity: ghost ? 0.1 : 0.3, roughness: 0.1, metalness: 0.3, depthWrite: false });
-          const t = 0.06;
+          const glass = day
+            ? ghost ? new THREE.MeshStandardMaterial({ color: 0xf7f2ec, roughness: 0.92, transparent: true, opacity: 0.55 }) : mat.wallDay
+            : new THREE.MeshStandardMaterial({ color: new THREE.Color(0x1a2b42).lerp(tone, 0.18), transparent: true, opacity: ghost ? 0.1 : 0.3, roughness: 0.1, metalness: 0.3, depthWrite: false });
+          const t = day ? 0.16 : 0.06;
           const door = Math.min(1.1, u.w * 0.35);
           const walls: [number, number, number, number][] = [
             [u.w, t, 0, -u.d / 2],
@@ -304,14 +375,37 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
             g.add(wall);
             pickables.push(wall);
           }
-          const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(u.w, WALL_H, u.d)), new THREE.LineBasicMaterial({ color: tone, transparent: true, opacity: ghost ? 0.15 : 0.3 }));
-          frame.position.y = WALL_H / 2;
-          g.add(frame);
-          g.add(rect(u.w, u.d, WALL_H, new THREE.LineBasicMaterial({ color: tone.clone().multiplyScalar(ghost ? 0.45 : 1.5), toneMapped: false, transparent: ghost, opacity: ghost ? 0.5 : 1 })));
+          if (!day) {
+            const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(u.w, WALL_H, u.d)), new THREE.LineBasicMaterial({ color: tone, transparent: true, opacity: ghost ? 0.15 : 0.3 }));
+            frame.position.y = WALL_H / 2;
+            g.add(frame);
+            g.add(rect(u.w, u.d, WALL_H, new THREE.LineBasicMaterial({ color: tone.clone().multiplyScalar(ghost ? 0.45 : 1.5), toneMapped: false, transparent: ghost, opacity: ghost ? 0.5 : 1 })));
+          } else if (!ghost) {
+            // خط رفيع بلون الحالة على حافة الجدار المقطوعة — الحالة تبقى واضحة دون أن تطغى على التصميم
+            g.add(rect(u.w - t, u.d - t, WALL_H + 0.005, new THREE.LineBasicMaterial({ color: tone })));
+          }
 
           // ضوء الغرفة: بقعة على الأرض + مصباح معلّق متوهج
           const light = ROOM_LIGHT[u.tone];
-          if (light && !ghost) {
+          if (day && light && !ghost && u.kind !== "facility") {
+            // أباجورة دافئة في زاوية الغرفة (مثل الصورة المرجعية)
+            const lamp = new THREE.Group();
+            const stand = box(0.35, 0.5, 0.35, mat.wood);
+            stand.position.y = 0.25;
+            const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.22, 16), mat.lampShade);
+            shade.position.y = 0.62;
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), mat.lampGlow);
+            bulb.position.y = 0.58;
+            lamp.add(stand, shade, bulb);
+            lamp.position.set(-u.w / 2 + 0.38, 0, -u.d / 2 + 0.38);
+            g.add(lamp);
+            if (u.tone !== "available") {
+              const pl = pool(0xffc98a, Math.min(3.2, Math.min(u.w, u.d) * 0.9), 0.22);
+              pl.position.set(-u.w / 2 + 0.6, 0.07, -u.d / 2 + 0.6);
+              g.add(pl);
+            }
+          }
+          if (!day && light && !ghost) {
             const [lc, li] = light;
             const k = u.bookedNow ? 1.25 : li;
             const pl = pool(lc, Math.min(7, Math.max(u.w, u.d) * 1.05), 0.36 * k);
@@ -327,7 +421,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
           // الأثاث والأشخاص الجالسون
           const rented = u.tone === "rented" || u.tone === "expiring" || u.tone === "partial";
-          const seatMat = new THREE.MeshStandardMaterial({ color: tone.clone().lerp(new THREE.Color(0x222831), 0.45), roughness: 0.7 });
+          const seatMat = day ? mat.sage : new THREE.MeshStandardMaterial({ color: tone.clone().lerp(new THREE.Color(0x222831), 0.45), roughness: 0.7 });
           const seat = (x: number, z: number, rotY: number, scale = 1) => {
             if (seatedBudget <= 0 || scale < 0.75) return;
             seatedBudget--;
@@ -341,8 +435,9 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           if (u.kind === "facility") {
             const n = Math.max(2, Math.floor(u.w / 1.1));
             for (let i = 0; i < n; i++) {
-              const stall = box(0.06, 1.8, Math.min(1.6, u.d * 0.4), mat.pot);
-              stall.position.set(-u.w / 2 + (u.w / n) * i + 0.05, 0.9, u.d / 2 - Math.min(1.6, u.d * 0.4) / 2 - 0.1);
+              const sh = Math.min(1.8, WALL_H - 0.05);
+              const stall = box(0.06, sh, Math.min(1.6, u.d * 0.4), mat.pot);
+              stall.position.set(-u.w / 2 + (u.w / n) * i + 0.05, sh / 2, u.d / 2 - Math.min(1.6, u.d * 0.4) / 2 - 0.1);
               g.add(stall);
             }
             const sinks = box(Math.min(u.w * 0.7, 6), 0.85, 0.5, mat.pot);
@@ -369,8 +464,8 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
               g.add(c);
               if (u.bookedNow && idx % 2 === 0) seat(x, z, row < 0 ? 0 : Math.PI);
             }
-            const tv = box(Math.min(2.2, u.w * 0.5), 1.1, 0.06, u.bookedNow ? mat.screenOn : mat.screenOff);
-            tv.position.set(0, 1.5, -u.d / 2 + 0.1);
+            const tv = box(Math.min(2.2, u.w * 0.5), day ? 0.55 : 1.1, 0.06, u.bookedNow ? mat.screenOn : mat.screenOff);
+            tv.position.set(0, day ? 0.95 : 1.5, -u.d / 2 + (day ? 0.16 : 0.1));
             g.add(tv);
           } else if (u.typeKey === "ADMIN_SPACE") {
             const sofa = box(Math.min(2.4, u.w * 0.55), 0.45, 0.8, mat.sofa);
@@ -420,7 +515,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
           // الشارة الدائرية المتوهجة فوق الغرفة
           const badge = new THREE.Sprite(
-            new THREE.SpriteMaterial({ map: tex.badge(TONE[u.tone].color, iconFor(u)), transparent: true, depthWrite: false, toneMapped: false, color: ghost ? 0x8899aa : bright(0xffffff, 1.35), opacity: ghost ? 0.55 : 1 }),
+            new THREE.SpriteMaterial({ map: tex.badge(TONE[u.tone].color, iconFor(u), day), transparent: true, depthWrite: false, toneMapped: false, color: ghost ? 0x8899aa : day ? 0xffffff : bright(0xffffff, 1.35), opacity: ghost ? 0.55 : 1 }),
           );
           const bs = ghost ? 0.85 : u.kind === "facility" ? 0.95 : 1.15;
           badge.scale.set(bs, bs, 1);
@@ -441,7 +536,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
           if (Math.abs(cz - lz) > 0.3) net.add(segment(node, junction, ghost ? mat.netDim : mat.net));
           laneSpan[li] = [Math.min(laneSpan[li]![0], cx), Math.max(laneSpan[li]![1], cx)];
           const hub = new THREE.Vector3(0, NET_Y, laneZ[0]!);
-          if (!ghost && !reduce) {
+          if (!ghost && !reduce && !day) {
             const pts = [node, junction, new THREE.Vector3(0, NET_Y, lz)];
             if (li !== 0) pts.push(hub);
             let len = 0;
@@ -456,19 +551,21 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
           // اسم الوحدة والمستأجر
           const tag = document.createElement("div");
-          tag.className = "pointer-events-none select-none whitespace-nowrap rounded-md bg-slate-950/75 px-2 py-0.5 text-center text-[11px] leading-tight text-white shadow-lg ring-1 ring-cyan-300/25 backdrop-blur-sm";
+          tag.className = day
+            ? "pointer-events-none select-none whitespace-nowrap rounded-md bg-white/90 px-2 py-0.5 text-center text-[11px] leading-tight text-[#4a3a2c] shadow-md ring-1 ring-black/5"
+            : "pointer-events-none select-none whitespace-nowrap rounded-md bg-slate-950/75 px-2 py-0.5 text-center text-[11px] leading-tight text-white shadow-lg ring-1 ring-cyan-300/25 backdrop-blur-sm";
           const code = document.createElement("b");
           code.textContent = u.code;
           code.style.color = TONE[u.tone].color;
           tag.appendChild(code);
           if (u.kind === "plan") {
             const sub = document.createElement("span");
-            sub.className = "block text-[10px] text-slate-400";
+            sub.className = day ? "block text-[10px] text-[#9a8775]" : "block text-[10px] text-slate-400";
             sub.textContent = "غير مسجلة";
             tag.appendChild(sub);
           } else if (u.tenants[0]) {
             const sub = document.createElement("span");
-            sub.className = "block max-w-36 truncate text-[10px] text-slate-200";
+            sub.className = day ? "block max-w-36 truncate text-[10px] text-[#7a6552]" : "block max-w-36 truncate text-[10px] text-slate-200";
             sub.textContent = u.tenants[0];
             tag.appendChild(sub);
           }
@@ -497,6 +594,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
         hub.renderOrder = 3;
         net.add(hub);
         hubs.push(hub);
+        net.visible = !day; // الشبكة المتوهجة للوضع الليلي فقط
 
         // مشاة يتحركون بهدوء في الممرات ويدخلون بعض المكاتب
         const people = Math.min(10, Math.max(3, Math.round(floor.units.length / 4)));
@@ -612,6 +710,27 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       camera.position.copy(startPos);
       placeCamera(reduce);
       moon.position.set(-span * 0.6, span * 1.4 + 20, span * 0.8);
+      if (day) {
+        moon.position.set(-span * 0.75, span * 0.85 + 10, span * 0.45); // شمس مائلة: ظلال أطول وأوضح
+        scene.fog = new THREE.Fog(BG, span * 3 + 40, span * 7 + 140);
+        const sc = moon.shadow.camera;
+        const half = span / 2 + 4;
+        sc.left = -half;
+        sc.right = half;
+        sc.top = half;
+        sc.bottom = -half;
+        sc.near = 1;
+        sc.far = span * 4 + 80;
+        sc.updateProjectionMatrix();
+        // الظلال: كل الأثاث والجدران تُلقي ظلًا، والأرضيات تستقبله
+        scene.traverse((o) => {
+          const m = o as Mesh;
+          if (!m.isMesh) return;
+          const mm = m.material as Material;
+          m.receiveShadow = true;
+          m.castShadow = !mm.transparent && m.geometry.type !== "PlaneGeometry" && m.geometry.type !== "CircleGeometry";
+        });
+      }
 
       let intro = reduce ? 1 : 0;
       let introStart = 0;
@@ -764,7 +883,7 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- يُعاد البناء فقط عند تغير بيانات المشهد
-  }, [floorsKey]);
+  }, [floorsKey, theme]);
 
 
   useEffect(() => {
@@ -780,24 +899,37 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
 
   const u = hover?.unit;
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-[#050b16] ring-1 ring-cyan-400/20" style={{ height }} data-branch-3d>
+    <div className={theme === "day" ? "relative overflow-hidden rounded-2xl bg-[#efe7dc] ring-1 ring-[#d9cbb8]" : "relative overflow-hidden rounded-2xl bg-[#050b16] ring-1 ring-cyan-400/20"} style={{ height }} data-branch-3d data-theme={theme}>
       <div ref={host} className="absolute inset-0" />
       {!ready && (
-        <div className="absolute inset-0 grid place-items-center text-sm text-brand-100" role="status">
+        <div className={`absolute inset-0 grid place-items-center text-sm ${theme === "day" ? "text-[#7a6552]" : "text-brand-100"}`} role="status">
           <span className="flex items-center gap-2"><span className="size-4 animate-spin rounded-full border-2 border-accent-300 border-t-transparent" />جارٍ بناء المجسم…</span>
         </div>
       )}
 
       {floors.length > 1 && (
-        <div className="absolute start-4 top-4 flex flex-wrap gap-1.5 rounded-xl bg-white/10 p-1 text-xs ring-1 ring-white/15 backdrop-blur" role="tablist" aria-label="الأدوار">
+        <div className={`absolute start-4 top-4 flex flex-wrap gap-1.5 rounded-xl p-1 text-xs ring-1 backdrop-blur ${theme === "day" ? "bg-white/70 ring-black/5 [&_button:not([aria-selected=true])]:text-[#5b4636]" : "bg-white/10 ring-white/15"}`} role="tablist" aria-label="الأدوار">
           <button type="button" role="tab" aria-selected={active === "all"} onClick={() => setActive("all")} className={active === "all" ? "rounded-lg bg-white px-3 py-1.5 font-semibold text-brand-900" : "rounded-lg px-3 py-1.5 text-white hover:bg-white/10"}>كل الأدوار</button>
           {floors.map((f, i) => (
             <button key={f.id ?? "none"} type="button" role="tab" aria-selected={active === i} onClick={() => setActive(i)} className={active === i ? "rounded-lg bg-white px-3 py-1.5 font-semibold text-brand-900" : "rounded-lg px-3 py-1.5 text-white hover:bg-white/10"}>{f.name}</button>
           ))}
         </div>
       )}
-      <button type="button" onClick={() => api.current?.reset()} className="absolute end-4 top-4 rounded-xl bg-white/10 px-3 py-1.5 text-xs text-white ring-1 ring-white/15 backdrop-blur transition hover:bg-white/20">↻ إعادة الجولة</button>
-      <p className="pointer-events-none absolute bottom-3 start-4 text-[11px] text-brand-100/80">اسحب للف · مرّر للتقريب · اضغط على مكتب لفتح بياناته</p>
+      <div className="absolute end-4 top-4 flex gap-1.5">
+        {(["switch", "reset"] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => (k === "reset" ? api.current?.reset() : switchTheme())}
+            aria-pressed={k === "switch" ? theme === "night" : undefined}
+            className={`rounded-xl px-3 py-1.5 text-xs ring-1 backdrop-blur transition ${theme === "day" ? "bg-white/75 text-[#5b4636] ring-black/5 hover:bg-white" : "bg-white/10 text-white ring-white/15 hover:bg-white/20"}`}
+            data-theme-toggle={k === "switch" ? "" : undefined}
+          >
+            {k === "reset" ? "↻ إعادة الجولة" : theme === "day" ? "☾ العرض الليلي" : "☀ العرض النهاري"}
+          </button>
+        ))}
+      </div>
+      <p className={`pointer-events-none absolute bottom-3 start-4 text-[11px] ${theme === "day" ? "text-[#8a7560]" : "text-brand-100/80"}`}>اسحب للف · مرّر للتقريب · اضغط على مكتب لفتح بياناته</p>
 
       {u && hover && (
         <div
