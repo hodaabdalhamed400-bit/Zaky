@@ -101,6 +101,13 @@ describe("مجسم الفرع ثلاثي الأبعاد ومخططه", () => {
     expect(first.units.some((u) => u.code === "101")).toBe(true);
     expect(s.floors.filter((f) => f.name.includes("اول") || f.name.includes("أول")).length).toBe(1);
     await prisma.floor.delete({ where: { id: created.id } }).catch(() => {});
+    // وحدة رقمها خارج المخطط: لا دور إضافي «الفرع»، وتُذكر في التنبيه
+    const type = await prisma.unitType.findUniqueOrThrow({ where: { key: "PRIVATE_OFFICE" } });
+    const odd = await prisma.unit.create({ data: { branchId: rwd.id, unitTypeId: type.id, code: `X-${Date.now() % 100000}`, basePrice: "1000", capacity: 1 } });
+    s = await getBranchScene(prisma, admin, rwd.id);
+    expect(s.floors.some((f) => f.name === "الفرع" || f.name === "بدون دور محدد")).toBe(false);
+    expect(s.unmatchedCodes).toContain(odd.code);
+    await prisma.unit.delete({ where: { id: odd.id } });
   });
 
   it("مخطط غرناطة جاهز وبلا تداخل", async () => {

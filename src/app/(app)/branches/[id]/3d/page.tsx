@@ -59,6 +59,12 @@ export default async function Branch3DPage({ params }: { params: Promise<{ id: s
                     </>
                   )
                   : "كل غرف المخطط مسجلة في النظام."}
+                {scene.unmatchedCodes.length > 0 && (
+                  <span className="mt-1 block">
+                    {`${scene.unmatchedCodes.length} وحدة مسجلة أرقامها غير موجودة في المخطط فلا تظهر في المجسم — عدّل رقمها في «المكاتب والوحدات» إلى رقمها في المخطط: `}
+                    <span className="tabular">{scene.unmatchedCodes.join("، ")}</span>
+                  </span>
+                )}
               </Alert>
             </div>
           )}

@@ -253,6 +253,13 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
   const groups: SceneFloor[] = [...floors, ...virtualFloors].sort((a, b) => a.level - b.level).map((f) => ({ id: f.id, name: f.name, level: f.level, units: [] }));
   const loose: SceneFloor = { id: null, name: floors.length ? "بدون دور محدد" : "الفرع", level: floors.length ? (floors.at(-1)!.level + 1) : 0, units: [] };
   for (const su of [...sceneUnits, ...ghosts]) (groups.find((g) => g.id === su.floorId) ?? loose).units.push(su);
+  // في المباني متعددة الأدوار بمخطط جاهز: لا يظهر دور إضافي باسم «الفرع» للوحدات التي لا تطابق أرقام المخطط ولم تُرسم —
+  // تُذكر في تنبيه الصفحة لتُعطى أرقام المخطط (أو دورها) فتأخذ مكانها
+  const unmatchedCodes: string[] = [];
+  if (virtualFloors.length || plan.some((p) => p.floor)) {
+    unmatchedCodes.push(...loose.units.filter((u) => u.kind === "unit" && !u.placed).map((u) => u.code));
+    loose.units = loose.units.filter((u) => u.placed);
+  }
   const all = [...groups, ...(loose.units.length ? [loose] : [])]
     .filter((g) => g.units.length > 0 || groups.length === 0)
     .map((g) => ({ ...g, units: autoLayout(g.units) }));
@@ -271,6 +278,7 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
     hasPlan: plan.length > 0,
     planUnits: usedPlan.size,
     unregisteredCodes: ghosts.filter((g) => g.kind === "plan").map((g) => g.code),
+    unmatchedCodes,
   };
 }
 

@@ -302,7 +302,8 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
         floorLabel.textContent = floor.name;
         const fl = new CSS2DObject(floorLabel);
         fl.position.set(-maxW / 2 - 1, 0.4, maxD / 2 + 1.6);
-        fg.add(fl);
+        // اسم الدور يظهر فقط في المباني متعددة الأدوار (لا داعي لعلامة «الفرع» في الدور الواحد)
+        if (floors.length > 1) fg.add(fl);
 
         // الممرات: الشرائح الأقل امتلاءً بالغرف
         const lanes: number[] = [];
