@@ -27,7 +27,7 @@ const ROOM_LIGHT: Record<SceneTone, [number, number] | null> = {
 };
 
 const iconFor = (u: SceneUnit): BadgeIcon =>
-  u.kind === "facility" ? "water" : u.kind === "plan" ? "plan" : u.typeKey === "MEETING_ROOM" ? "meeting" : u.typeKey === "SHARED_OFFICE" ? "people" : u.typeKey === "ADMIN_SPACE" ? "admin" : "desk";
+  u.kind === "facility" ? (u.typeKey === "COFFEE" ? "coffee" : "water") : u.kind === "plan" ? "plan" : u.typeKey === "MEETING_ROOM" ? "meeting" : u.typeKey === "SHARED_OFFICE" ? "people" : u.typeKey === "ADMIN_SPACE" ? "admin" : "desk";
 
 const OUTFITS: Outfit[] = ["thobe", "abaya", "thobe", "casual", "abaya", "thobe", "abaya", "casual"];
 
@@ -432,7 +432,43 @@ export function BranchScene({ floors, height = 620 }: { floors: SceneFloor[]; he
             g.add(p.root);
             seated.push(p);
           };
-          if (u.kind === "facility") {
+          if (u.kind === "facility" && u.typeKey === "COFFEE") {
+            // ركن القهوة: كاونتر بماكينة قهوة وأكواب، وطاولة صغيرة بكرسيين
+            const along = u.d >= u.w; // الكاونتر على الضلع الأطول
+            const len = Math.min(3, (along ? u.d : u.w) - 0.6);
+            const counter = box(along ? 0.6 : len, 0.9, along ? len : 0.6, mat.wood);
+            const top = box(along ? 0.66 : len + 0.06, 0.05, along ? len + 0.06 : 0.66, mat.pot);
+            const cx0 = along ? -u.w / 2 + 0.42 : 0;
+            const cz0 = along ? 0 : -u.d / 2 + 0.42;
+            counter.position.set(cx0, 0.45, cz0);
+            top.position.set(cx0, 0.925, cz0);
+            const machine = box(0.36, 0.42, 0.32, mat.dark);
+            machine.position.set(cx0 + (along ? 0 : -len / 3), 1.16, cz0 + (along ? -len / 3 : 0));
+            const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.24, 14), mat.pot);
+            kettle.position.set(cx0 + (along ? 0 : len / 6), 1.07, cz0 + (along ? len / 6 : 0));
+            g.add(counter, top, machine, kettle);
+            for (let i = 0; i < 3; i++) {
+              const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.035, 0.09, 10), mat.chair);
+              cup.position.set(cx0 + (along ? 0.1 : len / 4 + i * 0.13), 0.995, cz0 + (along ? len / 4 + i * 0.13 : 0.1));
+              g.add(cup);
+            }
+            const tbl = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.04, 24), mat.wood);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.72, 10), mat.dark);
+            const tx = along ? u.w / 2 - 0.75 : 0;
+            const tz = along ? 0.3 : u.d / 2 - 0.75;
+            tbl.position.set(tx, 0.74, tz);
+            leg.position.set(tx, 0.36, tz);
+            g.add(tbl, leg);
+            for (const sgn of [-1, 1]) {
+              const c = chair(mat.sage);
+              c.position.set(tx + (along ? 0 : sgn * 0.7), 0, tz + (along ? sgn * 0.7 : 0));
+              c.rotation.y = along ? (sgn < 0 ? Math.PI : 0) : (sgn < 0 ? -Math.PI / 2 : Math.PI / 2);
+              g.add(c);
+            }
+            const pl2 = plant();
+            pl2.position.set(u.w / 2 - 0.35, 0, -u.d / 2 + 0.35);
+            g.add(pl2);
+          } else if (u.kind === "facility") {
             const n = Math.max(2, Math.floor(u.w / 1.1));
             for (let i = 0; i < n; i++) {
               const sh = Math.min(1.8, WALL_H - 0.05);

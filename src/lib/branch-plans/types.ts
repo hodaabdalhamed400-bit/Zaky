@@ -8,5 +8,7 @@ export type PlanRoom = {
   d: number;
   capacity: number;
   label?: string;
+  /** نوع المرفق للمجسم: دورات مياه (الافتراضي) أو ركن قهوة */
+  facility?: "wc" | "coffee";
 };
 export type BranchPlan = PlanRoom[];

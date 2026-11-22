@@ -2,7 +2,7 @@
 type Three = typeof import("three");
 type Tex = InstanceType<Three["CanvasTexture"]>;
 
-export type BadgeIcon = "desk" | "people" | "meeting" | "admin" | "water" | "plan" | "hub";
+export type BadgeIcon = "desk" | "people" | "meeting" | "admin" | "water" | "coffee" | "plan" | "hub";
 
 function canvas(size: number) {
   const c = document.createElement("canvas");
@@ -104,6 +104,11 @@ export function createTextures(THREE: Three) {
         x.strokeRect(80, 104, 96, 64);
         x.strokeRect(108, 86, 40, 18);
         x.beginPath(); x.moveTo(80, 132); x.lineTo(176, 132); x.stroke();
+        break;
+      case "coffee": // فنجان وبخار
+        x.beginPath(); x.moveTo(84, 112); x.lineTo(156, 112); x.lineTo(148, 168); x.quadraticCurveTo(146, 176, 136, 176); x.lineTo(104, 176); x.quadraticCurveTo(94, 176, 92, 168); x.closePath(); x.stroke();
+        x.beginPath(); x.arc(162, 134, 14, -Math.PI / 2, Math.PI / 2); x.stroke();
+        for (const sx of [106, 126]) { x.beginPath(); x.moveTo(sx, 98); x.quadraticCurveTo(sx - 8, 88, sx, 78); x.stroke(); }
         break;
       case "water": // قطرة
         x.beginPath();

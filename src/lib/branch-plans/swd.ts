@@ -3,7 +3,7 @@ import type { BranchPlan } from "./types";
 /**
  * فرع السويدي — مستخرج من مخطط الفرع المعماري (صورة المخطط المرسلة من الإدارة).
  * المقياس ≈ 26 بكسل/متر، والمخطط مُدار 90° ليكون الطول أفقيًا. أرقام المكاتب مقترحة:
- * 101–105 الصف العلوي، 106–116 العمود الأيمن (من الأعلى)، 117–125 الصف السفلي (من اليمين)،
+ * 101–105 الصف العلوي، 106–115 العمود الأيمن (من الأعلى) وبجانبه ركن القهوة الملاصق لدورات المياه (ليس مكتبًا)، 117–125 الصف السفلي (من اليمين)،
  * 126–130 و131–135 صفا المكاتب 5م² في الوسط، 136 مكتب 10م².
  */
 export const SWD_PLAN: BranchPlan = [
@@ -22,7 +22,7 @@ export const SWD_PLAN: BranchPlan = [
   { code: "113", type: "PRIVATE_OFFICE", x: 19.81, y: 11.0, w: 2.23, d: 3.58, capacity: 1 },
   { code: "114", type: "PRIVATE_OFFICE", x: 17.62, y: 11.0, w: 2.19, d: 3.69, capacity: 1 },
   { code: "115", type: "PRIVATE_OFFICE", x: 15.0, y: 11.0, w: 2.62, d: 3.85, capacity: 1 },
-  { code: "116", type: "PRIVATE_OFFICE", x: 12.62, y: 11.0, w: 2.38, d: 4.0, capacity: 1 },
+  { code: "COFFEE", type: "FACILITY", facility: "coffee", x: 12.62, y: 11.0, w: 2.38, d: 4.0, capacity: 0, label: "ركن القهوة" },
   { code: "117", type: "PRIVATE_OFFICE", x: 0.08, y: 14.46, w: 2.81, d: 1.62, capacity: 1 },
   { code: "118", type: "PRIVATE_OFFICE", x: 0.08, y: 13.08, w: 2.81, d: 1.38, capacity: 1 },
   { code: "119", type: "PRIVATE_OFFICE", x: 0.08, y: 10.88, w: 2.81, d: 1.81, capacity: 1 },

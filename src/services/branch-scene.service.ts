@@ -193,8 +193,8 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
     .map((p) => ({
       id: `plan:${p.code}`,
       code: p.type === "FACILITY" ? (p.label ?? p.code) : p.code,
-      typeKey: p.type,
-      typeName: PLAN_TYPE_NAMES[p.type] ?? p.type,
+      typeKey: p.facility === "coffee" ? "COFFEE" : p.type,
+      typeName: p.facility === "coffee" ? "ركن القهوة" : (PLAN_TYPE_NAMES[p.type] ?? p.type),
       floorId: null,
       x: p.x,
       y: p.y,
