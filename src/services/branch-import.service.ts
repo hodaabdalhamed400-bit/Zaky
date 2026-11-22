@@ -247,12 +247,115 @@ async function readWorkbook(bytes: Uint8Array) {
     }
     return { name, rows };
   };
+  // الشيت المبسّط: سطر واحد لكل مكتب (المكتب + العميل + العقد + المدفوع)
+  const simple = read(SIMPLE_SHEET);
+  if (simple) {
+    const title = text(wb.worksheets.find((w) => normName(w.name) === normName(SIMPLE_SHEET))!.getRow(1).getCell(1).value) ?? "";
+    const branch = title.match(/^فرع (.+?) —/)?.[1]?.trim() ?? null;
+    return { ...fromSimple(simple, branch), simple: true };
+  }
   return {
     units: read(SHEETS.units),
     tenants: read(SHEETS.tenants),
     contracts: read(SHEETS.contracts),
     payments: read(SHEETS.payments),
+    simple: false,
   };
+}
+
+export const SIMPLE_SHEET = "المكاتب";
+
+/**
+ * يحوّل الشيت المبسّط إلى نفس الشيتات الأربعة التي يفهمها التحقق:
+ * - المكتب يتكرر في سطرين فقط في المكتب المشترك (عميل لكل سطر) — تُؤخذ بيانات المكتب من أول سطر.
+ * - العميل يتكرر لو عنده أكثر من مكتب — يُسجل مرة واحدة.
+ * - العقد = مكاتب نفس العميل بنفس تاريخ البداية والمدة وطريقة الدفع، والمدفوع مجموع سطورها.
+ */
+function fromSimple(sheet: Sheet, branch: string | null) {
+  type Row = Sheet["rows"][number];
+  const virt = (src: Row, map: [string, RegExp | ((r: Row) => Cell)][]): Row => ({
+    n: src.n,
+    branch,
+    get: (re) => {
+      const hit = map.find(([key]) => re.test(key));
+      if (!hit) return null;
+      return typeof hit[1] === "function" ? hit[1](src) : src.get(hit[1]);
+    },
+  });
+  const isMeeting = (r: Row) => normName(text(r.get(/^نوع المكتب/))).includes("قاعه");
+  const units: Row[] = [];
+  const tenants: Row[] = [];
+  const seenUnit = new Set<string>();
+  const seenTenant = new Set<string>();
+  const groups = new Map<string, { ref: string; rows: Row[] }>();
+  for (const r of sheet.rows) {
+    const code = text(r.get(/^رقم المكتب/));
+    if (!code || !seenUnit.has(code)) {
+      if (code) seenUnit.add(code);
+      units.push(
+        virt(r, [
+          ["رقم الوحده", /^رقم المكتب/],
+          ["نوع الوحده", /^نوع المكتب/],
+          ["الدور", /^الدور/],
+          ["السعه", /^عدد المقاعد/],
+          ["السعر الاساسي", /^الايجار الشهري/],
+          ["دوره التسعير", (x) => (isMeeting(x) ? "بالساعة" : "شهري")],
+          ["الحاله", /^حاله المكتب/],
+          ["ملاحظات", /^ملاحظات/],
+        ]),
+      );
+    }
+    const client = text(r.get(/^اسم العميل/));
+    if (!client) continue;
+    if (!seenTenant.has(normName(client))) {
+      seenTenant.add(normName(client));
+      tenants.push(
+        virt(r, [
+          ["اسم العميل", /^اسم العميل/],
+          ["نوع العميل", (x) => text(x.get(/^نوع العميل/)) ?? "منشأة"],
+          ["حاله العميل", () => "نشط"],
+          ["الجوال", /^جوال العميل/],
+          ["البريد", /^البريد/],
+          ["السجل التجاري", /^السجل التجاري/],
+          ["الرقم الضريبي", /^الرقم الضريبي/],
+        ]),
+      );
+    }
+    const key = [normName(client), ymd(r.get(/^تاريخ بدايه/)), text(r.get(/^مده العقد/)), normName(text(r.get(/^طريقه الدفع/)))].join("|");
+    let g = groups.get(key);
+    if (!g) {
+      let ref = `مكتب ${code ?? r.n}`;
+      for (let i = 2; [...groups.values()].some((x) => x.ref === ref); i++) ref = `مكتب ${code ?? r.n} (${i})`;
+      g = { ref, rows: [] };
+    }
+    g.rows.push(r);
+    groups.set(key, g);
+  }
+  const contracts: Row[] = [];
+  const payments: Row[] = [];
+  for (const g of groups.values()) {
+    for (const r of g.rows)
+      contracts.push(
+        virt(r, [
+          ["رقم مرجع العقد", () => g.ref],
+          ["اسم العميل", /^اسم العميل/],
+          ["رقم الوحده", /^رقم المكتب/],
+          ["الايجار الشهري", /^الايجار الشهري/],
+          ["تاريخ بدايه", /^تاريخ بدايه/],
+          ["مده العقد", /^مده العقد/],
+          ["دوره الدفع", /^طريقه الدفع/],
+          ["عدد المقاعد", /^المقاعد المؤجره/],
+        ]),
+      );
+    const paid = g.rows.map((r) => num(r.get(/^المدفوع/)));
+    if (paid.some((p) => p !== null)) {
+      const bad = paid.some((p) => p === "bad");
+      const total = paid.reduce<number>((a, p) => a + (typeof p === "number" ? p : 0), 0);
+      payments.push(virt(g.rows[0]!, [["رقم مرجع العقد", () => g.ref], ["اجمالي المسدد", () => (bad ? "؟" : total)]]));
+    }
+  }
+  const S = (rows: Row[]): Sheet => ({ name: SIMPLE_SHEET, rows });
+  return { units: S(units), tenants: S(tenants), contracts: S(contracts), payments: S(payments) };
 }
 
 // ───── التحليل والتحقق ─────
@@ -325,7 +428,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   const warn = (sheet: string, row: number | null, message: string) => issues.push({ sheet, row, level: "warning", message });
   const today = todayInRiyadh();
 
-  if (!book.units && !book.tenants && !book.contracts) throw new AppError("VALIDATION", "الملف لا يحتوي شيتات «الوحدات» و«العملاء» و«العقود». استخدم قالب بيانات الفرع.");
+  if (!book.units && !book.tenants && !book.contracts) throw new AppError("VALIDATION", "الملف لا يحتوي شيت «المكاتب» (القالب المبسّط) ولا شيتات «الوحدات» و«العملاء» و«العقود». حمّل القالب من صفحة الاستيراد.");
 
   // الفرع المكتوب في الملف يجب أن يطابق الفرع المختار — يمنع رفع ملف فرع على فرع آخر
   const branchNames = new Set([book.units, book.tenants, book.contracts].flatMap((s) => s?.rows.map((r) => r.branch).filter((b): b is string => !!b) ?? []).map(normName));
@@ -352,7 +455,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
 
   // ── الوحدات ──
   const units = new Map<string, UnitPlan>();
-  const S1 = SHEETS.units;
+  const S1 = book.simple ? SIMPLE_SHEET : SHEETS.units;
   const errCount = () => issues.reduce((n, i) => n + (i.level === "error" ? 1 : 0), 0);
   for (const r of book.units?.rows ?? []) {
     const before = errCount();
@@ -429,7 +532,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
 
   // ── العملاء ──
   const tenants = new Map<string, TenantPlan>();
-  const S2 = SHEETS.tenants;
+  const S2 = book.simple ? SIMPLE_SHEET : SHEETS.tenants;
   const seenCr = new Map<string, string>();
   const seenVat = new Map<string, string>();
   const seenKey = new Map<string, string>(); // الرقم ← مفتاح أول عميل
@@ -516,7 +619,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   };
 
   // ── العقود ──
-  const S3 = SHEETS.contracts;
+  const S3 = book.simple ? SIMPLE_SHEET : SHEETS.contracts;
   const groups = new Map<string, { rows: Sheet["rows"] }>();
   let auto = 0;
   for (const r of book.contracts?.rows ?? []) {
@@ -677,7 +780,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   }
 
   // ── السداد ──
-  const S4 = SHEETS.payments;
+  const S4 = book.simple ? SIMPLE_SHEET : SHEETS.payments;
   const paidRefs = new Set<string>();
   for (const r of book.payments?.rows ?? []) {
     const ref = text(r.get(/^رقم مرجع العقد/));
@@ -715,7 +818,7 @@ async function analyze(db: Db, actor: Actor, branchId: string, bytes: Uint8Array
   }
   for (const c of contracts)
     if (!paidRefs.has(c.ref) && !c.existing && c.installments.length)
-      warn(S3, c.rows[0]!, `${c.ref.startsWith("بدون مرجع") ? `السطر ${c.rows[0]}` : `العقد ${c.ref}`}: لا يوجد له سطر في شيت السداد — سيُعتبر غير مسدد`);
+      warn(S3, c.rows[0]!, `${c.ref.startsWith("بدون مرجع") ? `السطر ${c.rows[0]}` : `العقد ${c.ref}`}: ${book.simple ? "خانة «المدفوع حتى اليوم» فارغة" : "لا يوجد له سطر في شيت السداد"} — سيُعتبر غير مسدد`);
 
   // الأدوار الجديدة
   const floorNames = new Set(floors.map((f) => normName(f.name)));

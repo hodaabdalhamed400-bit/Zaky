@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requirePageActor } from "@/lib/auth/server";
 import { hasBranchAccess } from "@/lib/rbac/guard";
 import { IMPORT_PERMISSIONS } from "@/services/branch-import.service";
-import { Alert, Card, LinkButton, PageHeader } from "@/components/ui/primitives";
+import { Alert, Card, LinkButton, PageHeader, buttonClass } from "@/components/ui/primitives";
 import { ImportForm } from "./import-form";
 import { importAction } from "./actions";
 
@@ -21,8 +21,15 @@ export default async function ImportPage({ params }: { params: Promise<{ id: str
     <>
       <PageHeader
         title={`استيراد بيانات ${branch.nameAr}`}
-        description="ارفع شيت «بيانات الفرع» بعد تعبئته: يُراجع النظام كل سطر ويعرض لك ما سيُضاف والأخطاء قبل أي حفظ."
-        actions={<LinkButton href={`/branches/${id}`} variant="secondary" icon="arrowLeft">بيانات الفرع</LinkButton>}
+        description="نزّل الشيت المبسّط (سطر لكل مكتب) وابعته لموظفي الفرع، ثم ارفعه هنا بعد تعبئته: يُراجع النظام كل سطر ويعرض ما سيُضاف والأخطاء قبل أي حفظ. الشيت القديم (4 شيتات) مقبول أيضًا."
+        actions={
+          <>
+            <a href={`/api/branches/${id}/import-template`} className={buttonClass("primary")} data-template-download>
+              تنزيل الشيت المبسّط
+            </a>
+            <LinkButton href={`/branches/${id}`} variant="secondary" icon="arrowLeft">بيانات الفرع</LinkButton>
+          </>
+        }
       />
       {missing.length ? (
         <Alert kind="warning">الاستيراد يسجل وحدات وعملاء وعقودًا ودفعات معتمدة، لذلك يحتاج صلاحيات الإدارة كاملة (مدير النظام أو المدير العام).</Alert>

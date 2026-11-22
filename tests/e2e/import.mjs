@@ -54,6 +54,9 @@ try {
   await page.click("a:has-text('استيراد من Excel')");
   await page.waitForURL(/\/import$/);
   check("صفحة الاستيراد تفتح من صفحة الفرع", await page.isVisible("[data-import-form]"));
+  const tpl = await page.request.get(await page.getAttribute("[data-template-download]", "href").then((h) => BASE + h));
+  const body = await tpl.body();
+  check("تنزيل الشيت المبسّط", tpl.status() === 200 && body.subarray(0, 2).toString() === "PK" && /xlsx/.test(tpl.headers()["content-disposition"] ?? ""));
 
   const start = new Date(Date.now() - 20 * 86400000);
   const bad = `${OUT}/import-bad.xlsx`;

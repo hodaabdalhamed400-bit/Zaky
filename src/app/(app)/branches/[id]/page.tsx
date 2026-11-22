@@ -10,7 +10,7 @@ import { BRANCH_STATUS_COLOR as STATUS_COLOR, BRANCH_STATUS_LABELS, getBranch } 
 import { UNIT_STATUS_LABELS } from "@/services/units.service";
 import { getDashboardStats } from "@/services/dashboard.service";
 import { IMPORT_PERMISSIONS } from "@/services/branch-import.service";
-import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader } from "@/components/ui/primitives";
+import { Alert, Badge, Card, CardHeader, LinkButton, PageHeader, buttonClass } from "@/components/ui/primitives";
 import { StatCard } from "@/components/ui/stat-card";
 import { OccupancyBreakdown } from "@/components/ui/occupancy";
 import { DeleteFloorForm, FloorForm } from "../branch-form";
@@ -43,6 +43,9 @@ export default async function BranchPage({ params, searchParams }: { params: Pro
             <LinkButton href={`/branches/${branch.id}/3d`} icon="cube">المجسم 3D</LinkButton>
             <LinkButton href={`/units?branchId=${branch.id}`} variant="secondary" icon="units">وحدات الفرع</LinkButton>
             {canImport && <LinkButton href={`/branches/${branch.id}/import`} variant="secondary" icon="receipt">استيراد من Excel</LinkButton>}
+            {!canImport && actor.permissions.has("units.manage") && (
+              <a href={`/api/branches/${branch.id}/import-template`} className={buttonClass("secondary")}>شيت بيانات الفرع</a>
+            )}
             {canEdit && <LinkButton href={`/branches/${branch.id}/edit`}>تعديل</LinkButton>}
           </>
         }

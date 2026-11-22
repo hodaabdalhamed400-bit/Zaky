@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prisma, makeActor } from "./helpers";
 import { commitBranchImport, normName, previewBranchImport } from "@/services/branch-import.service";
 import { addDays, todayInRiyadh } from "@/lib/dates";
+import { buildSimpleTemplate } from "@/lib/import-template";
 
 const TODAY = todayInRiyadh();
 const START = addDays(TODAY, -40);
@@ -295,6 +296,33 @@ describe("استيراد بيانات الفرع من Excel", () => {
     const { branch, actor } = await setup();
     const bytes = await book({ units: [["فرع غريب", "1", "مكتب خاص", null, null, 2, 1000, "شهري", "متاحة"]] });
     await expect(commitBranchImport(prisma, actor, branch.id, bytes, {}, { partial: true })).rejects.toThrow(/الملف خاص بفرع/);
+  });
+
+  it("الشيت المبسّط: سطر لكل مكتب يُحوَّل لوحدات وعملاء وعقود ومدفوعات", async () => {
+    const { branch, actor } = await setup();
+    const d = new Date(`${START}T00:00:00Z`);
+    const bytes = new Uint8Array(
+      await buildSimpleTemplate(branch.nameAr, [
+        { code: "1", type: "مكتب خاص", floor: "الأول", capacity: 2, price: 1725, status: "مؤجرة", client: "شركة النخبة", mobile: "0551110001", start: d, months: 12, cycle: "ربع سنوي", paid: 5175 },
+        { code: "2", type: "مكتب خاص", floor: "الأول", capacity: 2, price: 1725, status: "مؤجرة", client: "شركه النخبة", mobile: "0551110001", start: d, months: 12, cycle: "ربع سنوي", paid: 5175 },
+        { code: "3", type: "مكتب خاص", capacity: 1, price: 1500, status: "متاحة" },
+        { code: "4", type: "مكتب خاص", capacity: 1, price: 1500, status: "مؤجرة", client: "مرام", clientType: "فرد", mobile: "0552220002", start: d, months: 6, cycle: "شهري" },
+        { code: "5", type: "مكتب خاص", capacity: 1, price: 1500, status: "مؤجرة", client: "بلا تاريخ", mobile: "0553330003" },
+      ]),
+    );
+    const p = await previewBranchImport(prisma, actor, branch.id, bytes);
+    expect(p.units.map((u) => u.code)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(p.tenants.map((t) => t.name)).toEqual(["شركة النخبة", "مرام", "بلا تاريخ"]);
+    const big = p.contracts.find((c) => c.units.length === 2)!;
+    expect(big).toMatchObject({ ref: "مكتب 1", total: "41400.00", paid: "10350.00", action: "create" });
+    expect(p.issues.some((i) => i.level === "error" && i.sheet === "المكاتب" && i.message.includes("تاريخ بداية العقد فارغ"))).toBe(true);
+    expect(p.issues.some((i) => i.message.includes("المدفوع حتى اليوم"))).toBe(true);
+    expect(p.ready).toEqual({ units: 5, tenants: 2, contracts: 2 });
+    const r = await commitBranchImport(prisma, actor, branch.id, bytes, {}, { partial: true });
+    expect(r).toMatchObject({ units: 5, tenants: 2, contracts: 2, payments: 1, failed: [] });
+    // ملف فرع آخر مرفوض حتى في الشيت المبسّط
+    const other = new Uint8Array(await buildSimpleTemplate("فرع غريب", [{ code: "9", type: "مكتب خاص", capacity: 1, price: 1, status: "متاحة" }]));
+    expect((await previewBranchImport(prisma, actor, branch.id, other)).blocking).toBe(1);
   });
 
   it("يتطلب صلاحيات الإدارة الكاملة", async () => {
