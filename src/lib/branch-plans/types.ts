@@ -10,5 +10,7 @@ export type PlanRoom = {
   label?: string;
   /** نوع المرفق للمجسم: دورات مياه (الافتراضي) أو ركن قهوة */
   facility?: "wc" | "coffee";
+  /** اسم الدور في المباني متعددة الأدوار (الأرضي، الأول…) — يُطابَق مع أدوار الفرع المسجلة بالاسم */
+  floor?: string;
 };
 export type BranchPlan = PlanRoom[];

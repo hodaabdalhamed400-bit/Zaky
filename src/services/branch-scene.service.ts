@@ -99,6 +99,18 @@ function nowHourRiyadh() {
   return Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Asia/Riyadh" }).format(new Date()));
 }
 
+/** رقم الدور من اسمه (الأرضي=0، الأول=1…، القبو=-1) لمطابقة أدوار المخطط مع أدوار الفرع */
+export function floorKey(name: string): number | null {
+  const n = name.replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").trim().toLowerCase();
+  if (/قبو|بدروم|basement/.test(n)) return -1;
+  if (/ارضي|ground|^g$/.test(n)) return 0;
+  if (/اول|first|^1$/.test(n)) return 1;
+  if (/ثاني|second|^2$/.test(n)) return 2;
+  if (/ثالث|third|^3$/.test(n)) return 3;
+  if (/رابع|fourth|^4$/.test(n)) return 4;
+  return null;
+}
+
 export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
   requirePermission(actor, "units.view");
   assertBranchAccess(actor, branchId);
@@ -132,6 +144,20 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
   // المخطط الجاهز للفرع (إن وُجد): يحدد أماكن الوحدات غير المرسومة، ويعرض الغرف غير المسجلة بعد
   const plan = BRANCH_PLANS[branch.code] ?? [];
   const usedPlan = new Set<string>();
+  // المخططات متعددة الأدوار: كل غرفة في دورها. يُطابَق الدور مع أدوار الفرع المسجلة (الأرضي/الأول…)،
+  // وإن لم يكن مسجلًا يُعرض دور من المخطط نفسه حتى تُضاف الأدوار في النظام
+  const planFloorIds = new Map<string, string>();
+  const virtualFloors: { id: string; name: string; level: number }[] = [];
+  [...new Set(plan.map((p) => p.floor).filter((x): x is string => !!x))].forEach((name, i) => {
+    const key = floorKey(name);
+    const match = floors.find((f) => (key !== null && floorKey(f.name) === key) || f.name.trim() === name.trim());
+    if (match) planFloorIds.set(name, match.id);
+    else {
+      const id = `plan-floor:${name}`;
+      virtualFloors.push({ id, name, level: key ?? 100 + i });
+      planFloorIds.set(name, id);
+    }
+  });
   const todayMs = T.getTime();
 
   const sceneUnits: SceneUnit[] = units.map((u) => {
@@ -165,7 +191,7 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
       code: u.code,
       typeKey: u.unitType.key,
       typeName: u.unitType.nameAr,
-      floorId: u.floorId,
+      floorId: u.floorId ?? (fromPlan?.floor ? (planFloorIds.get(fromPlan.floor) ?? null) : null),
       x: saved ? Number(u.layoutX) : (fromPlan?.x ?? 0),
       y: saved ? Number(u.layoutY) : (fromPlan?.y ?? 0),
       w: size.w,
@@ -195,7 +221,7 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
       code: p.type === "FACILITY" ? (p.label ?? p.code) : p.code,
       typeKey: p.facility === "coffee" ? "COFFEE" : p.type,
       typeName: p.facility === "coffee" ? "ركن القهوة" : (PLAN_TYPE_NAMES[p.type] ?? p.type),
-      floorId: null,
+      floorId: p.floor ? (planFloorIds.get(p.floor) ?? null) : null,
       x: p.x,
       y: p.y,
       w: p.w,
@@ -221,10 +247,10 @@ export async function getBranchScene(db: Db, actor: Actor, branchId: string) {
     for (const su of sceneUnits) if (usedPlan.has(su.code)) tally.set(su.floorId, (tally.get(su.floorId) ?? 0) + 1);
     return [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   })();
-  for (const g of ghosts) g.floorId = planFloorId;
+  for (const g of ghosts) if (!g.floorId) g.floorId = planFloorId;
 
   // الطوابق: المعرّفة + «بدون دور» للوحدات غير المرتبطة بدور
-  const groups: SceneFloor[] = floors.map((f) => ({ id: f.id, name: f.name, level: f.level, units: [] }));
+  const groups: SceneFloor[] = [...floors, ...virtualFloors].sort((a, b) => a.level - b.level).map((f) => ({ id: f.id, name: f.name, level: f.level, units: [] }));
   const loose: SceneFloor = { id: null, name: floors.length ? "بدون دور محدد" : "الفرع", level: floors.length ? (floors.at(-1)!.level + 1) : 0, units: [] };
   for (const su of [...sceneUnits, ...ghosts]) (groups.find((g) => g.id === su.floorId) ?? loose).units.push(su);
   const all = [...groups, ...(loose.units.length ? [loose] : [])]

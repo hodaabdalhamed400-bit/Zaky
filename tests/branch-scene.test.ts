@@ -84,6 +84,34 @@ describe("مجسم الفرع ثلاثي الأبعاد ومخططه", () => {
     await prisma.unit.deleteMany({ where: { branchId: swd.id, code } });
   });
 
+  it("مخطط متعدد الأدوار (الروضة): كل غرفة في دورها، ويُطابَق الدور المسجل بالاسم", async () => {
+    const { admin } = await setup();
+    const rwd = await prisma.branch.findUniqueOrThrow({ where: { code: "RWD" } });
+    const { BRANCH_PLANS } = await import("@/lib/branch-plans");
+    const plan = BRANCH_PLANS.RWD!;
+    let s = await getBranchScene(prisma, admin, rwd.id);
+    const names = s.floors.map((f) => f.name);
+    for (const n of ["الأرضي", "الأول", "الثاني", "الثالث"]) expect(names.some((x) => x.includes(n.slice(2)))).toBe(true);
+    const second = s.floors.find((f) => f.name.includes("ثاني"))!;
+    expect(second.units.filter((u) => u.kind === "plan").length).toBe(plan.filter((p) => p.floor === "الثاني" && p.type !== "FACILITY" && !s.floors.some((f) => f.units.some((u) => u.kind === "unit" && u.code === p.code))).length);
+    // دور مسجل باسم مختلف الكتابة («الدور الأول») يأخذ غرف «الأول»
+    const created = await prisma.floor.upsert({ where: { branchId_name: { branchId: rwd.id, name: "الدور الأول" } }, create: { branchId: rwd.id, name: "الدور الأول", level: 1 }, update: {} });
+    s = await getBranchScene(prisma, admin, rwd.id);
+    const first = s.floors.find((f) => f.id === created.id)!;
+    expect(first.units.some((u) => u.code === "101")).toBe(true);
+    expect(s.floors.filter((f) => f.name.includes("اول") || f.name.includes("أول")).length).toBe(1);
+    await prisma.floor.delete({ where: { id: created.id } }).catch(() => {});
+  });
+
+  it("مخطط غرناطة جاهز وبلا تداخل", async () => {
+    const { BRANCH_PLANS } = await import("@/lib/branch-plans");
+    const p = BRANCH_PLANS.GRN!;
+    expect(p.filter((r) => r.type === "PRIVATE_OFFICE")).toHaveLength(46);
+    for (const a of p)
+      for (const b of p)
+        if (a !== b) expect(a.x < b.x + b.w - 0.05 && b.x < a.x + a.w - 0.05 && a.y < b.y + b.d - 0.05 && b.y < a.y + a.d - 0.05).toBe(false);
+  });
+
   it("الصلاحيات: العرض لمن يرى الفرع، والتعديل لمن يدير الوحدات", async () => {
     const { branch, units } = await setup();
     const { actor: viewer } = await makeActor("READ_ONLY", { branchCodes: [branch.code] });

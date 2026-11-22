@@ -1,0 +1,60 @@
+import type { BranchPlan } from "./types";
+
+/**
+ * فرع غرناطة — مستخرج من مخطط الفرع (PDF المرسل من الإدارة)، والمقاسات بالسنتيمتر المكتوبة على المخطط.
+ * أرقام المكاتب مقترحة: 101–111 الصف العلوي (من اليسار)، 112–115 العمود الأيمن (من الأعلى)،
+ * 116–120 الصف الأوسط و121–125 الصف السفلي (من اليمين)، 126–130 العمود الأيسر (من الأسفل)،
+ * 131 المكتب بجوار الدرج، 132–146 مكاتب الجزيرة الوسطى (2.3م)، ومساحتا العمل المشتركة بينها.
+ * الصالة الكبيرة يسار المخطط والمصاعد والدرج غير مشمولة (ليست وحدات تأجير).
+ */
+export const GRN_PLAN: BranchPlan = [
+  { code: "101", type: "PRIVATE_OFFICE", x: 15.85, y: 0.09, w: 3.81, d: 2.8, capacity: 1 },
+  { code: "102", type: "PRIVATE_OFFICE", x: 19.66, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "103", type: "PRIVATE_OFFICE", x: 22.16, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "104", type: "PRIVATE_OFFICE", x: 24.66, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "105", type: "PRIVATE_OFFICE", x: 27.16, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "106", type: "PRIVATE_OFFICE", x: 29.66, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "107", type: "PRIVATE_OFFICE", x: 32.16, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "108", type: "PRIVATE_OFFICE", x: 34.66, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "109", type: "PRIVATE_OFFICE", x: 37.16, y: 0.09, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "110", type: "PRIVATE_OFFICE", x: 39.66, y: 0.09, w: 3.06, d: 2.8, capacity: 1 },
+  { code: "111", type: "PRIVATE_OFFICE", x: 42.93, y: 0.09, w: 2.8, d: 4.2, capacity: 1 },
+  { code: "112", type: "PRIVATE_OFFICE", x: 42.93, y: 4.36, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "113", type: "PRIVATE_OFFICE", x: 42.93, y: 6.89, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "114", type: "PRIVATE_OFFICE", x: 42.93, y: 9.42, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "115", type: "PRIVATE_OFFICE", x: 42.93, y: 11.95, w: 2.8, d: 4.4, capacity: 1 },
+  { code: "116", type: "PRIVATE_OFFICE", x: 39.88, y: 13.41, w: 3.06, d: 2.8, capacity: 1 },
+  { code: "117", type: "PRIVATE_OFFICE", x: 37.38, y: 13.41, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "118", type: "PRIVATE_OFFICE", x: 34.88, y: 13.41, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "119", type: "PRIVATE_OFFICE", x: 32.38, y: 13.41, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "120", type: "PRIVATE_OFFICE", x: 29.88, y: 13.41, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "121", type: "PRIVATE_OFFICE", x: 36.01, y: 20.61, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "122", type: "PRIVATE_OFFICE", x: 33.51, y: 20.61, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "123", type: "PRIVATE_OFFICE", x: 31.01, y: 20.61, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "124", type: "PRIVATE_OFFICE", x: 28.51, y: 20.61, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "125", type: "PRIVATE_OFFICE", x: 26.01, y: 20.61, w: 2.5, d: 2.8, capacity: 1 },
+  { code: "126", type: "PRIVATE_OFFICE", x: 15.85, y: 13.49, w: 2.8, d: 2.77, capacity: 1 },
+  { code: "127", type: "PRIVATE_OFFICE", x: 15.85, y: 10.99, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "128", type: "PRIVATE_OFFICE", x: 15.85, y: 8.49, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "129", type: "PRIVATE_OFFICE", x: 15.85, y: 5.99, w: 2.8, d: 2.5, capacity: 1 },
+  { code: "130", type: "PRIVATE_OFFICE", x: 15.85, y: 2.93, w: 2.8, d: 3.06, capacity: 1 },
+  { code: "131", type: "PRIVATE_OFFICE", x: 19.97, y: 8.54, w: 2.3, d: 3.45, capacity: 1 },
+  { code: "132", type: "PRIVATE_OFFICE", x: 22.47, y: 5.03, w: 2.3, d: 2.26, capacity: 1 },
+  { code: "133", type: "PRIVATE_OFFICE", x: 22.47, y: 7.29, w: 2.3, d: 2.22, capacity: 1 },
+  { code: "134", type: "PRIVATE_OFFICE", x: 22.47, y: 9.51, w: 2.3, d: 2.29, capacity: 1 },
+  { code: "135", type: "PRIVATE_OFFICE", x: 28.35, y: 5.03, w: 2.3, d: 2.26, capacity: 1 },
+  { code: "136", type: "PRIVATE_OFFICE", x: 28.35, y: 7.29, w: 2.3, d: 2.22, capacity: 1 },
+  { code: "137", type: "PRIVATE_OFFICE", x: 28.35, y: 9.51, w: 2.3, d: 2.29, capacity: 1 },
+  { code: "138", type: "PRIVATE_OFFICE", x: 30.79, y: 5.03, w: 2.3, d: 2.26, capacity: 1 },
+  { code: "139", type: "PRIVATE_OFFICE", x: 30.79, y: 7.29, w: 2.3, d: 2.22, capacity: 1 },
+  { code: "140", type: "PRIVATE_OFFICE", x: 30.79, y: 9.51, w: 2.3, d: 2.29, capacity: 1 },
+  { code: "141", type: "PRIVATE_OFFICE", x: 36.55, y: 5.03, w: 2.3, d: 2.26, capacity: 1 },
+  { code: "142", type: "PRIVATE_OFFICE", x: 36.55, y: 7.29, w: 2.3, d: 2.22, capacity: 1 },
+  { code: "143", type: "PRIVATE_OFFICE", x: 36.55, y: 9.51, w: 2.3, d: 2.29, capacity: 1 },
+  { code: "144", type: "PRIVATE_OFFICE", x: 38.99, y: 5.03, w: 2.3, d: 2.26, capacity: 1 },
+  { code: "145", type: "PRIVATE_OFFICE", x: 38.99, y: 7.29, w: 2.3, d: 2.22, capacity: 1 },
+  { code: "146", type: "PRIVATE_OFFICE", x: 38.99, y: 9.51, w: 2.3, d: 2.29, capacity: 1 },
+  { code: "مشترك 1", type: "SHARED_OFFICE", x: 24.85, y: 5.03, w: 3.45, d: 6.8, capacity: 14 },
+  { code: "مشترك 2", type: "SHARED_OFFICE", x: 33.14, y: 5.03, w: 3.35, d: 6.8, capacity: 14 },
+  { code: "COFFEE", type: "FACILITY", facility: "coffee", x: 0.15, y: 16.71, w: 3.11, d: 5.12, capacity: 0, label: "ركن القهوة" },
+];
