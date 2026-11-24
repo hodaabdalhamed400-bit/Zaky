@@ -40,6 +40,9 @@ const schema = z.object({
   SMTP_PASS: optional(z.string().min(1)),
   // يُتحقق من صيغته عند الإرسال فقط (mail.ts) — صيغة خاطئة تعطّل الإيميل ولا توقف النظام
   MAIL_FROM: optional(z.string().min(3)),
+  // النسخة الاحتياطية الأسبوعية بالإيميل: كلمة سر التشفير (12 حرفًا على الأقل) والمستلمون (مفصولون بفواصل)
+  BACKUP_PASSPHRASE: optional(z.string().min(12)),
+  BACKUP_EMAIL: optional(z.string().min(5)),
 });
 
 let cached: z.infer<typeof schema> | null = null;

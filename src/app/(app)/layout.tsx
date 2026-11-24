@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!actor) redirect("/login");
 
   // القائمة تعرض فقط ما يملك المستخدم صلاحيته (والتحقق الحقيقي يتم في كل صفحة/إجراء)
-  const sections = NAV.map((s) => ({ ...s, items: s.items.filter((i) => actor.permissions.has(i.perm)) })).filter(
+  const sections = NAV.map((s) => ({ ...s, items: s.items.filter((i) => actor.permissions.has(i.perm) && (!i.superAdmin || actor.roleKey === "SUPER_ADMIN")) })).filter(
     (s) => s.items.length > 0,
   );
 

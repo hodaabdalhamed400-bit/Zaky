@@ -10,7 +10,8 @@ import { env } from "@/lib/env";
  * - الاتصال غير المشفر مسموح فقط مع localhost (للاختبار).
  * بدون إعداد SMTP_* تُرجع false ولا ترمي خطأ.
  */
-export type MailMessage = { to: string; subject: string; html: string; text: string };
+export type MailAttachment = { filename: string; content: Buffer; contentType?: string };
+export type MailMessage = { to: string; subject: string; html: string; text: string; attachments?: MailAttachment[] };
 
 export function mailConfigured(): boolean {
   const e = env();
@@ -35,6 +36,48 @@ function b64Lines(v: string) {
 export function buildMime(from: string, m: MailMessage, now = new Date()): string {
   const boundary = "zaki_" + randomBytes(12).toString("hex");
   const domain = from.split("@")[1] ?? "localhost";
+  const alt = [
+    "Content-Type: multipart/alternative; boundary=\"" + boundary + "\"",
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64Lines(m.text),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64Lines(m.html),
+    `--${boundary}--`,
+  ];
+  if (m.attachments?.length) {
+    // مرفقات: multipart/mixed يحتوي النص ثم الملفات
+    const mixed = "zakimix_" + randomBytes(12).toString("hex");
+    const safeName = (n: string) => n.replace(/[^\w.\-]+/g, "_").slice(0, 100) || "file";
+    return [
+      `From: ${encodeHeader("ZAKI Smart ERP")} <${from}>`,
+      `To: <${m.to}>`,
+      `Subject: ${encodeHeader(m.subject)}`,
+      `Date: ${now.toUTCString()}`,
+      `Message-ID: <${randomBytes(16).toString("hex")}@${domain}>`,
+      "MIME-Version: 1.0",
+      `Content-Type: multipart/mixed; boundary="${mixed}"`,
+      "",
+      `--${mixed}`,
+      ...alt,
+      ...m.attachments.flatMap((a) => [
+        `--${mixed}`,
+        `Content-Type: ${a.contentType ?? "application/octet-stream"}; name="${safeName(a.filename)}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-Disposition: attachment; filename="${safeName(a.filename)}"`,
+        "",
+        a.content.toString("base64").replace(/.{1,76}/g, "$&\r\n"),
+      ]),
+      `--${mixed}--`,
+      "",
+    ].join("\r\n");
+  }
   return [
     `From: ${encodeHeader("ZAKI Smart ERP")} <${from}>`,
     `To: <${m.to}>`,

@@ -8,6 +8,8 @@ export type NavItem = {
   perm: PermissionKey;
   /** إن وُجد: القسم غير مفعّل بعد ويظهر معطلًا مع رقم المرحلة */
   phase?: number;
+  /** لمسؤول النظام فقط (مثل النسخ الاحتياطي) */
+  superAdmin?: boolean;
 };
 
 export const NAV: { title?: string; items: NavItem[] }[] = [
@@ -41,6 +43,7 @@ export const NAV: { title?: string; items: NavItem[] }[] = [
       { href: "/users", label: "المستخدمون", icon: "users", perm: "users.view" },
       { href: "/roles", label: "الأدوار والصلاحيات", icon: "shield", perm: "roles.view" },
       { href: "/audit", label: "سجل التدقيق", icon: "audit", perm: "audit.view" },
+      { href: "/backup", label: "النسخ الاحتياطي", icon: "shield", perm: "audit.view", superAdmin: true },
     ],
   },
 ];
