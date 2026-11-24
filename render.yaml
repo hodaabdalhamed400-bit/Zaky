@@ -18,6 +18,8 @@ services:
         value: "8"
       - key: DATA_DIR
         value: /var/data
+      - key: CANONICAL_HOST
+        value: meet.smartcompany.sa
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: ANTHROPIC_API_KEY

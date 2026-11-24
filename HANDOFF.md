@@ -18,7 +18,7 @@
 |---|---|
 | المستودع على GitHub | `hodaabdalhamed400-bit/Zaky` |
 | الفرع اللي فيه كل الشغل | `claude/new-project-tnsui6` (مش متدمج في `main`) |
-| الموقع الشغّال | https://smart-meet-zwtk.onrender.com |
+| الموقع الشغّال | https://meet.smartcompany.sa (روابط smart-meet-zwtk.onrender.com بتتحوّل له تلقائيًا — `CANONICAL_HOST`) |
 | الدومين المطلوب (لسه ما اتربطش) | https://meet.startupsmart.net |
 | الاستضافة | Render، خدمة اسمها `smart-meet`، خطة Starter (حوالي 7$ شهريًا)، منطقة Frankfurt، بتنشر لوحدها مع كل push على الفرع |
 | موقع الشركة | startupsmart.net (WordPress على cPanel، والـ DNS على **Cloudflare**) |

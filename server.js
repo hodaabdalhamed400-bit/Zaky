@@ -123,6 +123,16 @@ const clean = (v, max) => String(v ?? '').replace(/[\u0000-\u001f]/g, ' ').trim(
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1); // Render بيحط الـ IP الحقيقي في X-Forwarded-For
+// عنوان واحد للموقع: أي حد يفتح رابط onrender.com يتحوّل لدومين الشركة
+// (علشان الـ VIP وتسجيل الدخول يتحفظوا مرة واحدة). لإيقافه: CANONICAL_HOST=off
+const CANONICAL_HOST = (process.env.CANONICAL_HOST ?? 'meet.smartcompany.sa').trim().toLowerCase();
+app.use((req, res, next) => {
+  if (!CANONICAL_HOST || CANONICAL_HOST === 'off') return next();
+  if (!/\.onrender\.com$/i.test(req.hostname || '')) return next();
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.path === '/healthz' || req.path.startsWith('/api/') || req.path.startsWith('/socket.io')) return next();
+  res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+});
 app.use(express.json({ limit: '8kb' }));
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
